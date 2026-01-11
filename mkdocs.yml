@@ -1,0 +1,53 @@
+site_name: Reusable Environmental Control Platform
+site_description: ESP32 + FreeRTOS based reusable thermostat, incubator and cooler platform
+site_author: Prabhagaran
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - content.code.copy
+  palette:
+    scheme: default
+    primary: deep purple
+    accent: deep purple
+
+nav:
+  - Home: index.md
+
+  - Overview:
+      - Vision & Purpose: overview/vision.md
+      - Design Philosophy: overview/design_philosophy.md
+      - System Architecture: overview/system_architecture.md
+
+  - Hardware:
+      - Hardware Overview: hardware/hardware_overview.md
+      - Pinout: hardware/pinout.md
+      - Sensors: hardware/sensors.md
+      - Actuators: hardware/actuators.md
+
+  - Software:
+      - Software Overview: software/software_overview.md
+      - RTOS Architecture: software/rtos_architecture.md
+      - FSM Design: software/fsm_design.md
+      - Profiles: software/profiles.md
+
+  - User Interface:
+      - UI Overview: ui/ui_overview.md
+      - Nokia Style UI: ui/nokia_ui.md
+      - Encoder Mapping: ui/encoder_mapping.md
+
+  - Safety & Logging:
+      - Alarms: safety/alarms.md
+      - Logging: safety/logging.md
+
+  - Development:
+      - Development Flow: development/development_flow.md
+      - MVP Definition: development/mvp_definition.md
+      - Roadmap: development/roadmap.md
+
+  - Appendix:
+      - Glossary: appendix/glossary.md
+      - Future Expansion: appendix/future_expansion.md
