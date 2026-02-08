@@ -3,6 +3,7 @@
 #include <ezButton.h>
 #include "RTClib.h"
 #include "oled_ui.h"
+#include <DHT.h>
 
 /* ================= PINS ================= */
 #define BTN_UP 32
@@ -11,6 +12,11 @@
 
 #define I2C_SDA 21
 #define I2C_SCL 22
+
+#define DHT_PIN 4
+#define DHT_TYPE DHT11
+
+DHT dht(DHT_PIN, DHT_TYPE);
 
 /* ================= UI EVENTS ================= */
 enum UiEvent {
@@ -36,10 +42,26 @@ enum UiState {
   UI_DAY,
   UI_SETTINGS
 };
+/* ================= SHARED RTC DATA ================= */
+typedef struct {
+  float temperature;
+  float humidity;
+} SensorData_t;
+
+SensorData_t gSensorData;
+SemaphoreHandle_t sensorMutex;
+
+/* ================= SHARED RTC DATA ================= */
+typedef struct {
+  DateTime now;
+  uint32_t epoch;
+} RtcTime_t;
+
+RtcTime_t gRtcTime;
+SemaphoreHandle_t rtcMutex;
 
 /* ================= GLOBALS ================= */
 QueueHandle_t uiEventQueue;
-
 RTC_DS1307 rtc;
 
 /* ================= BUTTON OBJECTS ================= */
@@ -52,6 +74,79 @@ UiState uiState = UI_HOME;
 int menuIndex = 0;
 int lastMenuIndex = -1;
 int lastMinute = -1;
+
+String googleScriptURL =
+  "https://script.google.com/macros/s/AKfycbw9pKv0ojIoN3bpq8qJGAdbnDf4E-kDDfy8Y36-KIDzUr3MVwG8Mlta-2ozrXsegSOBcQ/exec";
+
+void task_cloud(void* pvParameters) {
+  WiFiManager wm;
+
+  bool res = wm.autoConnect("INCUBATOR_SETUP");
+  if (!res) {
+    vTaskDelete(NULL);
+  }
+
+  for (;;) {
+    float t, h;
+
+    if (xSemaphoreTake(sensorMutex, portMAX_DELAY)) {
+      t = gSensorData.temperature;
+      h = gSensorData.humidity;
+      xSemaphoreGive(sensorMutex);
+    }
+
+    if (WiFi.status() == WL_CONNECTED) {
+      WiFiClientSecure client;
+      client.setInsecure();
+
+      HTTPClient http;
+
+      String url = googleScriptURL + "?temp=" + String(t, 1) + "&hum=" + String(h, 0);
+
+      http.begin(client, url);
+      http.GET();
+      http.end();
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(60000));
+  }
+}
+
+
+void task_sensor(void* pvParameters) {
+  dht.begin();
+
+  for (;;) {
+    float t = dht.readTemperature();
+    float h = dht.readHumidity();
+
+    if (!isnan(t) && !isnan(h)) {
+      if (xSemaphoreTake(sensorMutex, portMAX_DELAY)) {
+        gSensorData.temperature = t;
+        gSensorData.humidity = h;
+        xSemaphoreGive(sensorMutex);
+      }
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(2000));
+  }
+}
+
+
+/* ================= TASK: RTC ================= */
+void task_rtc(void* pvParameters) {
+  for (;;) {
+    DateTime now = rtc.now();
+
+    if (xSemaphoreTake(rtcMutex, portMAX_DELAY)) {
+      gRtcTime.now = now;
+      gRtcTime.epoch = now.unixtime();
+      xSemaphoreGive(rtcMutex);
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(1000));
+  }
+}
 
 /* ================= TASK: BUTTONS ================= */
 void task_buttons(void* pvParameters) {
@@ -91,19 +186,33 @@ void task_ui(void* pvParameters) {
 
   for (;;) {
 
-    /* ----- HOME PAGE AUTO UPDATE ----- */
+    /* ----- HOME PAGE UPDATE ----- */
+    /* ----- HOME PAGE UPDATE ----- */
     if (uiState == UI_HOME) {
-      DateTime now = rtc.now();
+
+      DateTime now;
+      float temp = 0.0;
+      float hum = 0.0;
+
+      if (xSemaphoreTake(rtcMutex, portMAX_DELAY)) {
+        now = gRtcTime.now;
+        xSemaphoreGive(rtcMutex);
+      }
+
+      if (xSemaphoreTake(sensorMutex, portMAX_DELAY)) {
+        temp = gSensorData.temperature;
+        hum = gSensorData.humidity;
+        xSemaphoreGive(sensorMutex);
+      }
 
       if (now.minute() != lastMinute) {
         lastMinute = now.minute();
 
         oled_show_home(
           now,
-          3,     // dummy day
-          37.5,  // dummy temp
-          55.0   // dummy hum
-        );
+          3,  // incubation day (to be replaced)
+          temp,
+          hum);
       }
     }
 
@@ -116,6 +225,7 @@ void task_ui(void* pvParameters) {
           uiState = UI_MENU;
           menuIndex = 0;
           lastMenuIndex = -1;
+
           oled_show_menu(menuIndex);
           lastMenuIndex = menuIndex;
         }
@@ -181,27 +291,17 @@ void setup() {
       ;
   }
 
+  rtcMutex = xSemaphoreCreateMutex();
   uiEventQueue = xQueueCreate(10, sizeof(UiEvent));
+  sensorMutex = xSemaphoreCreateMutex();
 
-  xTaskCreatePinnedToCore(
-    task_buttons,
-    "Buttons",
-    2048,
-    NULL,
-    2,
-    NULL,
-    1);
-
-  xTaskCreatePinnedToCore(
-    task_ui,
-    "UI",
-    4096,
-    NULL,
-    1,
-    NULL,
-    1);
+  xTaskCreatePinnedToCore(task_rtc, "RTC", 2048, NULL, 3, NULL, 1);
+  xTaskCreatePinnedToCore(task_buttons, "Buttons", 2048, NULL, 2, NULL, 1);
+  xTaskCreatePinnedToCore(task_ui, "UI", 4096, NULL, 1, NULL, 1);
+  xTaskCreatePinnedToCore(task_sensor, "Sensor", 2048, NULL, 2, NULL, 1);
+  xTaskCreatePinnedToCore(task_cloud, "Cloud", 4096, NULL, 1, NULL, 1);
 }
 
 void loop() {
-  /* Empty – RTOS runs everything */
+  /* RTOS only */
 }
