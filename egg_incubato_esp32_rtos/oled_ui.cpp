@@ -103,12 +103,14 @@ void oled_show_home(
 
 
 void oled_show_menu(int selected) {
-  static const char* menuItems[] = {
-    "Time & Date",
-    "Incubation Day",
-    "Settings",
-    "Exit"
-  };
+static const char* menuItems[] = {
+  "Controller Mode",
+  "Set Environment",
+  "Settings",
+  "Exit"
+};
+
+
 
   display.clearDisplay();
   display.setTextSize(1);
@@ -123,6 +125,98 @@ void oled_show_menu(int selected) {
     display.print(i == selected ? "> " : "  ");
     display.println(menuItems[i]);
   }
+
+  display.display();
+}
+
+void oled_show_controller_mode(int selected) {
+  static const char* items[] = {
+    "Egg Incubator",
+    "Climate Chamber",
+    "Thermostat",
+    "Common Controller",
+    "Back"
+  };
+
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+
+  display.setCursor(0, 0);
+  display.println("CONTROLLER MODE");
+  display.drawLine(0, 15, 127, 15, SSD1306_WHITE);
+
+  for (int i = 0; i < 5; i++) {
+    display.setCursor(0, 20 + i * 9);
+    display.print(i == selected ? "> " : "  ");
+    display.println(items[i]);
+  }
+
+  display.display();
+}
+
+void oled_show_set_environment(int selected) {
+static const char* items[] = {
+  "Temperature",
+  "Hysteresis",
+  "Humidity",
+  "Incubation Day",
+  "Turning",
+  "Back"
+};
+
+
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+
+  display.setCursor(0, 0);
+  display.println("SET ENVIRONMENT");
+  display.drawLine(0, 15, 127, 15, SSD1306_WHITE);
+
+  for (int i = 0; i < 5; i++) {
+    display.setCursor(0, 20 + i * 9);
+    display.print(i == selected ? "> " : "  ");
+    display.println(items[i]);
+  }
+
+  display.display();
+}
+
+void oled_show_temperature(float current, float setpoint) {
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+
+  display.setCursor(0, 0);
+  display.println("TEMPERATURE");
+  display.drawLine(0, 15, 127, 15, SSD1306_WHITE);
+
+  display.setCursor(0, 24);
+  display.print("Current : ");
+  display.print(current, 1);
+  display.print(" C");
+
+  display.setCursor(0, 36);
+  display.print("Setpoint: ");
+  display.print(setpoint, 1);
+  display.print(" C");
+
+  display.display();
+}
+void oled_show_hysteresis(float hysteresis) {
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+
+  display.setCursor(0, 0);
+  display.println("HYSTERESIS");
+  display.drawLine(0, 15, 127, 15, SSD1306_WHITE);
+
+  display.setCursor(0, 30);
+  display.print("Band : +-");
+  display.print(hysteresis, 1);
+  display.print(" C");
 
   display.display();
 }
