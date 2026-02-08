@@ -5,6 +5,11 @@
 #include "oled_ui.h"
 #include <DHT.h>
 
+#include <WiFi.h>
+#include <WiFiManager.h>
+#include <HTTPClient.h>
+#include <WiFiClientSecure.h>
+
 /* ================= PINS ================= */
 #define BTN_UP 32
 #define BTN_DOWN 33
@@ -42,7 +47,8 @@ enum UiState {
   UI_DAY,
   UI_SETTINGS
 };
-/* ================= SHARED RTC DATA ================= */
+
+/* ================= SENSOR DATA ================= */
 typedef struct {
   float temperature;
   float humidity;
@@ -51,7 +57,7 @@ typedef struct {
 SensorData_t gSensorData;
 SemaphoreHandle_t sensorMutex;
 
-/* ================= SHARED RTC DATA ================= */
+/* ================= RTC DATA ================= */
 typedef struct {
   DateTime now;
   uint32_t epoch;
@@ -64,27 +70,34 @@ SemaphoreHandle_t rtcMutex;
 QueueHandle_t uiEventQueue;
 RTC_DS1307 rtc;
 
-/* ================= BUTTON OBJECTS ================= */
 ezButton btnUp(BTN_UP);
 ezButton btnDown(BTN_DOWN);
 ezButton btnOk(BTN_OK);
 
-/* ================= UI STATE ================= */
 UiState uiState = UI_HOME;
 int menuIndex = 0;
 int lastMenuIndex = -1;
 int lastMinute = -1;
+unsigned long lastSensorUiUpdate = 0;
 
 String googleScriptURL =
-  "https://script.google.com/macros/s/AKfycbw9pKv0ojIoN3bpq8qJGAdbnDf4E-kDDfy8Y36-KIDzUr3MVwG8Mlta-2ozrXsegSOBcQ/exec";
+  "https://script.google.com/macros/s/AKfycbzwaA2LvXgwjS5uKyzoz7kOgmiPWyOK5AIbWJ_js8-MqJfCbuuzWJ-_5fo4K0R49e8k-g/exec";
 
+/* ================= TASK: CLOUD ================= */
 void task_cloud(void* pvParameters) {
   WiFiManager wm;
 
+  Serial.println("[CLOUD] Starting WiFiManager");
+
   bool res = wm.autoConnect("INCUBATOR_SETUP");
   if (!res) {
+    Serial.println("[CLOUD] WiFi FAILED");
     vTaskDelete(NULL);
   }
+
+  Serial.println("[CLOUD] WiFi CONNECTED");
+  Serial.print("[CLOUD] IP: ");
+  Serial.println(WiFi.localIP());
 
   for (;;) {
     float t, h;
@@ -100,11 +113,16 @@ void task_cloud(void* pvParameters) {
       client.setInsecure();
 
       HTTPClient http;
-
-      String url = googleScriptURL + "?temp=" + String(t, 1) + "&hum=" + String(h, 0);
+      String url = googleScriptURL + "?temp=" + String(t, 1) + "&hum=" + String((int)h);
 
       http.begin(client, url);
-      http.GET();
+      int httpCode = http.GET();
+
+      Serial.print("[CLOUD] URL: ");
+      Serial.println(url);
+      Serial.print("[CLOUD] HTTP code: ");
+      Serial.println(httpCode);
+
       http.end();
     }
 
@@ -112,26 +130,38 @@ void task_cloud(void* pvParameters) {
   }
 }
 
-
+/* ================= TASK: SENSOR ================= */
 void task_sensor(void* pvParameters) {
   dht.begin();
+
+  float lastTemp = 0.0;
+  float lastHum = 0.0;
 
   for (;;) {
     float t = dht.readTemperature();
     float h = dht.readHumidity();
 
-    if (!isnan(t) && !isnan(h)) {
-      if (xSemaphoreTake(sensorMutex, portMAX_DELAY)) {
-        gSensorData.temperature = t;
-        gSensorData.humidity = h;
-        xSemaphoreGive(sensorMutex);
-      }
+    Serial.print("[DHT] T=");
+    Serial.print(t);
+    Serial.print(" H=");
+    Serial.println(h);
+
+
+    if (isnan(t)) t = lastTemp;
+    if (isnan(h)) h = lastHum;
+
+    lastTemp = t;
+    lastHum = h;
+
+    if (xSemaphoreTake(sensorMutex, portMAX_DELAY)) {
+      gSensorData.temperature = t;
+      gSensorData.humidity = h;
+      xSemaphoreGive(sensorMutex);
     }
 
     vTaskDelay(pdMS_TO_TICKS(2000));
   }
 }
-
 
 /* ================= TASK: RTC ================= */
 void task_rtc(void* pvParameters) {
@@ -186,8 +216,6 @@ void task_ui(void* pvParameters) {
 
   for (;;) {
 
-    /* ----- HOME PAGE UPDATE ----- */
-    /* ----- HOME PAGE UPDATE ----- */
     if (uiState == UI_HOME) {
 
       DateTime now;
@@ -205,44 +233,40 @@ void task_ui(void* pvParameters) {
         xSemaphoreGive(sensorMutex);
       }
 
+      bool redraw = false;
+
       if (now.minute() != lastMinute) {
         lastMinute = now.minute();
+        redraw = true;
+      }
 
-        oled_show_home(
-          now,
-          3,  // incubation day (to be replaced)
-          temp,
-          hum);
+      if (millis() - lastSensorUiUpdate > 3000) {
+        lastSensorUiUpdate = millis();
+        redraw = true;
+      }
+
+      if (redraw) {
+        oled_show_home(now, 3, temp, hum);
       }
     }
 
-    /* ----- HANDLE UI EVENTS ----- */
     UiEvent evt;
     if (xQueueReceive(uiEventQueue, &evt, pdMS_TO_TICKS(50))) {
 
-      if (uiState == UI_HOME) {
-        if (evt == UI_EVT_OK) {
-          uiState = UI_MENU;
-          menuIndex = 0;
-          lastMenuIndex = -1;
-
-          oled_show_menu(menuIndex);
-          lastMenuIndex = menuIndex;
-        }
+      if (uiState == UI_HOME && evt == UI_EVT_OK) {
+        uiState = UI_MENU;
+        menuIndex = 0;
+        lastMenuIndex = -1;
+        oled_show_menu(menuIndex);
+        lastMenuIndex = menuIndex;
       }
 
       else if (uiState == UI_MENU) {
 
         if (evt == UI_EVT_UP) {
-          menuIndex--;
-          if (menuIndex < 0)
-            menuIndex = MENU_COUNT - 1;
-        }
-
-        else if (evt == UI_EVT_DOWN) {
-          menuIndex++;
-          if (menuIndex >= MENU_COUNT)
-            menuIndex = 0;
+          menuIndex = (menuIndex - 1 + MENU_COUNT) % MENU_COUNT;
+        } else if (evt == UI_EVT_DOWN) {
+          menuIndex = (menuIndex + 1) % MENU_COUNT;
         }
 
         if (menuIndex != lastMenuIndex) {
@@ -251,25 +275,10 @@ void task_ui(void* pvParameters) {
         }
 
         if (evt == UI_EVT_OK) {
-
-          if (menuIndex == MENU_TIME) {
-            uiState = UI_TIME;
-          } else if (menuIndex == MENU_DAY) {
-            uiState = UI_DAY;
-          } else if (menuIndex == MENU_SETTINGS) {
-            uiState = UI_SETTINGS;
-          } else if (menuIndex == MENU_EXIT) {
+          if (menuIndex == MENU_EXIT) {
             uiState = UI_HOME;
             lastMinute = -1;
           }
-        }
-      }
-
-      else if (uiState == UI_TIME || uiState == UI_DAY || uiState == UI_SETTINGS) {
-
-        if (evt == UI_EVT_OK) {
-          uiState = UI_MENU;
-          lastMenuIndex = -1;
         }
       }
     }
@@ -292,14 +301,20 @@ void setup() {
   }
 
   rtcMutex = xSemaphoreCreateMutex();
-  uiEventQueue = xQueueCreate(10, sizeof(UiEvent));
   sensorMutex = xSemaphoreCreateMutex();
+  uiEventQueue = xQueueCreate(10, sizeof(UiEvent));
+
+  if (xSemaphoreTake(sensorMutex, portMAX_DELAY)) {
+    gSensorData.temperature = 0.0;
+    gSensorData.humidity = 0.0;
+    xSemaphoreGive(sensorMutex);
+  }
 
   xTaskCreatePinnedToCore(task_rtc, "RTC", 2048, NULL, 3, NULL, 1);
   xTaskCreatePinnedToCore(task_buttons, "Buttons", 2048, NULL, 2, NULL, 1);
   xTaskCreatePinnedToCore(task_ui, "UI", 4096, NULL, 1, NULL, 1);
   xTaskCreatePinnedToCore(task_sensor, "Sensor", 2048, NULL, 2, NULL, 1);
-  xTaskCreatePinnedToCore(task_cloud, "Cloud", 4096, NULL, 1, NULL, 1);
+  xTaskCreatePinnedToCore(task_cloud, "Cloud", 10240, NULL, 1, NULL, 1);
 }
 
 void loop() {
