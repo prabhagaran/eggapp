@@ -27,6 +27,15 @@
 
 #define DS18B20_PIN 18
 
+/* ================= RELAY PINS ================= */
+
+#define RELAY_HEATER 26
+#define RELAY_COOLER 27
+
+#define RELAY_ON LOW
+#define RELAY_OFF HIGH
+
+
 OneWire oneWire(DS18B20_PIN);
 DallasTemperature ds18b20(&oneWire);
 
@@ -70,11 +79,13 @@ enum EnvironmentItem {
 enum SettingsItem {
   SET_TIME_DATE = 0,
   SET_WIFI,
+  SET_HEATER_CONTROL,
   SET_DEVICE_INFO,
   SET_FACTORY_RESET,
   SET_BACK,
   SET_COUNT
 };
+
 
 
 /* ================= UI STATES ================= */
@@ -88,10 +99,13 @@ enum UiState {
 
   UI_ENV_TEMPERATURE,
   UI_ENV_HYSTERESIS,
+  UI_SETTINGS_HEATER_CONTROL,
   UI_ENV_HUMIDITY,
   UI_ENV_DAY,
   UI_ENV_TURNING
 };
+
+
 
 
 /* ================= SENSOR DATA ================= */
@@ -129,15 +143,30 @@ int settingsMenuIndex = 0;
 int lastMenuIndex = -1;
 int lastMinute = -1;
 unsigned long lastSensorUiUpdate = 0;
+
 unsigned long lastTempUiRefresh = 0;
 float tempSetpoint = 37.5;   // Target temperature
 float tempHysteresis = 0.3;  // +/- hysteresis band
+
 bool heaterOn = false;
+bool coolerOn = false;
+bool heaterEditMode = false;
+
+// Heater control mode
+
+enum ControlMode {
+  MODE_AUTO = 0,
+  MODE_MANUAL
+};
+
+ControlMode heaterMode = MODE_AUTO;
+bool heaterManualOn = false;
+
 
 
 
 String googleScriptURL =
-  "https://script.google.com/macros/s/AKfycbzwaA2LvXgwjS5uKyzoz7kOgmiPWyOK5AIbWJ_js8-MqJfCbuuzWJ-_5fo4K0R49e8k-g/exec";
+  "https://script.google.com/macros/s/AKfycbzDZYSqP8gbKBfHBH2iKy2FaxckK5Js72oxQVCFOwp4YrHTfiHbEfGDAY0stKV3tIqNmQ/exec";
 
 /* ================= TASK: CLOUD ================= */
 void task_cloud(void* pvParameters) {
@@ -195,21 +224,45 @@ void task_temperature_control(void* pvParameters) {
       currentTemp = gSensorData.temp_ds18b20;
       xSemaphoreGive(sensorMutex);
     }
-
-    // Hysteresis control
-    if (!heaterOn && currentTemp <= (tempSetpoint - tempHysteresis)) {
-      heaterOn = true;
-      Serial.println("[CTRL] Heater ON");
-    } else if (heaterOn && currentTemp >= (tempSetpoint + tempHysteresis)) {
-      heaterOn = false;
-      Serial.println("[CTRL] Heater OFF");
+    // ================= MANUAL MODE =================
+    if (heaterMode == MODE_MANUAL) {
+      // In MANUAL mode, UI owns the relays
+      vTaskDelay(pdMS_TO_TICKS(200));
+      continue;
     }
 
-    // Later: digitalWrite(HEATER_PIN, heaterOn);
 
-    vTaskDelay(pdMS_TO_TICKS(500));  // control loop
+    // ================= AUTO MODE =================
+    // ---- HEATER CONTROL (with hysteresis) ----
+    if (!heaterOn && currentTemp <= (tempSetpoint - tempHysteresis)) {
+      heaterOn = true;
+      digitalWrite(RELAY_HEATER, RELAY_ON);
+      digitalWrite(RELAY_COOLER, RELAY_OFF);  // safety
+      Serial.println("[RELAY] HEATER ON");
+    } else if (heaterOn && currentTemp >= (tempSetpoint + tempHysteresis)) {
+      heaterOn = false;
+      digitalWrite(RELAY_HEATER, RELAY_OFF);
+      Serial.println("[RELAY] HEATER OFF");
+    }
+
+    // ---- COOLING SAFETY CONTROL ----
+    float tempHighLimit = 39.0;  // safety limit
+
+    if (currentTemp >= tempHighLimit) {
+      coolerOn = true;
+      digitalWrite(RELAY_COOLER, RELAY_ON);
+      digitalWrite(RELAY_HEATER, RELAY_OFF);
+      heaterOn = false;
+      Serial.println("[RELAY] COOLER ON (SAFETY)");
+    } else {
+      coolerOn = false;
+      digitalWrite(RELAY_COOLER, RELAY_OFF);
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(500));
   }
 }
+
 
 
 /* ================= TASK: SENSOR ================= */
@@ -395,6 +448,12 @@ void task_ui(void* pvParameters) {
           } else if (mainMenuIndex == MENU_EXIT) {
             uiState = UI_HOME;
             lastMinute = -1;
+          } else if (mainMenuIndex == MENU_SETTINGS) {
+            uiState = UI_SETTINGS_MENU;
+            settingsMenuIndex = 0;
+            lastMenuIndex = -1;
+            oled_show_settings_menu(settingsMenuIndex);
+            lastMenuIndex = settingsMenuIndex;
           }
         }
       } else if (uiState == UI_CONTROLLER_MODE_MENU) {
@@ -458,6 +517,33 @@ void task_ui(void* pvParameters) {
           }
           // Temperature / Humidity / Day handled next
         }
+      } else if (uiState == UI_SETTINGS_MENU) {
+
+        if (evt == UI_EVT_UP) {
+          settingsMenuIndex = (settingsMenuIndex - 1 + SET_COUNT) % SET_COUNT;
+        } else if (evt == UI_EVT_DOWN) {
+          settingsMenuIndex = (settingsMenuIndex + 1) % SET_COUNT;
+        }
+
+        if (settingsMenuIndex != lastMenuIndex) {
+          oled_show_settings_menu(settingsMenuIndex);
+          lastMenuIndex = settingsMenuIndex;
+        }
+
+        if (evt == UI_EVT_OK) {
+
+          if (settingsMenuIndex == SET_HEATER_CONTROL) {
+            uiState = UI_SETTINGS_HEATER_CONTROL;
+            oled_show_heater_control(heaterMode == MODE_AUTO);
+          }
+
+          else if (settingsMenuIndex == SET_BACK) {
+            uiState = UI_MAIN_MENU;
+            lastMenuIndex = -1;
+            oled_show_menu(mainMenuIndex);
+            lastMenuIndex = mainMenuIndex;
+          }
+        }
       } else if (uiState == UI_ENV_TEMPERATURE) {
 
         bool redraw = false;
@@ -517,6 +603,51 @@ void task_ui(void* pvParameters) {
           oled_show_set_environment(environmentMenuIndex);
           lastMenuIndex = environmentMenuIndex;
         }
+      } else if (uiState == UI_SETTINGS_HEATER_CONTROL) {
+
+        // -------- NOT IN EDIT MODE --------
+        if (!heaterEditMode) {
+
+          if (evt == UI_EVT_OK) {
+            heaterEditMode = true;  // enter edit mode
+          }
+
+          else if (evt == UI_EVT_DOWN) {
+            uiState = UI_SETTINGS_MENU;
+            lastMenuIndex = -1;
+            oled_show_settings_menu(settingsMenuIndex);
+            lastMenuIndex = settingsMenuIndex;
+            continue;
+          }
+        }
+
+        // -------- EDIT MODE --------
+        else {
+
+          if (evt == UI_EVT_UP || evt == UI_EVT_DOWN) {
+
+            // Toggle between AUTO <-> MANUAL
+            if (heaterMode == MODE_AUTO) {
+              heaterMode = MODE_MANUAL;
+            }
+            // Toggle heater ON/OFF in MANUAL
+            else {
+              heaterManualOn = !heaterManualOn;
+            }
+          }
+
+          else if (evt == UI_EVT_OK) {
+            // SAVE & APPLY
+            heaterEditMode = false;
+
+            if (heaterMode == MODE_MANUAL) {
+              digitalWrite(RELAY_HEATER,
+                           heaterManualOn ? RELAY_ON : RELAY_OFF);
+            }
+          }
+        }
+
+        oled_show_heater_control(heaterMode == MODE_AUTO);
       }
     }
   }
@@ -529,6 +660,14 @@ void setup() {
   pinMode(BTN_UP, INPUT_PULLUP);
   pinMode(BTN_DOWN, INPUT_PULLUP);
   pinMode(BTN_OK, INPUT_PULLUP);
+
+  pinMode(RELAY_HEATER, OUTPUT);
+  pinMode(RELAY_COOLER, OUTPUT);
+
+  // Safety: OFF at boot
+  digitalWrite(RELAY_HEATER, RELAY_OFF);
+  digitalWrite(RELAY_COOLER, RELAY_OFF);
+
 
   Wire.begin(I2C_SDA, I2C_SCL);
 

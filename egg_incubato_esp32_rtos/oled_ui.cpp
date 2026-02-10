@@ -220,3 +220,52 @@ void oled_show_hysteresis(float hysteresis) {
 
   display.display();
 }
+void oled_show_settings_menu(int selected) {
+  static const char* items[] = {
+    "Time & Date",
+    "WiFi",
+    "Heater Control",
+    "Device Info",
+    "Factory Reset",
+    "Back"
+  };
+
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+
+  display.setCursor(0, 0);
+  display.println("SETTINGS");
+  display.drawLine(0, 15, 127, 15, SSD1306_WHITE);
+
+  for (int i = 0; i < 6; i++) {
+    display.setCursor(0, 20 + i * 8);
+    display.print(i == selected ? "> " : "  ");
+    display.println(items[i]);
+  }
+
+  display.display();
+}
+void oled_show_heater_control(bool isAutoMode) {
+
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+
+  display.setCursor(0, 0);
+  display.println("HEATER CONTROL");
+  display.drawLine(0, 15, 127, 15, SSD1306_WHITE);
+
+  display.setCursor(0, 26);
+  display.print("Mode : ");
+  display.println(isAutoMode ? "AUTO" : "MANUAL");
+
+  display.setCursor(0, 44);
+  display.println("OK : Toggle Mode");
+
+  display.setCursor(0, 56);
+  display.println("DOWN : Back");
+
+  display.display();
+}
+
