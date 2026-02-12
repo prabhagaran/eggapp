@@ -12,7 +12,7 @@ void oled_show_temperature(float current, float setpoint);
 void oled_show_hysteresis(float hysteresis);
 void oled_show_settings_menu(int selected);
 void oled_show_heater_control(bool isAutoMode);
-
-
+void oled_show_mode_menu(int selected);
+void oled_show_manual_control(int selected, bool heaterOn, bool coolerOn);
 
 #endif

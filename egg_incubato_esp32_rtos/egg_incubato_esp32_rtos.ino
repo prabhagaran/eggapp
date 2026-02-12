@@ -79,33 +79,38 @@ enum EnvironmentItem {
 enum SettingsItem {
   SET_TIME_DATE = 0,
   SET_WIFI,
-  SET_HEATER_CONTROL,
+  SET_MODE,
   SET_DEVICE_INFO,
   SET_FACTORY_RESET,
   SET_BACK,
   SET_COUNT
 };
 
-
-
 /* ================= UI STATES ================= */
 enum UiState {
   UI_HOME,
-
   UI_MAIN_MENU,
   UI_CONTROLLER_MODE_MENU,
   UI_SET_ENV_MENU,
   UI_SETTINGS_MENU,
-
   UI_ENV_TEMPERATURE,
   UI_ENV_HYSTERESIS,
   UI_SETTINGS_HEATER_CONTROL,
   UI_ENV_HUMIDITY,
   UI_ENV_DAY,
-  UI_ENV_TURNING
+  UI_ENV_TURNING,
+  UI_MODE_MENU,
+  UI_MANUAL_CONTROL_MENU
+};
+UiState uiState = UI_HOME;
+// Heater control mode
+
+enum ControlMode {
+  MODE_AUTO = 0,
+  MODE_MANUAL
 };
 
-
+ControlMode heaterMode = MODE_AUTO;
 
 
 /* ================= SENSOR DATA ================= */
@@ -135,13 +140,15 @@ ezButton btnUp(BTN_UP);
 ezButton btnDown(BTN_DOWN);
 ezButton btnOk(BTN_OK);
 
-UiState uiState = UI_HOME;
 int mainMenuIndex = 0;
 int controllerModeIndex = 0;
 int environmentMenuIndex = 0;
 int settingsMenuIndex = 0;
 int lastMenuIndex = -1;
 int lastMinute = -1;
+int modeMenuIndex = 0;
+int manualControlIndex = 0;
+
 unsigned long lastSensorUiUpdate = 0;
 
 unsigned long lastTempUiRefresh = 0;
@@ -150,18 +157,10 @@ float tempHysteresis = 0.3;  // +/- hysteresis band
 
 bool heaterOn = false;
 bool coolerOn = false;
+
 bool heaterEditMode = false;
-
-// Heater control mode
-
-enum ControlMode {
-  MODE_AUTO = 0,
-  MODE_MANUAL
-};
-
-ControlMode heaterMode = MODE_AUTO;
+bool coolerManualOn = false;
 bool heaterManualOn = false;
-
 
 
 
@@ -218,42 +217,79 @@ void task_cloud(void* pvParameters) {
 void task_temperature_control(void* pvParameters) {
 
   for (;;) {
+
     float currentTemp = 0.0;
 
     if (xSemaphoreTake(sensorMutex, portMAX_DELAY)) {
       currentTemp = gSensorData.temp_ds18b20;
       xSemaphoreGive(sensorMutex);
     }
-    // ================= MANUAL MODE =================
+
+    /* ================= SENSOR SAFETY ================= */
+
+    if (currentTemp <= 0.0 || currentTemp > 100.0) {
+      heaterOn = false;
+      coolerOn = false;
+
+      digitalWrite(RELAY_HEATER, RELAY_OFF);
+      digitalWrite(RELAY_COOLER, RELAY_OFF);
+
+      Serial.println("[SAFETY] Sensor invalid - All outputs OFF");
+      vTaskDelay(pdMS_TO_TICKS(500));
+      continue;
+    }
+
+    /* ================= MANUAL MODE ================= */
+
     if (heaterMode == MODE_MANUAL) {
-      // In MANUAL mode, UI owns the relays
+
+      heaterOn = heaterManualOn;
+      coolerOn = coolerManualOn;
+
+      digitalWrite(RELAY_HEATER,
+                   heaterManualOn ? RELAY_ON : RELAY_OFF);
+
+      digitalWrite(RELAY_COOLER,
+                   coolerManualOn ? RELAY_ON : RELAY_OFF);
+
       vTaskDelay(pdMS_TO_TICKS(200));
       continue;
     }
 
 
-    // ================= AUTO MODE =================
-    // ---- HEATER CONTROL (with hysteresis) ----
+    /* ================= AUTO MODE ================= */
+
+    float tempHighLimit = tempSetpoint + 1.5;
+
+    // ---- HEATER CONTROL (Hysteresis) ----
     if (!heaterOn && currentTemp <= (tempSetpoint - tempHysteresis)) {
+
       heaterOn = true;
+      coolerOn = false;
+
       digitalWrite(RELAY_HEATER, RELAY_ON);
-      digitalWrite(RELAY_COOLER, RELAY_OFF);  // safety
+      digitalWrite(RELAY_COOLER, RELAY_OFF);
+
       Serial.println("[RELAY] HEATER ON");
     } else if (heaterOn && currentTemp >= (tempSetpoint + tempHysteresis)) {
+
       heaterOn = false;
+
       digitalWrite(RELAY_HEATER, RELAY_OFF);
+
       Serial.println("[RELAY] HEATER OFF");
     }
 
-    // ---- COOLING SAFETY CONTROL ----
-    float tempHighLimit = 39.0;  // safety limit
-
+    // ---- COOLING SAFETY ----
     if (currentTemp >= tempHighLimit) {
+
       coolerOn = true;
+      heaterOn = false;
+
       digitalWrite(RELAY_COOLER, RELAY_ON);
       digitalWrite(RELAY_HEATER, RELAY_OFF);
-      heaterOn = false;
-      Serial.println("[RELAY] COOLER ON (SAFETY)");
+
+      Serial.println("[RELAY] COOLER ON (HIGH TEMP)");
     } else {
       coolerOn = false;
       digitalWrite(RELAY_COOLER, RELAY_OFF);
@@ -262,6 +298,7 @@ void task_temperature_control(void* pvParameters) {
     vTaskDelay(pdMS_TO_TICKS(500));
   }
 }
+
 
 
 
@@ -532,9 +569,15 @@ void task_ui(void* pvParameters) {
 
         if (evt == UI_EVT_OK) {
 
-          if (settingsMenuIndex == SET_HEATER_CONTROL) {
-            uiState = UI_SETTINGS_HEATER_CONTROL;
-            oled_show_heater_control(heaterMode == MODE_AUTO);
+          // Mode submenu
+          if (settingsMenuIndex == SET_MODE) {
+
+            uiState = UI_MODE_MENU;
+            modeMenuIndex = 0;
+            lastMenuIndex = -1;
+
+            oled_show_mode_menu(modeMenuIndex);
+            lastMenuIndex = modeMenuIndex;
           }
 
           else if (settingsMenuIndex == SET_BACK) {
@@ -603,51 +646,94 @@ void task_ui(void* pvParameters) {
           oled_show_set_environment(environmentMenuIndex);
           lastMenuIndex = environmentMenuIndex;
         }
-      } else if (uiState == UI_SETTINGS_HEATER_CONTROL) {
+      } else if (uiState == UI_MODE_MENU) {
 
-        // -------- NOT IN EDIT MODE --------
-        if (!heaterEditMode) {
+        if (evt == UI_EVT_UP) {
+          modeMenuIndex = (modeMenuIndex - 1 + 3) % 3;
+        } else if (evt == UI_EVT_DOWN) {
+          modeMenuIndex = (modeMenuIndex + 1) % 3;
+        }
 
-          if (evt == UI_EVT_OK) {
-            heaterEditMode = true;  // enter edit mode
-          }
+        if (modeMenuIndex != lastMenuIndex) {
+          oled_show_mode_menu(modeMenuIndex);
+          lastMenuIndex = modeMenuIndex;
+        }
 
-          else if (evt == UI_EVT_DOWN) {
+        if (evt == UI_EVT_OK) {
+
+          if (modeMenuIndex == 0) {  // AUTO
+
+            heaterMode = MODE_AUTO;
+
             uiState = UI_SETTINGS_MENU;
             lastMenuIndex = -1;
             oled_show_settings_menu(settingsMenuIndex);
             lastMenuIndex = settingsMenuIndex;
-            continue;
+          }
+
+          else if (modeMenuIndex == 1) {  // MANUAL
+
+            heaterMode = MODE_MANUAL;
+
+            uiState = UI_MANUAL_CONTROL_MENU;
+            manualControlIndex = 0;
+            lastMenuIndex = -1;
+
+            oled_show_manual_control(
+              manualControlIndex,
+              heaterManualOn,
+              coolerManualOn);
+
+            lastMenuIndex = manualControlIndex;
+          }
+
+          else if (modeMenuIndex == 2) {  // BACK
+
+            uiState = UI_SETTINGS_MENU;
+            lastMenuIndex = -1;
+            oled_show_settings_menu(settingsMenuIndex);
+            lastMenuIndex = settingsMenuIndex;
           }
         }
+      } else if (uiState == UI_MANUAL_CONTROL_MENU) {
 
-        // -------- EDIT MODE --------
-        else {
-
-          if (evt == UI_EVT_UP || evt == UI_EVT_DOWN) {
-
-            // Toggle between AUTO <-> MANUAL
-            if (heaterMode == MODE_AUTO) {
-              heaterMode = MODE_MANUAL;
-            }
-            // Toggle heater ON/OFF in MANUAL
-            else {
-              heaterManualOn = !heaterManualOn;
-            }
-          }
-
-          else if (evt == UI_EVT_OK) {
-            // SAVE & APPLY
-            heaterEditMode = false;
-
-            if (heaterMode == MODE_MANUAL) {
-              digitalWrite(RELAY_HEATER,
-                           heaterManualOn ? RELAY_ON : RELAY_OFF);
-            }
-          }
+        if (evt == UI_EVT_UP) {
+          manualControlIndex = (manualControlIndex - 1 + 3) % 3;
+        } else if (evt == UI_EVT_DOWN) {
+          manualControlIndex = (manualControlIndex + 1) % 3;
         }
 
-        oled_show_heater_control(heaterMode == MODE_AUTO);
+        if (manualControlIndex != lastMenuIndex) {
+          oled_show_manual_control(
+            manualControlIndex,
+            heaterManualOn,
+            coolerManualOn);
+          lastMenuIndex = manualControlIndex;
+        }
+
+        if (evt == UI_EVT_OK) {
+
+          if (manualControlIndex == 0) {  // HEATER
+            heaterManualOn = !heaterManualOn;
+          }
+
+          else if (manualControlIndex == 1) {  // COOLER
+            coolerManualOn = !coolerManualOn;
+          }
+
+          else if (manualControlIndex == 2) {  // BACK
+            uiState = UI_MODE_MENU;
+            lastMenuIndex = -1;
+            oled_show_mode_menu(modeMenuIndex);
+            lastMenuIndex = modeMenuIndex;
+            return;
+          }
+
+          oled_show_manual_control(
+            manualControlIndex,
+            heaterManualOn,
+            coolerManualOn);
+        }
       }
     }
   }

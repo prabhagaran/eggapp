@@ -174,7 +174,7 @@ static const char* items[] = {
   display.println("SET ENVIRONMENT");
   display.drawLine(0, 15, 127, 15, SSD1306_WHITE);
 
-  for (int i = 0; i < 5; i++) {
+  for (int i = 0; i < 6; i++) {
     display.setCursor(0, 20 + i * 9);
     display.print(i == selected ? "> " : "  ");
     display.println(items[i]);
@@ -265,6 +265,61 @@ void oled_show_heater_control(bool isAutoMode) {
 
   display.setCursor(0, 56);
   display.println("DOWN : Back");
+
+  display.display();
+}
+void oled_show_mode_menu(int selected) {
+
+  static const char* items[] = {
+    "Auto",
+    "Manual",
+    "Back"
+  };
+
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+
+  display.setCursor(0, 0);
+  display.println("MODE");
+  display.drawLine(0, 15, 127, 15, SSD1306_WHITE);
+
+  for (int i = 0; i < 3; i++) {
+    display.setCursor(0, 22 + i * 12);
+    display.print(i == selected ? "> " : "  ");
+    display.println(items[i]);
+  }
+
+  display.display();
+}
+void oled_show_manual_control(int selected,
+                              bool heaterOn,
+                              bool coolerOn)
+{
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+
+  display.setCursor(0, 0);
+  display.println("MANUAL CONTROL");
+  display.drawLine(0, 15, 127, 15, SSD1306_WHITE);
+
+  // Heater line
+  display.setCursor(0, 24);
+  display.print(selected == 0 ? "> " : "  ");
+  display.print("Heater : ");
+  display.println(heaterOn ? "ON" : "OFF");
+
+  // Cooler line
+  display.setCursor(0, 36);
+  display.print(selected == 1 ? "> " : "  ");
+  display.print("Cooler : ");
+  display.println(coolerOn ? "ON" : "OFF");
+
+  // Back line
+  display.setCursor(0, 48);
+  display.print(selected == 2 ? "> " : "  ");
+  display.println("Back");
 
   display.display();
 }
