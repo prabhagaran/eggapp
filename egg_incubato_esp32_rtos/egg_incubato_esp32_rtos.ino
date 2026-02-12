@@ -95,7 +95,6 @@ enum UiState {
   UI_SETTINGS_MENU,
   UI_ENV_TEMPERATURE,
   UI_ENV_HYSTERESIS,
-  UI_SETTINGS_HEATER_CONTROL,
   UI_ENV_HUMIDITY,
   UI_ENV_DAY,
   UI_ENV_TURNING,
@@ -157,8 +156,6 @@ float tempHysteresis = 0.3;  // +/- hysteresis band
 
 bool heaterOn = false;
 bool coolerOn = false;
-
-bool heaterEditMode = false;
 bool coolerManualOn = false;
 bool heaterManualOn = false;
 
@@ -440,7 +437,15 @@ void task_ui(void* pvParameters) {
       }
 
       if (redraw) {
-        oled_show_home(now, 3, temp, hum);
+        oled_show_home(
+          now,
+          3,
+          temp,
+          hum,
+          tempSetpoint,
+          heaterMode == MODE_AUTO,
+          heaterOn,
+          coolerOn);
       }
     }
 
@@ -726,8 +731,9 @@ void task_ui(void* pvParameters) {
             lastMenuIndex = -1;
             oled_show_mode_menu(modeMenuIndex);
             lastMenuIndex = modeMenuIndex;
-            return;
+            continue;  // IMPORTANT
           }
+
 
           oled_show_manual_control(
             manualControlIndex,

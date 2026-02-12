@@ -27,36 +27,32 @@ void oled_init(void) {
   display.display();
 }
 
-void oled_show_home(
-  const DateTime& now,
-  int day,
-  float temp,
-  float hum
-)
-{
+void oled_show_home(const DateTime& now,
+                    int day,
+                    float temp,
+                    float hum,
+                    float setpoint,
+                    bool isAutoMode,
+                    bool heaterOn,
+                    bool coolerOn) {
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
 
-  /* ---------- TOP AREA (YELLOW) ---------- */
+  /* ---------- TOP STATUS AREA ---------- */
 
-  /* Status (left) */
   display.setCursor(0, 0);
-  display.print("RUNNING");
+  display.print(isAutoMode ? "AUTO" : "MANUAL");
 
-  /* Time (right) */
   char timeBuf[6];
   sprintf(timeBuf, "%02d:%02d", now.hour(), now.minute());
   display.setCursor(88, 0);
   display.print(timeBuf);
-
-  /* Day (left) */
-  display.setCursor(0, 8);          // MUST stay <= 8
+  display.setCursor(0, 8);
   display.print("Day ");
   display.print(day);
   display.print(" / 21");
 
-  /* Date (right) */
   static const char* MONTH_NAMES[] = {
     "Jan", "Feb", "Mar", "Apr", "May", "Jun",
     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
@@ -67,48 +63,56 @@ void oled_show_home(
           now.day(),
           MONTH_NAMES[now.month() - 1]);
 
-  display.setCursor(88, 8);          // SAME Y as Day
+  display.setCursor(88, 8);
   display.print(dateBuf);
 
-  /* Divider line (last yellow row) */
+
   display.drawLine(0, 16, 127, 16, SSD1306_WHITE);
 
-  /* ---------- LOWER AREA (BLUE REGION) ---------- */
+  /* ---------- TEMPERATURE ---------- */
 
-  /* Temp label */
-  display.setCursor(0, 24);
-  display.print("Temp:");
-
-  /* Temp value */
-  display.setCursor(30, 24);
+  display.setCursor(0, 22);
+  display.print("Temp: ");
   display.print(temp, 1);
+  display.print(" / ");
+  display.print(setpoint, 1);
   display.print(" C");
 
-  /* Hum label */
-  display.setCursor(0, 36);
-  display.print("Hum :");
+  /* ---------- HUMIDITY ---------- */
 
-  /* Hum value */
-  display.setCursor(30, 36);
+  display.setCursor(0, 34);
+  display.print("Hum : ");
   display.print((int)hum);
   display.print(" %");
 
-  /* Menu (bottom-left) */
+  /* ---------- OUTPUT STATES ---------- */
+
+  display.setCursor(0, 46);
+  display.print("Heat: ");
+  display.print(heaterOn ? "ON " : "OFF");
+
+  display.setCursor(64, 46);
+  display.print("Cool: ");
+  display.print(coolerOn ? "ON" : "OFF");
+
+  /* ---------- MENU ---------- */
+
   display.setCursor(0, 56);
-  display.print("Menu");
+  display.print("OK: Menu");
 
   display.display();
 }
 
 
 
+
 void oled_show_menu(int selected) {
-static const char* menuItems[] = {
-  "Controller Mode",
-  "Set Environment",
-  "Settings",
-  "Exit"
-};
+  static const char* menuItems[] = {
+    "Controller Mode",
+    "Set Environment",
+    "Settings",
+    "Exit"
+  };
 
 
 
@@ -156,14 +160,14 @@ void oled_show_controller_mode(int selected) {
 }
 
 void oled_show_set_environment(int selected) {
-static const char* items[] = {
-  "Temperature",
-  "Hysteresis",
-  "Humidity",
-  "Incubation Day",
-  "Turning",
-  "Back"
-};
+  static const char* items[] = {
+    "Temperature",
+    "Hysteresis",
+    "Humidity",
+    "Incubation Day",
+    "Turning",
+    "Back"
+  };
 
 
   display.clearDisplay();
@@ -294,8 +298,7 @@ void oled_show_mode_menu(int selected) {
 }
 void oled_show_manual_control(int selected,
                               bool heaterOn,
-                              bool coolerOn)
-{
+                              bool coolerOn) {
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
@@ -323,4 +326,3 @@ void oled_show_manual_control(int selected,
 
   display.display();
 }
-

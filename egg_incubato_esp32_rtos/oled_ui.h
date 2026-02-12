@@ -4,7 +4,7 @@
 #include "RTClib.h"
 
 void oled_init(void);
-void oled_show_home(const DateTime& now, int day, float temp, float hum);
+void oled_show_home(const DateTime& now,int day,float temp,float hum,float setpoint,bool isAutoMode,bool heaterOn,bool coolerOn);
 void oled_show_menu(int selected);
 void oled_show_controller_mode(int selected);
 void oled_show_set_environment(int selected);
