@@ -12,6 +12,8 @@
 
 #include <OneWire.h>
 #include <DallasTemperature.h>
+#include <Preferences.h>
+
 
 
 /* ================= PINS ================= */
@@ -149,6 +151,8 @@ int modeMenuIndex = 0;
 int manualControlIndex = 0;
 
 unsigned long lastSensorUiUpdate = 0;
+Preferences prefs;
+
 
 unsigned long lastTempUiRefresh = 0;
 float tempSetpoint = 37.5;   // Target temperature
@@ -626,6 +630,7 @@ void task_ui(void* pvParameters) {
         }
 
         if (evt == UI_EVT_OK) {
+          saveSettings();
           uiState = UI_SET_ENV_MENU;
           lastMenuIndex = -1;
           oled_show_set_environment(environmentMenuIndex);
@@ -646,6 +651,7 @@ void task_ui(void* pvParameters) {
         oled_show_hysteresis(tempHysteresis);
 
         if (evt == UI_EVT_OK) {
+          saveSettings();
           uiState = UI_SET_ENV_MENU;
           lastMenuIndex = -1;
           oled_show_set_environment(environmentMenuIndex);
@@ -669,7 +675,7 @@ void task_ui(void* pvParameters) {
           if (modeMenuIndex == 0) {  // AUTO
 
             heaterMode = MODE_AUTO;
-
+            saveSettings();
             uiState = UI_SETTINGS_MENU;
             lastMenuIndex = -1;
             oled_show_settings_menu(settingsMenuIndex);
@@ -677,9 +683,9 @@ void task_ui(void* pvParameters) {
           }
 
           else if (modeMenuIndex == 1) {  // MANUAL
-
+            saveSettings();
             heaterMode = MODE_MANUAL;
-
+            saveSettings();
             uiState = UI_MANUAL_CONTROL_MENU;
             manualControlIndex = 0;
             lastMenuIndex = -1;
@@ -744,6 +750,32 @@ void task_ui(void* pvParameters) {
     }
   }
 }
+void loadSettings() {
+
+  prefs.begin("incubator", true);  // read only
+
+  tempSetpoint = prefs.getFloat("setTemp", 37.5);
+  tempHysteresis = prefs.getFloat("hyst", 0.3);
+  heaterMode = (ControlMode)prefs.getUInt("mode", MODE_AUTO);
+
+  prefs.end();
+
+  Serial.println("[NVS] Settings Loaded");
+}
+
+
+void saveSettings() {
+
+  prefs.begin("incubator", false);  // write mode
+
+  prefs.putFloat("setTemp", tempSetpoint);
+  prefs.putFloat("hyst", tempHysteresis);
+  prefs.putUInt("mode", heaterMode);
+
+  prefs.end();
+
+  Serial.println("[NVS] Settings Saved");
+}
 
 /* ================= SETUP ================= */
 void setup() {
@@ -771,6 +803,8 @@ void setup() {
   rtcMutex = xSemaphoreCreateMutex();
   sensorMutex = xSemaphoreCreateMutex();
   uiEventQueue = xQueueCreate(10, sizeof(UiEvent));
+  loadSettings();
+
 
   if (xSemaphoreTake(sensorMutex, portMAX_DELAY)) {
     gSensorData.temp_ds18b20 = 0.0;
