@@ -726,10 +726,12 @@ void task_ui(void* pvParameters) {
 
           if (manualControlIndex == 0) {  // HEATER
             heaterManualOn = !heaterManualOn;
+            saveSettings();
           }
 
           else if (manualControlIndex == 1) {  // COOLER
             coolerManualOn = !coolerManualOn;
+            saveSettings();
           }
 
           else if (manualControlIndex == 2) {  // BACK
@@ -757,12 +759,13 @@ void loadSettings() {
   tempSetpoint = prefs.getFloat("setTemp", 37.5);
   tempHysteresis = prefs.getFloat("hyst", 0.3);
   heaterMode = (ControlMode)prefs.getUInt("mode", MODE_AUTO);
+  heaterManualOn = prefs.getBool("heatMan", false);
+  coolerManualOn = prefs.getBool("coolMan", false);
 
   prefs.end();
 
   Serial.println("[NVS] Settings Loaded");
 }
-
 
 void saveSettings() {
 
@@ -771,6 +774,8 @@ void saveSettings() {
   prefs.putFloat("setTemp", tempSetpoint);
   prefs.putFloat("hyst", tempHysteresis);
   prefs.putUInt("mode", heaterMode);
+  prefs.putBool("heatMan", heaterManualOn);
+  prefs.putBool("coolMan", coolerManualOn);
 
   prefs.end();
 
@@ -804,7 +809,10 @@ void setup() {
   sensorMutex = xSemaphoreCreateMutex();
   uiEventQueue = xQueueCreate(10, sizeof(UiEvent));
   loadSettings();
-
+  if (heaterMode == MODE_MANUAL) {
+    heaterOn = heaterManualOn;
+    coolerOn = coolerManualOn;
+  }
 
   if (xSemaphoreTake(sensorMutex, portMAX_DELAY)) {
     gSensorData.temp_ds18b20 = 0.0;
