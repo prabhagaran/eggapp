@@ -37,6 +37,10 @@
 #define RELAY_ON LOW
 #define RELAY_OFF HIGH
 
+#define DEVICE_ID "INCUBATOR_01"
+#define FW_VERSION "1.0.0"
+
+
 
 OneWire oneWire(DS18B20_PIN);
 DallasTemperature ds18b20(&oneWire);
@@ -162,58 +166,135 @@ bool heaterOn = false;
 bool coolerOn = false;
 bool coolerManualOn = false;
 bool heaterManualOn = false;
+unsigned long lastErrorSent = 0;
+
 
 
 
 String googleScriptURL =
-  "https://script.google.com/macros/s/AKfycbzDZYSqP8gbKBfHBH2iKy2FaxckK5Js72oxQVCFOwp4YrHTfiHbEfGDAY0stKV3tIqNmQ/exec";
+  "https://script.google.com/macros/s/AKfycbzhHZv2t5gtTAkxTMoRq5QyXhRFlbQDU6dIhVVZs96QpcsA07PoNkDlY_e2qM5Clihnmg/exec";
+
+void sendErrorToCloud(String type, String message) {
+
+  if (millis() - lastErrorSent < 60000) {
+    Serial.println("[CLOUD] Error skipped (rate limit)");
+    return;
+  }
+
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("[CLOUD] Error skipped (WiFi not connected)");
+    return;
+  }
+
+  lastErrorSent = millis();
+
+  WiFiClientSecure client;
+  client.setInsecure();
+
+  HTTPClient http;
+  http.setTimeout(5000);
+
+  String url = googleScriptURL + "?id=" + String(DEVICE_ID)
+               + "&fw=" + String(FW_VERSION)
+               + "&error=" + type
+               + "&msg=" + message;
+
+  Serial.println("[CLOUD] Sending ERROR:");
+  Serial.println(url);
+
+  http.begin(client, url);
+  int code = http.GET();
+
+  Serial.print("[CLOUD] Error HTTP Code: ");
+  Serial.println(code);
+
+  http.end();
+}
+
 
 /* ================= TASK: CLOUD ================= */
 void task_cloud(void* pvParameters) {
+
   WiFiManager wm;
 
   Serial.println("[CLOUD] Starting WiFiManager");
 
-  bool res = wm.autoConnect("INCUBATOR_SETUP");
-  if (!res) {
-    Serial.println("[CLOUD] WiFi FAILED");
+  if (!wm.autoConnect("INCUBATOR_SETUP")) {
+    Serial.println("[CLOUD] WiFi Failed");
     vTaskDelete(NULL);
   }
 
-  Serial.println("[CLOUD] WiFi CONNECTED");
-  Serial.print("[CLOUD] IP: ");
-  Serial.println(WiFi.localIP());
+  Serial.println("[CLOUD] WiFi Connected");
+  static unsigned long lastHeartbeat = 0;
 
   for (;;) {
-    float t, h;
 
-    if (xSemaphoreTake(sensorMutex, portMAX_DELAY)) {
+    // Ensure WiFi is connected
+    if (WiFi.status() != WL_CONNECTED) {
+
+      Serial.println("[CLOUD] Reconnecting WiFi...");
+      WiFi.reconnect();
+
+      vTaskDelay(pdMS_TO_TICKS(5000));
+      continue;
+    }
+    static unsigned long lastHeartbeat = 0;
+    if (millis() - lastHeartbeat > 10000) {  // 5 minutes
+      sendErrorToCloud("HEARTBEAT", "Device Alive");
+      lastHeartbeat = millis();
+    }
+
+
+    float t = 0.0;
+    float h = 0.0;
+
+    if (xSemaphoreTake(sensorMutex, pdMS_TO_TICKS(200))) {
       t = gSensorData.temp_ds18b20;
       h = gSensorData.humidity_dht;
       xSemaphoreGive(sensorMutex);
     }
 
-    if (WiFi.status() == WL_CONNECTED) {
-      WiFiClientSecure client;
-      client.setInsecure();
+    WiFiClientSecure client;
+    client.setInsecure();
 
-      HTTPClient http;
-      String url = googleScriptURL + "?temp=" + String(t, 1) + "&hum=" + String((int)h);
+    HTTPClient http;
+    http.setTimeout(5000);  // 5 second timeout
 
-      http.begin(client, url);
-      int httpCode = http.GET();
+    String url = googleScriptURL + "?id=" + String(DEVICE_ID) + "&fw=" + String(FW_VERSION) + "&temp=" + String(t, 1) + "&hum=" + String((int)h) + "&mode=" + String(heaterMode == MODE_AUTO ? "AUTO" : "MANUAL") + "&heater=" + String(heaterOn ? "1" : "0") + "&cooler=" + String(coolerOn ? "1" : "0");
 
-      Serial.print("[CLOUD] URL: ");
-      Serial.println(url);
-      Serial.print("[CLOUD] HTTP code: ");
+
+    Serial.println("[CLOUD] Sending data...");
+
+    http.begin(client, url);
+    int httpCode = http.GET();
+
+    if (httpCode > 0) {
+
+      Serial.print("[CLOUD] HTTP Code: ");
       Serial.println(httpCode);
 
-      http.end();
+      if (httpCode == 200 || httpCode == 302) {
+        Serial.println("[CLOUD] Upload Success");
+      } else {
+        Serial.println("[CLOUD] Server Error");
+        sendErrorToCloud("SERVER_ERROR", "HTTP code unexpected");
+      }
+
+    } else {
+      Serial.println("[CLOUD] HTTP Failed");
+      sendErrorToCloud("HTTP_FAIL", "Upload failed");
     }
 
-    vTaskDelay(pdMS_TO_TICKS(60000));
+
+
+
+
+    http.end();
+
+    vTaskDelay(pdMS_TO_TICKS(60000));  // 60 sec interval
   }
 }
+
 
 void task_temperature_control(void* pvParameters) {
 
@@ -229,6 +310,7 @@ void task_temperature_control(void* pvParameters) {
     /* ================= SENSOR SAFETY ================= */
 
     if (currentTemp <= 0.0 || currentTemp > 100.0) {
+
       heaterOn = false;
       coolerOn = false;
 
@@ -236,9 +318,13 @@ void task_temperature_control(void* pvParameters) {
       digitalWrite(RELAY_COOLER, RELAY_OFF);
 
       Serial.println("[SAFETY] Sensor invalid - All outputs OFF");
+
+      sendErrorToCloud("SENSOR_ERROR", "Invalid temperature reading");
+
       vTaskDelay(pdMS_TO_TICKS(500));
       continue;
     }
+
 
     /* ================= MANUAL MODE ================= */
 
@@ -683,7 +769,7 @@ void task_ui(void* pvParameters) {
           }
 
           else if (modeMenuIndex == 1) {  // MANUAL
-            saveSettings();
+
             heaterMode = MODE_MANUAL;
             saveSettings();
             uiState = UI_MANUAL_CONTROL_MENU;
