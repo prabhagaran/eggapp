@@ -166,7 +166,10 @@ bool heaterOn = false;
 bool coolerOn = false;
 bool coolerManualOn = false;
 bool heaterManualOn = false;
-unsigned long lastErrorSent = 0;
+unsigned long lastSensorErrorSent = 0;
+unsigned long lastHttpErrorSent = 0;
+unsigned long lastHeartbeatSent = 0;
+
 
 
 
@@ -176,17 +179,7 @@ String googleScriptURL =
 
 void sendErrorToCloud(String type, String message) {
 
-  if (millis() - lastErrorSent < 60000) {
-    Serial.println("[CLOUD] Error skipped (rate limit)");
-    return;
-  }
-
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("[CLOUD] Error skipped (WiFi not connected)");
-    return;
-  }
-
-  lastErrorSent = millis();
+  if (WiFi.status() != WL_CONNECTED) return;
 
   WiFiClientSecure client;
   client.setInsecure();
@@ -194,20 +187,10 @@ void sendErrorToCloud(String type, String message) {
   HTTPClient http;
   http.setTimeout(5000);
 
-  String url = googleScriptURL + "?id=" + String(DEVICE_ID)
-               + "&fw=" + String(FW_VERSION)
-               + "&error=" + type
-               + "&msg=" + message;
-
-  Serial.println("[CLOUD] Sending ERROR:");
-  Serial.println(url);
+  String url = googleScriptURL + "?id=" + String(DEVICE_ID) + "&fw=" + String(FW_VERSION) + "&error=" + type + "&msg=" + message;
 
   http.begin(client, url);
-  int code = http.GET();
-
-  Serial.print("[CLOUD] Error HTTP Code: ");
-  Serial.println(code);
-
+  http.GET();
   http.end();
 }
 
@@ -238,11 +221,11 @@ void task_cloud(void* pvParameters) {
       vTaskDelay(pdMS_TO_TICKS(5000));
       continue;
     }
-    static unsigned long lastHeartbeat = 0;
-    if (millis() - lastHeartbeat > 10000) {  // 5 minutes
+    if (millis() - lastHeartbeat > 300000) {
       sendErrorToCloud("HEARTBEAT", "Device Alive");
       lastHeartbeat = millis();
     }
+
 
 
     float t = 0.0;
@@ -282,7 +265,10 @@ void task_cloud(void* pvParameters) {
 
     } else {
       Serial.println("[CLOUD] HTTP Failed");
-      sendErrorToCloud("HTTP_FAIL", "Upload failed");
+      if (millis() - lastHttpErrorSent > 60000) {
+        sendErrorToCloud("HTTP_FAIL", "Upload failed");
+        lastHttpErrorSent = millis();
+      }
     }
 
 
@@ -309,7 +295,7 @@ void task_temperature_control(void* pvParameters) {
 
     /* ================= SENSOR SAFETY ================= */
 
-    if (currentTemp <= 0.0 || currentTemp > 100.0) {
+    if (currentTemp < -100 || currentTemp > 100) {
 
       heaterOn = false;
       coolerOn = false;
@@ -319,7 +305,11 @@ void task_temperature_control(void* pvParameters) {
 
       Serial.println("[SAFETY] Sensor invalid - All outputs OFF");
 
-      sendErrorToCloud("SENSOR_ERROR", "Invalid temperature reading");
+      if (millis() - lastSensorErrorSent > 60000) {
+        sendErrorToCloud("SENSOR_ERROR", "Invalid temperature reading");
+        lastSensorErrorSent = millis();
+      }
+
 
       vTaskDelay(pdMS_TO_TICKS(500));
       continue;
@@ -423,16 +413,27 @@ void task_sensor(void* pvParameters) {
 }
 
 void task_ds18b20(void* pvParameters) {
+
   ds18b20.begin();
   ds18b20.setWaitForConversion(false);
 
-
   for (;;) {
+
     ds18b20.requestTemperatures();
     vTaskDelay(pdMS_TO_TICKS(800));
+
     float t = ds18b20.getTempCByIndex(0);
 
-    if (t != DEVICE_DISCONNECTED_C) {
+    if (t == DEVICE_DISCONNECTED_C) {
+
+      if (xSemaphoreTake(sensorMutex, portMAX_DELAY)) {
+        gSensorData.temp_ds18b20 = -999.0;  // special error value
+        xSemaphoreGive(sensorMutex);
+      }
+
+      sendErrorToCloud("SENSOR_ERROR", "DS18B20 disconnected");
+    } else {
+
       if (xSemaphoreTake(sensorMutex, portMAX_DELAY)) {
         gSensorData.temp_ds18b20 = t;
         xSemaphoreGive(sensorMutex);
@@ -899,6 +900,8 @@ void setup() {
     heaterOn = heaterManualOn;
     coolerOn = coolerManualOn;
   }
+  sendErrorToCloud("TEST", "Auto test message");
+
 
   if (xSemaphoreTake(sensorMutex, portMAX_DELAY)) {
     gSensorData.temp_ds18b20 = 0.0;
