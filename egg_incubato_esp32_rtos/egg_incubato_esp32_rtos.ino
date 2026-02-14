@@ -137,6 +137,14 @@ typedef struct {
 RtcTime_t gRtcTime;
 SemaphoreHandle_t rtcMutex;
 
+typedef struct {
+  char type[20];
+  char message[60];
+} ErrorMsg_t;
+
+QueueHandle_t errorQueue;
+
+
 /* ================= GLOBALS ================= */
 QueueHandle_t uiEventQueue;
 RTC_DS1307 rtc;
@@ -177,37 +185,21 @@ unsigned long lastHeartbeatSent = 0;
 String googleScriptURL =
   "https://script.google.com/macros/s/AKfycbzhHZv2t5gtTAkxTMoRq5QyXhRFlbQDU6dIhVVZs96QpcsA07PoNkDlY_e2qM5Clihnmg/exec";
 
-void sendErrorToCloud(String type, String message) {
+void pushError(const char* type, const char* message) {
 
-  if (WiFi.status() != WL_CONNECTED) return;
+  ErrorMsg_t err;
 
-  WiFiClientSecure client;
-  client.setInsecure();
+  strncpy(err.type, type, sizeof(err.type));
+  err.type[sizeof(err.type) - 1] = '\0';
 
-  HTTPClient http;
-  http.setTimeout(5000);
+  strncpy(err.message, message, sizeof(err.message));
+  err.message[sizeof(err.message) - 1] = '\0';
 
-  String url = googleScriptURL + "?id=" + String(DEVICE_ID) + "&fw=" + String(FW_VERSION) + "&error=" + type + "&msg=" + message;
-
-  http.begin(client, url);
-  http.GET();
-  http.end();
+  xQueueSend(errorQueue, &err, 0);
 }
-
-
 /* ================= TASK: CLOUD ================= */
 void task_cloud(void* pvParameters) {
 
-  WiFiManager wm;
-
-  Serial.println("[CLOUD] Starting WiFiManager");
-
-  if (!wm.autoConnect("INCUBATOR_SETUP")) {
-    Serial.println("[CLOUD] WiFi Failed");
-    vTaskDelete(NULL);
-  }
-
-  Serial.println("[CLOUD] WiFi Connected");
   static unsigned long lastHeartbeat = 0;
 
   for (;;) {
@@ -221,12 +213,31 @@ void task_cloud(void* pvParameters) {
       vTaskDelay(pdMS_TO_TICKS(5000));
       continue;
     }
-    if (millis() - lastHeartbeat > 300000) {
-      sendErrorToCloud("HEARTBEAT", "Device Alive");
-      lastHeartbeat = millis();
+    ErrorMsg_t incomingError;
+
+    if (xQueueReceive(errorQueue, &incomingError, 0) == pdTRUE) {
+
+      WiFiClientSecure client;
+      client.setInsecure();
+
+      HTTPClient http;
+      http.setTimeout(5000);
+
+      String msg = String(incomingError.message);
+      msg.replace(" ", "%20");
+
+      String url = googleScriptURL + "?id=" + String(DEVICE_ID) + "&fw=" + String(FW_VERSION) + "&error=" + String(incomingError.type) + "&msg=" + msg;
+
+      http.begin(client, url);
+      http.GET();
+      http.end();
     }
 
 
+    if (millis() - lastHeartbeat > 300000) {
+      pushError("HEARTBEAT", "Device Alive");
+      lastHeartbeat = millis();
+    }
 
     float t = 0.0;
     float h = 0.0;
@@ -260,21 +271,17 @@ void task_cloud(void* pvParameters) {
         Serial.println("[CLOUD] Upload Success");
       } else {
         Serial.println("[CLOUD] Server Error");
-        sendErrorToCloud("SERVER_ERROR", "HTTP code unexpected");
+        pushError("SERVER_ERROR", "HTTP code unexpected");
+
       }
 
     } else {
       Serial.println("[CLOUD] HTTP Failed");
       if (millis() - lastHttpErrorSent > 60000) {
-        sendErrorToCloud("HTTP_FAIL", "Upload failed");
+        pushError("HTTP_FAIL", "Upload failed");
         lastHttpErrorSent = millis();
       }
     }
-
-
-
-
-
     http.end();
 
     vTaskDelay(pdMS_TO_TICKS(60000));  // 60 sec interval
@@ -306,7 +313,7 @@ void task_temperature_control(void* pvParameters) {
       Serial.println("[SAFETY] Sensor invalid - All outputs OFF");
 
       if (millis() - lastSensorErrorSent > 60000) {
-        sendErrorToCloud("SENSOR_ERROR", "Invalid temperature reading");
+        pushError("SENSOR_ERROR", "DS18B20 disconnected");
         lastSensorErrorSent = millis();
       }
 
@@ -431,7 +438,8 @@ void task_ds18b20(void* pvParameters) {
         xSemaphoreGive(sensorMutex);
       }
 
-      sendErrorToCloud("SENSOR_ERROR", "DS18B20 disconnected");
+      pushError("SENSOR_ERROR", "DS18B20 disconnected");
+
     } else {
 
       if (xSemaphoreTake(sensorMutex, portMAX_DELAY)) {
@@ -873,6 +881,24 @@ void saveSettings() {
 void setup() {
   Serial.begin(115200);
 
+  WiFi.mode(WIFI_STA);
+
+  WiFiManager wm;
+
+  Serial.println("[SETUP] Starting WiFiManager...");
+
+  if (!wm.autoConnect("INCUBATOR_SETUP")) {
+    Serial.println("[SETUP] Failed to connect. Restarting...");
+    ESP.restart();
+  }
+
+  Serial.println("[SETUP] WiFi Connected!");
+  Serial.print("SSID: ");
+  Serial.println(WiFi.SSID());
+  Serial.print("IP: ");
+  Serial.println(WiFi.localIP());
+
+
   pinMode(BTN_UP, INPUT_PULLUP);
   pinMode(BTN_DOWN, INPUT_PULLUP);
   pinMode(BTN_OK, INPUT_PULLUP);
@@ -895,13 +921,13 @@ void setup() {
   rtcMutex = xSemaphoreCreateMutex();
   sensorMutex = xSemaphoreCreateMutex();
   uiEventQueue = xQueueCreate(10, sizeof(UiEvent));
+  errorQueue = xQueueCreate(10, sizeof(ErrorMsg_t));
+
   loadSettings();
   if (heaterMode == MODE_MANUAL) {
     heaterOn = heaterManualOn;
     coolerOn = coolerManualOn;
   }
-  sendErrorToCloud("TEST", "Auto test message");
-
 
   if (xSemaphoreTake(sensorMutex, portMAX_DELAY)) {
     gSensorData.temp_ds18b20 = 0.0;
@@ -913,7 +939,7 @@ void setup() {
   xTaskCreatePinnedToCore(task_buttons, "Buttons", 2048, NULL, 3, NULL, 1);
   xTaskCreatePinnedToCore(task_ui, "UI", 4096, NULL, 2, NULL, 1);
   xTaskCreatePinnedToCore(task_sensor, "Sensor", 2048, NULL, 2, NULL, 1);
-  xTaskCreatePinnedToCore(task_ds18b20, "DS18B20", 2048, NULL, 2, NULL, 1);
+  xTaskCreatePinnedToCore(task_ds18b20, "DS18B20", 4096, NULL, 2, NULL, 1);
   xTaskCreatePinnedToCore(task_cloud, "Cloud", 10240, NULL, 1, NULL, 1);
   xTaskCreatePinnedToCore(task_temperature_control, "TempCtrl", 2048, NULL, 2, NULL, 1);
 }
