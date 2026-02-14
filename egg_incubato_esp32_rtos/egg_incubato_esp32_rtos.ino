@@ -169,6 +169,8 @@ Preferences prefs;
 unsigned long lastTempUiRefresh = 0;
 float tempSetpoint = 37.5;   // Target temperature
 float tempHysteresis = 0.3;  // +/- hysteresis band
+float humSetpoint = 60.0;  // default humidity target
+
 
 bool heaterOn = false;
 bool coolerOn = false;
@@ -183,7 +185,7 @@ unsigned long lastHeartbeatSent = 0;
 
 
 String googleScriptURL =
-  "https://script.google.com/macros/s/AKfycbzhHZv2t5gtTAkxTMoRq5QyXhRFlbQDU6dIhVVZs96QpcsA07PoNkDlY_e2qM5Clihnmg/exec";
+  "https://script.google.com/macros/s/AKfycbwQPhJOnfiILeU8a0UpUuxf7Jx1jC_9RmE5fsETXEMdrBcwqfmVYo5QaMLl3pi4l369nQ/exec";
 
 void pushError(const char* type, const char* message) {
 
@@ -228,11 +230,7 @@ void task_cloud(void* pvParameters) {
       String msg = String(incomingError.message);
       msg.replace(" ", "%20");
 
-      String url = googleScriptURL +
-                   "?id=" + String(DEVICE_ID) +
-                   "&fw=" + String(FW_VERSION) +
-                   "&error=" + String(incomingError.type) +
-                   "&msg=" + msg;
+      String url = googleScriptURL + "?id=" + String(DEVICE_ID) + "&fw=" + String(FW_VERSION) + "&error=" + String(incomingError.type) + "&msg=" + msg;
 
       Serial.println("[CLOUD] Sending ERROR log...");
 
@@ -275,6 +273,10 @@ void task_cloud(void* pvParameters) {
       humStr = String((int)h);
     }
 
+    String setTempStr = String(tempSetpoint, 1);
+    String setHumStr = String(humSetpoint, 1);
+
+
     /* ================= TELEMETRY ================= */
 
     WiFiClientSecure client;
@@ -283,14 +285,16 @@ void task_cloud(void* pvParameters) {
     HTTPClient http;
     http.setTimeout(5000);
 
-    String url = googleScriptURL +
-                 "?id=" + String(DEVICE_ID) +
-                 "&fw=" + String(FW_VERSION) +
-                 "&temp=" + tempStr +
-                 "&hum=" + humStr +
-                 "&mode=" + String(heaterMode == MODE_AUTO ? "AUTO" : "MANUAL") +
-                 "&heater=" + String(heaterOn ? "1" : "0") +
-                 "&cooler=" + String(coolerOn ? "1" : "0");
+    String url = googleScriptURL + 
+    "?id=" + String(DEVICE_ID) + 
+    "&fw=" + String(FW_VERSION) + 
+    "&temp=" + tempStr + 
+    "&hum=" + humStr + 
+    "&setTemp=" + setTempStr +
+    "&setHum=" + setHumStr +
+    "&mode=" + String(heaterMode == MODE_AUTO ? "AUTO" : "MANUAL") + 
+    "&heater=" + String(heaterOn ? "1" : "0") + 
+    "&cooler=" + String(coolerOn ? "1" : "0");
 
     Serial.println("[CLOUD] Sending telemetry...");
 
