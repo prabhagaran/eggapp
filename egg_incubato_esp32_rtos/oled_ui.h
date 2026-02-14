@@ -25,6 +25,10 @@ void oled_show_heater_control(bool isAutoMode);
 void oled_show_mode_menu(int selected);
 void oled_show_manual_control(int selected, bool heaterOn, bool coolerOn);
 void oled_show_humidity(float current, float setpoint);
+void oled_show_hysteresis_menu(int selected,
+                               float tempHyst,
+                               float humHyst);
+
 
 
 #endif

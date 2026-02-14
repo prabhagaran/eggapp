@@ -36,8 +36,7 @@ void oled_show_home(const DateTime& now,
                     bool isAutoMode,
                     bool heaterOn,
                     bool coolerOn,
-                    bool humidifierOn)
-{
+                    bool humidifierOn){
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
@@ -109,10 +108,28 @@ void oled_show_home(const DateTime& now,
 
   display.display();
 }
+void oled_show_humidity(float current, float setpoint) {
 
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
 
+  display.setCursor(0, 0);
+  display.println("HUMIDITY");
+  display.drawLine(0, 15, 127, 15, SSD1306_WHITE);
 
+  display.setCursor(0, 24);
+  display.print("Current : ");
+  display.print((int)current);
+  display.print(" %");
 
+  display.setCursor(0, 36);
+  display.print("Setpoint: ");
+  display.print((int)setpoint);
+  display.print(" %");
+
+  display.display();
+}
 void oled_show_menu(int selected) {
   static const char* menuItems[] = {
     "Controller Mode",
@@ -139,7 +156,6 @@ void oled_show_menu(int selected) {
 
   display.display();
 }
-
 void oled_show_controller_mode(int selected) {
   static const char* items[] = {
     "Egg Incubator",
@@ -165,7 +181,6 @@ void oled_show_controller_mode(int selected) {
 
   display.display();
 }
-
 void oled_show_set_environment(int selected) {
   static const char* items[] = {
     "Temperature",
@@ -193,7 +208,6 @@ void oled_show_set_environment(int selected) {
 
   display.display();
 }
-
 void oled_show_temperature(float current, float setpoint) {
   display.clearDisplay();
   display.setTextSize(1);
@@ -333,3 +347,39 @@ void oled_show_manual_control(int selected,
 
   display.display();
 }
+void oled_show_hysteresis_menu(int selected,
+                               float tempHyst,
+                               float humHyst)
+{
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+
+  // Title
+  display.setCursor(0, 0);
+  display.println("HYSTERESIS SETTINGS");
+  display.drawLine(0, 15, 127, 15, SSD1306_WHITE);
+
+  // Temperature Hysteresis
+  display.setCursor(0, 24);
+  display.print(selected == 0 ? "> " : "  ");
+  display.print("Temp Hyst : +-");
+  display.print(tempHyst, 1);
+  display.print(" C");
+
+  // Humidity Hysteresis
+  display.setCursor(0, 36);
+  display.print(selected == 1 ? "> " : "  ");
+  display.print("Hum  Hyst : +-");
+  display.print(humHyst, 0);
+  display.print(" %");
+
+  // Back Option
+  display.setCursor(0, 48);
+  display.print(selected == 2 ? "> " : "  ");
+  display.print("Back");
+
+  display.display();
+}
+
+

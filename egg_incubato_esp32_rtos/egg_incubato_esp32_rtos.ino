@@ -76,6 +76,7 @@ enum ControllerModeItem {
 enum EnvironmentItem {
   ENV_TEMPERATURE = 0,
   ENV_HYSTERESIS,
+
   ENV_HUMIDITY,
   ENV_INCUBATION_DAY,
   ENV_TURNING,
@@ -102,6 +103,9 @@ enum UiState {
   UI_SETTINGS_MENU,
   UI_ENV_TEMPERATURE,
   UI_ENV_HYSTERESIS,
+  UI_ENV_HYSTERESIS_MENU,
+  UI_ENV_HYST_TEMP_EDIT,
+  UI_ENV_HYST_HUM_EDIT,
   UI_ENV_HUMIDITY,
   UI_ENV_DAY,
   UI_ENV_TURNING,
@@ -162,6 +166,8 @@ int lastMenuIndex = -1;
 int lastMinute = -1;
 int modeMenuIndex = 0;
 int manualControlIndex = 0;
+int hysteresisMenuIndex = 0;
+
 
 unsigned long lastSensorUiUpdate = 0;
 Preferences prefs;
@@ -181,6 +187,7 @@ bool heaterManualOn = false;
 unsigned long lastSensorErrorSent = 0;
 unsigned long lastHttpErrorSent = 0;
 unsigned long lastHeartbeatSent = 0;
+
 
 
 
@@ -702,9 +709,33 @@ void task_ui(void* pvParameters) {
             oled_show_temperature(currentTemp, tempSetpoint);
           }
           if (environmentMenuIndex == ENV_HYSTERESIS) {
-            uiState = UI_ENV_HYSTERESIS;
-            oled_show_hysteresis(tempHysteresis);
+
+            uiState = UI_ENV_HYSTERESIS_MENU;
+            hysteresisMenuIndex = 0;
+            lastMenuIndex = -1;
+
+            oled_show_hysteresis_menu(
+              hysteresisMenuIndex,
+              tempHysteresis,
+              humHysteresis);
+
+            lastMenuIndex = hysteresisMenuIndex;
           }
+
+          if (environmentMenuIndex == ENV_HUMIDITY) {
+
+            uiState = UI_ENV_HUMIDITY;
+
+            float currentHum = 0.0;
+
+            if (xSemaphoreTake(sensorMutex, portMAX_DELAY)) {
+              currentHum = gSensorData.humidity_dht;
+              xSemaphoreGive(sensorMutex);
+            }
+
+            oled_show_humidity(currentHum, humSetpoint);
+          }
+
 
           if (environmentMenuIndex == ENV_BACK) {
             uiState = UI_MAIN_MENU;
@@ -808,6 +839,41 @@ void task_ui(void* pvParameters) {
           oled_show_set_environment(environmentMenuIndex);
           lastMenuIndex = environmentMenuIndex;
         }
+      } else if (uiState == UI_ENV_HUMIDITY) {
+
+        bool redraw = false;
+
+        if (evt == UI_EVT_UP) {
+          humSetpoint += 1;
+          redraw = true;
+        } else if (evt == UI_EVT_DOWN) {
+          humSetpoint -= 1;
+          redraw = true;
+        }
+
+        // Clamp range
+        if (humSetpoint < 30) humSetpoint = 30;
+        if (humSetpoint > 90) humSetpoint = 90;
+
+        if (redraw) {
+
+          float currentHum = 0.0;
+
+          if (xSemaphoreTake(sensorMutex, portMAX_DELAY)) {
+            currentHum = gSensorData.humidity_dht;
+            xSemaphoreGive(sensorMutex);
+          }
+
+          oled_show_humidity(currentHum, humSetpoint);
+        }
+
+        if (evt == UI_EVT_OK) {
+          saveSettings();
+          uiState = UI_SET_ENV_MENU;
+          lastMenuIndex = -1;
+          oled_show_set_environment(environmentMenuIndex);
+          lastMenuIndex = environmentMenuIndex;
+        }
       } else if (uiState == UI_MODE_MENU) {
 
         if (evt == UI_EVT_UP) {
@@ -898,6 +964,75 @@ void task_ui(void* pvParameters) {
             manualControlIndex,
             heaterManualOn,
             coolerManualOn);
+        }
+      } else if (uiState == UI_ENV_HYSTERESIS_MENU) {
+
+        if (evt == UI_EVT_UP) {
+          hysteresisMenuIndex = (hysteresisMenuIndex - 1 + 3) % 3;
+        } else if (evt == UI_EVT_DOWN) {
+          hysteresisMenuIndex = (hysteresisMenuIndex + 1) % 3;
+        }
+
+        if (hysteresisMenuIndex != lastMenuIndex) {
+          oled_show_hysteresis_menu(
+            hysteresisMenuIndex,
+            tempHysteresis,
+            humHysteresis);
+          lastMenuIndex = hysteresisMenuIndex;
+        }
+
+        if (evt == UI_EVT_OK) {
+
+          if (hysteresisMenuIndex == 0) {
+            uiState = UI_ENV_HYST_TEMP_EDIT;
+          } else if (hysteresisMenuIndex == 1) {
+            uiState = UI_ENV_HYST_HUM_EDIT;
+          } else if (hysteresisMenuIndex == 2) {
+            saveSettings();
+            uiState = UI_SET_ENV_MENU;
+            lastMenuIndex = -1;
+            oled_show_set_environment(environmentMenuIndex);
+            lastMenuIndex = environmentMenuIndex;
+            continue;
+          }
+        }
+      } else if (uiState == UI_ENV_HYST_TEMP_EDIT) {
+
+        if (evt == UI_EVT_UP) {
+          tempHysteresis += 0.1;
+          if (tempHysteresis > 2.0) tempHysteresis = 2.0;
+        } else if (evt == UI_EVT_DOWN) {
+          tempHysteresis -= 0.1;
+          if (tempHysteresis < 0.1) tempHysteresis = 0.1;
+        }
+
+        oled_show_hysteresis_menu(
+          hysteresisMenuIndex,
+          tempHysteresis,
+          humHysteresis);
+
+        if (evt == UI_EVT_OK) {
+          saveSettings();
+          uiState = UI_ENV_HYSTERESIS_MENU;
+        }
+      } else if (uiState == UI_ENV_HYST_HUM_EDIT) {
+
+        if (evt == UI_EVT_UP) {
+          humHysteresis += 1;
+          if (humHysteresis > 10) humHysteresis = 10;
+        } else if (evt == UI_EVT_DOWN) {
+          humHysteresis -= 1;
+          if (humHysteresis < 1) humHysteresis = 1;
+        }
+
+        oled_show_hysteresis_menu(
+          hysteresisMenuIndex,
+          tempHysteresis,
+          humHysteresis);
+
+        if (evt == UI_EVT_OK) {
+          saveSettings();
+          uiState = UI_ENV_HYSTERESIS_MENU;
         }
       }
     }
