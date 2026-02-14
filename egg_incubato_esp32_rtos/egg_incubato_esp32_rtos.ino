@@ -33,6 +33,7 @@
 
 #define RELAY_HEATER 26
 #define RELAY_COOLER 27
+#define RELAY_HUMIDIFIER 14
 
 #define RELAY_ON LOW
 #define RELAY_OFF HIGH
@@ -164,18 +165,19 @@ int manualControlIndex = 0;
 
 unsigned long lastSensorUiUpdate = 0;
 Preferences prefs;
-
-
 unsigned long lastTempUiRefresh = 0;
+
 float tempSetpoint = 37.5;   // Target temperature
 float tempHysteresis = 0.3;  // +/- hysteresis band
-float humSetpoint = 60.0;  // default humidity target
+float humSetpoint = 60.0;    // default humidity target
+float humHysteresis = 3.0;
 
-
+bool humidifierOn = false;
 bool heaterOn = false;
 bool coolerOn = false;
 bool coolerManualOn = false;
 bool heaterManualOn = false;
+
 unsigned long lastSensorErrorSent = 0;
 unsigned long lastHttpErrorSent = 0;
 unsigned long lastHeartbeatSent = 0;
@@ -285,16 +287,7 @@ void task_cloud(void* pvParameters) {
     HTTPClient http;
     http.setTimeout(5000);
 
-    String url = googleScriptURL + 
-    "?id=" + String(DEVICE_ID) + 
-    "&fw=" + String(FW_VERSION) + 
-    "&temp=" + tempStr + 
-    "&hum=" + humStr + 
-    "&setTemp=" + setTempStr +
-    "&setHum=" + setHumStr +
-    "&mode=" + String(heaterMode == MODE_AUTO ? "AUTO" : "MANUAL") + 
-    "&heater=" + String(heaterOn ? "1" : "0") + 
-    "&cooler=" + String(coolerOn ? "1" : "0");
+    String url = googleScriptURL + "?id=" + String(DEVICE_ID) + "&fw=" + String(FW_VERSION) + "&temp=" + tempStr + "&hum=" + humStr + "&setTemp=" + setTempStr + "&setHum=" + setHumStr + "&mode=" + String(heaterMode == MODE_AUTO ? "AUTO" : "MANUAL") + "&heater=" + String(heaterOn ? "1" : "0") + "&cooler=" + String(coolerOn ? "1" : "0");
 
     Serial.println("[CLOUD] Sending telemetry...");
 
@@ -414,6 +407,30 @@ void task_temperature_control(void* pvParameters) {
     } else {
       coolerOn = false;
       digitalWrite(RELAY_COOLER, RELAY_OFF);
+    }
+    /* ================= HUMIDITY CONTROL ================= */
+
+    float currentHum = 0.0;
+
+    if (xSemaphoreTake(sensorMutex, portMAX_DELAY)) {
+      currentHum = gSensorData.humidity_dht;
+      xSemaphoreGive(sensorMutex);
+    }
+
+    if (currentHum >= 0 && currentHum <= 100) {
+
+      if (!humidifierOn && currentHum <= (humSetpoint - humHysteresis)) {
+
+        humidifierOn = true;
+        digitalWrite(RELAY_HUMIDIFIER, RELAY_ON);
+        Serial.println("[RELAY] HUMIDIFIER ON");
+
+      } else if (humidifierOn && currentHum >= (humSetpoint + humHysteresis)) {
+
+        humidifierOn = false;
+        digitalWrite(RELAY_HUMIDIFIER, RELAY_OFF);
+        Serial.println("[RELAY] HUMIDIFIER OFF");
+      }
     }
 
     vTaskDelay(pdMS_TO_TICKS(500));
@@ -579,9 +596,11 @@ void task_ui(void* pvParameters) {
           temp,
           hum,
           tempSetpoint,
+          humSetpoint,
           heaterMode == MODE_AUTO,
           heaterOn,
-          coolerOn);
+          coolerOn,
+          humidifierOn);
       }
     }
 
@@ -893,6 +912,9 @@ void loadSettings() {
   heaterMode = (ControlMode)prefs.getUInt("mode", MODE_AUTO);
   heaterManualOn = prefs.getBool("heatMan", false);
   coolerManualOn = prefs.getBool("coolMan", false);
+  humSetpoint = prefs.getFloat("setHum", 60.0);
+  humHysteresis = prefs.getFloat("humHyst", 3.0);
+
 
   prefs.end();
 
@@ -908,6 +930,9 @@ void saveSettings() {
   prefs.putUInt("mode", heaterMode);
   prefs.putBool("heatMan", heaterManualOn);
   prefs.putBool("coolMan", coolerManualOn);
+  prefs.putFloat("setHum", humSetpoint);
+  prefs.putFloat("humHyst", humHysteresis);
+
 
   prefs.end();
 
@@ -942,10 +967,14 @@ void setup() {
 
   pinMode(RELAY_HEATER, OUTPUT);
   pinMode(RELAY_COOLER, OUTPUT);
+  pinMode(RELAY_HUMIDIFIER, OUTPUT);
+
+
 
   // Safety: OFF at boot
   digitalWrite(RELAY_HEATER, RELAY_OFF);
   digitalWrite(RELAY_COOLER, RELAY_OFF);
+  digitalWrite(RELAY_HUMIDIFIER, RELAY_OFF);
 
 
   Wire.begin(I2C_SDA, I2C_SCL);

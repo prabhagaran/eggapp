@@ -31,10 +31,13 @@ void oled_show_home(const DateTime& now,
                     int day,
                     float temp,
                     float hum,
-                    float setpoint,
+                    float tempSetpoint,
+                    float humSetpoint,
                     bool isAutoMode,
                     bool heaterOn,
-                    bool coolerOn) {
+                    bool coolerOn,
+                    bool humidifierOn)
+{
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
@@ -75,7 +78,7 @@ void oled_show_home(const DateTime& now,
   display.print("Temp: ");
   display.print(temp, 1);
   display.print(" / ");
-  display.print(setpoint, 1);
+  display.print(tempSetpoint, 1);
   display.print(" C");
 
   /* ---------- HUMIDITY ---------- */
@@ -83,7 +86,10 @@ void oled_show_home(const DateTime& now,
   display.setCursor(0, 34);
   display.print("Hum : ");
   display.print((int)hum);
+  display.print(" / ");
+  display.print((int)humSetpoint);
   display.print(" %");
+
 
   /* ---------- OUTPUT STATES ---------- */
 
@@ -95,10 +101,11 @@ void oled_show_home(const DateTime& now,
   display.print("Cool: ");
   display.print(coolerOn ? "ON" : "OFF");
 
-  /* ---------- MENU ---------- */
-
   display.setCursor(0, 56);
-  display.print("OK: Menu");
+  display.print("Humid: ");
+  display.print(humidifierOn ? "ON" : "OFF");
+
+
 
   display.display();
 }
