@@ -204,18 +204,20 @@ void task_cloud(void* pvParameters) {
 
   for (;;) {
 
-    // Ensure WiFi is connected
-    if (WiFi.status() != WL_CONNECTED) {
+    /* ================= WIFI CHECK ================= */
 
+    if (WiFi.status() != WL_CONNECTED) {
       Serial.println("[CLOUD] Reconnecting WiFi...");
       WiFi.reconnect();
-
       vTaskDelay(pdMS_TO_TICKS(5000));
       continue;
     }
+
+    /* ================= SEND QUEUED ERRORS ================= */
+
     ErrorMsg_t incomingError;
 
-    if (xQueueReceive(errorQueue, &incomingError, 0) == pdTRUE) {
+    while (xQueueReceive(errorQueue, &incomingError, 0) == pdTRUE) {
 
       WiFiClientSecure client;
       client.setInsecure();
@@ -226,18 +228,27 @@ void task_cloud(void* pvParameters) {
       String msg = String(incomingError.message);
       msg.replace(" ", "%20");
 
-      String url = googleScriptURL + "?id=" + String(DEVICE_ID) + "&fw=" + String(FW_VERSION) + "&error=" + String(incomingError.type) + "&msg=" + msg;
+      String url = googleScriptURL +
+                   "?id=" + String(DEVICE_ID) +
+                   "&fw=" + String(FW_VERSION) +
+                   "&error=" + String(incomingError.type) +
+                   "&msg=" + msg;
+
+      Serial.println("[CLOUD] Sending ERROR log...");
 
       http.begin(client, url);
       http.GET();
       http.end();
     }
 
+    /* ================= HEARTBEAT ================= */
 
-    if (millis() - lastHeartbeat > 300000) {
+    if (millis() - lastHeartbeat > 300000) {  // 5 minutes
       pushError("HEARTBEAT", "Device Alive");
       lastHeartbeat = millis();
     }
+
+    /* ================= READ SENSOR DATA ================= */
 
     float t = 0.0;
     float h = 0.0;
@@ -248,16 +259,40 @@ void task_cloud(void* pvParameters) {
       xSemaphoreGive(sensorMutex);
     }
 
+    /* ================= DATA VALIDATION ================= */
+
+    String tempStr;
+    if (t < -100 || t > 100) {
+      tempStr = "NA";
+    } else {
+      tempStr = String(t, 1);
+    }
+
+    String humStr;
+    if (h < 0 || h > 100) {
+      humStr = "NA";
+    } else {
+      humStr = String((int)h);
+    }
+
+    /* ================= TELEMETRY ================= */
+
     WiFiClientSecure client;
     client.setInsecure();
 
     HTTPClient http;
-    http.setTimeout(5000);  // 5 second timeout
+    http.setTimeout(5000);
 
-    String url = googleScriptURL + "?id=" + String(DEVICE_ID) + "&fw=" + String(FW_VERSION) + "&temp=" + String(t, 1) + "&hum=" + String((int)h) + "&mode=" + String(heaterMode == MODE_AUTO ? "AUTO" : "MANUAL") + "&heater=" + String(heaterOn ? "1" : "0") + "&cooler=" + String(coolerOn ? "1" : "0");
+    String url = googleScriptURL +
+                 "?id=" + String(DEVICE_ID) +
+                 "&fw=" + String(FW_VERSION) +
+                 "&temp=" + tempStr +
+                 "&hum=" + humStr +
+                 "&mode=" + String(heaterMode == MODE_AUTO ? "AUTO" : "MANUAL") +
+                 "&heater=" + String(heaterOn ? "1" : "0") +
+                 "&cooler=" + String(coolerOn ? "1" : "0");
 
-
-    Serial.println("[CLOUD] Sending data...");
+    Serial.println("[CLOUD] Sending telemetry...");
 
     http.begin(client, url);
     int httpCode = http.GET();
@@ -267,24 +302,22 @@ void task_cloud(void* pvParameters) {
       Serial.print("[CLOUD] HTTP Code: ");
       Serial.println(httpCode);
 
-      if (httpCode == 200 || httpCode == 302) {
-        Serial.println("[CLOUD] Upload Success");
-      } else {
-        Serial.println("[CLOUD] Server Error");
-        pushError("SERVER_ERROR", "HTTP code unexpected");
-
+      if (httpCode != 200 && httpCode != 302) {
+        pushError("SERVER_ERROR", "HTTP unexpected");
       }
 
     } else {
+
       Serial.println("[CLOUD] HTTP Failed");
-      if (millis() - lastHttpErrorSent > 60000) {
-        pushError("HTTP_FAIL", "Upload failed");
-        lastHttpErrorSent = millis();
-      }
+
+      pushError("HTTP_FAIL", "Upload failed");
     }
+
     http.end();
 
-    vTaskDelay(pdMS_TO_TICKS(60000));  // 60 sec interval
+    /* ================= INTERVAL ================= */
+
+    vTaskDelay(pdMS_TO_TICKS(60000));  // 60 sec
   }
 }
 
