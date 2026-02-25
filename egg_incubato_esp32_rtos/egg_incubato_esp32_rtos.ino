@@ -162,6 +162,7 @@ int lastMinute = -1;
 int modeMenuIndex = 0;
 int manualControlIndex = 0;
 int hysteresisMenuIndex = 0;
+volatile bool overTempFault = false;
 
 
 unsigned long lastSensorUiUpdate = 0;
@@ -319,7 +320,7 @@ void task_cloud(void* pvParameters) {
 
 void task_temperature_control(void* pvParameters) {
 
-  const float MAX_TEMP_LIMIT = 39.5;   // Absolute safety limit
+  const float MAX_TEMP_LIMIT = 39.5;  // Absolute safety limit
 
   for (;;) {
 
@@ -351,21 +352,34 @@ void task_temperature_control(void* pvParameters) {
       continue;
     }
 
+    /* ================= FAULT LATCH CHECK ================= */
+
+    if (overTempFault) {
+
+      heaterOn = false;
+      humidifierOn = false;
+
+      digitalWrite(RELAY_HEATER, RELAY_OFF);
+      digitalWrite(RELAY_HUMIDIFIER, RELAY_OFF);
+
+      vTaskDelay(pdMS_TO_TICKS(500));
+      continue;  // Skip control logic
+    }
     /* ================= OVER-TEMPERATURE SAFETY ================= */
 
     if (currentTemp > MAX_TEMP_LIMIT) {
 
+      overTempFault = true;
       heaterOn = false;
-      digitalWrite(RELAY_HEATER, RELAY_OFF);
+      humidifierOn = false;
 
-      Serial.println("[SAFETY] OVER TEMPERATURE - HEATER OFF");
+      digitalWrite(RELAY_HEATER, RELAY_OFF);
+      digitalWrite(RELAY_HUMIDIFIER, RELAY_OFF);
+
+      Serial.println("[FAULT] OVER TEMPERATURE - LATCHED");
 
       pushError("OVER_TEMP", "Incubator Over Temperature");
-
-      vTaskDelay(pdMS_TO_TICKS(500));
-      continue;
     }
-
     /* ================= HEATER CONTROL ================= */
 
     if (!heaterOn && currentTemp <= (tempSetpoint - tempHysteresis)) {
@@ -494,30 +508,71 @@ void task_rtc(void* pvParameters) {
 
 /* ================= TASK: BUTTONS ================= */
 void task_buttons(void* pvParameters) {
+
   btnUp.setDebounceTime(50);
   btnDown.setDebounceTime(50);
   btnOk.setDebounceTime(50);
 
+  static unsigned long okPressStart = 0;
+  static bool okHeld = false;
+
   for (;;) {
+
     btnUp.loop();
     btnDown.loop();
     btnOk.loop();
 
     UiEvent evt;
 
+    /* ================= UP BUTTON ================= */
     if (btnUp.isPressed()) {
       evt = UI_EVT_UP;
       xQueueSend(uiEventQueue, &evt, 0);
     }
 
+    /* ================= DOWN BUTTON ================= */
     if (btnDown.isPressed()) {
       evt = UI_EVT_DOWN;
       xQueueSend(uiEventQueue, &evt, 0);
     }
 
+    /* ================= OK BUTTON ================= */
+
+    // Detect press start
     if (btnOk.isPressed()) {
-      evt = UI_EVT_OK;
-      xQueueSend(uiEventQueue, &evt, 0);
+
+      okPressStart = millis();
+      okHeld = true;
+
+      // Send UI event only if NOT in fault
+      if (!overTempFault) {
+        evt = UI_EVT_OK;
+        xQueueSend(uiEventQueue, &evt, 0);
+      }
+    }
+
+    // Detect release
+    if (btnOk.isReleased()) {
+
+      if (overTempFault && okHeld) {
+
+        // Long press ≥ 3 seconds
+        if (millis() - okPressStart >= 3000) {
+
+          overTempFault = false;
+
+          // Ensure outputs remain OFF after reset
+          heaterOn = false;
+          humidifierOn = false;
+
+          digitalWrite(RELAY_HEATER, RELAY_OFF);
+          digitalWrite(RELAY_HUMIDIFIER, RELAY_OFF);
+
+          Serial.println("[FAULT] Manual Reset");
+        }
+      }
+
+      okHeld = false;
     }
 
     vTaskDelay(pdMS_TO_TICKS(10));
