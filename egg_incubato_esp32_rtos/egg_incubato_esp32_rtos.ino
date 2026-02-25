@@ -585,6 +585,21 @@ void task_ui(void* pvParameters) {
 
   for (;;) {
 
+    if (overTempFault) {
+
+      float temp = 0.0;
+
+      if (xSemaphoreTake(sensorMutex, portMAX_DELAY)) {
+        temp = gSensorData.temp_ds18b20;
+        xSemaphoreGive(sensorMutex);
+      }
+
+      oled_show_fault_screen(temp);
+
+      vTaskDelay(pdMS_TO_TICKS(500));
+      continue;  // Skip normal UI
+    }
+
     if (uiState == UI_HOME) {
 
       DateTime now;

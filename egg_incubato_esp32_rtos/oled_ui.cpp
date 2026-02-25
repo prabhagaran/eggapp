@@ -381,5 +381,31 @@ void oled_show_hysteresis_menu(int selected,
 
   display.display();
 }
+void oled_show_fault_screen(float currentTemp) {
 
+  display.clearDisplay();
+  display.setTextColor(SSD1306_WHITE);
+
+  // Big warning title
+  display.setTextSize(2);
+  display.setCursor(10, 5);
+  display.println("ALARM!");
+
+  display.drawLine(0, 22, 127, 22, SSD1306_WHITE);
+
+  display.setTextSize(1);
+
+  display.setCursor(0, 30);
+  display.print("Over Temperature");
+
+  display.setCursor(0, 42);
+  display.print("Temp: ");
+  display.print(currentTemp, 1);
+  display.print(" C");
+
+  display.setCursor(0, 54);
+  display.print("Hold OK 3s to Reset");
+
+  display.display();
+}
 
