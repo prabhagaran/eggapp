@@ -31,10 +31,12 @@ void oled_show_home(const DateTime& now,
                     int day,
                     float temp,
                     float hum,
-                    float setpoint,
+                    float tempSetpoint,
+                    float humSetpoint,
                     bool isAutoMode,
                     bool heaterOn,
-                    bool coolerOn) {
+                    bool coolerOn,
+                    bool humidifierOn){
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
@@ -75,7 +77,7 @@ void oled_show_home(const DateTime& now,
   display.print("Temp: ");
   display.print(temp, 1);
   display.print(" / ");
-  display.print(setpoint, 1);
+  display.print(tempSetpoint, 1);
   display.print(" C");
 
   /* ---------- HUMIDITY ---------- */
@@ -83,7 +85,10 @@ void oled_show_home(const DateTime& now,
   display.setCursor(0, 34);
   display.print("Hum : ");
   display.print((int)hum);
+  display.print(" / ");
+  display.print((int)humSetpoint);
   display.print(" %");
+
 
   /* ---------- OUTPUT STATES ---------- */
 
@@ -95,17 +100,36 @@ void oled_show_home(const DateTime& now,
   display.print("Cool: ");
   display.print(coolerOn ? "ON" : "OFF");
 
-  /* ---------- MENU ---------- */
-
   display.setCursor(0, 56);
-  display.print("OK: Menu");
+  display.print("Humid: ");
+  display.print(humidifierOn ? "ON" : "OFF");
+
+
 
   display.display();
 }
+void oled_show_humidity(float current, float setpoint) {
 
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
 
+  display.setCursor(0, 0);
+  display.println("HUMIDITY");
+  display.drawLine(0, 15, 127, 15, SSD1306_WHITE);
 
+  display.setCursor(0, 24);
+  display.print("Current : ");
+  display.print((int)current);
+  display.print(" %");
 
+  display.setCursor(0, 36);
+  display.print("Setpoint: ");
+  display.print((int)setpoint);
+  display.print(" %");
+
+  display.display();
+}
 void oled_show_menu(int selected) {
   static const char* menuItems[] = {
     "Controller Mode",
@@ -132,7 +156,6 @@ void oled_show_menu(int selected) {
 
   display.display();
 }
-
 void oled_show_controller_mode(int selected) {
   static const char* items[] = {
     "Egg Incubator",
@@ -158,7 +181,6 @@ void oled_show_controller_mode(int selected) {
 
   display.display();
 }
-
 void oled_show_set_environment(int selected) {
   static const char* items[] = {
     "Temperature",
@@ -186,7 +208,6 @@ void oled_show_set_environment(int selected) {
 
   display.display();
 }
-
 void oled_show_temperature(float current, float setpoint) {
   display.clearDisplay();
   display.setTextSize(1);
@@ -326,3 +347,39 @@ void oled_show_manual_control(int selected,
 
   display.display();
 }
+void oled_show_hysteresis_menu(int selected,
+                               float tempHyst,
+                               float humHyst)
+{
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+
+  // Title
+  display.setCursor(0, 0);
+  display.println("HYSTERESIS SETTINGS");
+  display.drawLine(0, 15, 127, 15, SSD1306_WHITE);
+
+  // Temperature Hysteresis
+  display.setCursor(0, 24);
+  display.print(selected == 0 ? "> " : "  ");
+  display.print("Temp Hyst : +-");
+  display.print(tempHyst, 1);
+  display.print(" C");
+
+  // Humidity Hysteresis
+  display.setCursor(0, 36);
+  display.print(selected == 1 ? "> " : "  ");
+  display.print("Hum  Hyst : +-");
+  display.print(humHyst, 0);
+  display.print(" %");
+
+  // Back Option
+  display.setCursor(0, 48);
+  display.print(selected == 2 ? "> " : "  ");
+  display.print("Back");
+
+  display.display();
+}
+
+
