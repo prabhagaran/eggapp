@@ -28,6 +28,7 @@ void oled_show_humidity(float current, float setpoint);
 void oled_show_hysteresis_menu(int selected,
                                float tempHyst,
                                float humHyst);
+void oled_show_fault_screen(float currentTemp);
 
 
 
