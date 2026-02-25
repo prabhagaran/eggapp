@@ -319,6 +319,8 @@ void task_cloud(void* pvParameters) {
 
 void task_temperature_control(void* pvParameters) {
 
+  const float MAX_TEMP_LIMIT = 39.5;   // Absolute safety limit
+
   for (;;) {
 
     float currentTemp = 0.0;
@@ -333,10 +335,10 @@ void task_temperature_control(void* pvParameters) {
     if (currentTemp < -100 || currentTemp > 100) {
 
       heaterOn = false;
-      coolerOn = false;
+      humidifierOn = false;
 
       digitalWrite(RELAY_HEATER, RELAY_OFF);
-      digitalWrite(RELAY_COOLER, RELAY_OFF);
+      digitalWrite(RELAY_HUMIDIFIER, RELAY_OFF);
 
       Serial.println("[SAFETY] Sensor invalid - All outputs OFF");
 
@@ -345,67 +347,40 @@ void task_temperature_control(void* pvParameters) {
         lastSensorErrorSent = millis();
       }
 
+      vTaskDelay(pdMS_TO_TICKS(500));
+      continue;
+    }
+
+    /* ================= OVER-TEMPERATURE SAFETY ================= */
+
+    if (currentTemp > MAX_TEMP_LIMIT) {
+
+      heaterOn = false;
+      digitalWrite(RELAY_HEATER, RELAY_OFF);
+
+      Serial.println("[SAFETY] OVER TEMPERATURE - HEATER OFF");
+
+      pushError("OVER_TEMP", "Incubator Over Temperature");
 
       vTaskDelay(pdMS_TO_TICKS(500));
       continue;
     }
 
+    /* ================= HEATER CONTROL ================= */
 
-    /* ================= MANUAL MODE ================= */
-
-    if (heaterMode == MODE_MANUAL) {
-
-      heaterOn = heaterManualOn;
-      coolerOn = coolerManualOn;
-
-      digitalWrite(RELAY_HEATER,
-                   heaterManualOn ? RELAY_ON : RELAY_OFF);
-
-      digitalWrite(RELAY_COOLER,
-                   coolerManualOn ? RELAY_ON : RELAY_OFF);
-
-      vTaskDelay(pdMS_TO_TICKS(200));
-      continue;
-    }
-
-
-    /* ================= AUTO MODE ================= */
-
-    float tempHighLimit = tempSetpoint + 1.5;
-
-    // ---- HEATER CONTROL (Hysteresis) ----
     if (!heaterOn && currentTemp <= (tempSetpoint - tempHysteresis)) {
 
       heaterOn = true;
-      coolerOn = false;
-
       digitalWrite(RELAY_HEATER, RELAY_ON);
-      digitalWrite(RELAY_COOLER, RELAY_OFF);
-
       Serial.println("[RELAY] HEATER ON");
+
     } else if (heaterOn && currentTemp >= (tempSetpoint + tempHysteresis)) {
 
       heaterOn = false;
-
       digitalWrite(RELAY_HEATER, RELAY_OFF);
-
       Serial.println("[RELAY] HEATER OFF");
     }
 
-    // ---- COOLING SAFETY ----
-    if (currentTemp >= tempHighLimit) {
-
-      coolerOn = true;
-      heaterOn = false;
-
-      digitalWrite(RELAY_COOLER, RELAY_ON);
-      digitalWrite(RELAY_HEATER, RELAY_OFF);
-
-      Serial.println("[RELAY] COOLER ON (HIGH TEMP)");
-    } else {
-      coolerOn = false;
-      digitalWrite(RELAY_COOLER, RELAY_OFF);
-    }
     /* ================= HUMIDITY CONTROL ================= */
 
     float currentHum = 0.0;
@@ -434,9 +409,6 @@ void task_temperature_control(void* pvParameters) {
     vTaskDelay(pdMS_TO_TICKS(500));
   }
 }
-
-
-
 
 /* ================= TASK: SENSOR ================= */
 void task_sensor(void* pvParameters) {
