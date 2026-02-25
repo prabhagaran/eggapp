@@ -507,6 +507,7 @@ void task_rtc(void* pvParameters) {
 }
 
 /* ================= TASK: BUTTONS ================= */
+/* ================= TASK: BUTTONS ================= */
 void task_buttons(void* pvParameters) {
 
   btnUp.setDebounceTime(50);
@@ -524,44 +525,22 @@ void task_buttons(void* pvParameters) {
 
     UiEvent evt;
 
-    /* ================= UP BUTTON ================= */
-    if (btnUp.isPressed()) {
-      evt = UI_EVT_UP;
-      xQueueSend(uiEventQueue, &evt, 0);
-    }
+    /* ================= FAULT MODE ================= */
+    if (overTempFault) {
 
-    /* ================= DOWN BUTTON ================= */
-    if (btnDown.isPressed()) {
-      evt = UI_EVT_DOWN;
-      xQueueSend(uiEventQueue, &evt, 0);
-    }
-
-    /* ================= OK BUTTON ================= */
-
-    // Detect press start
-    if (btnOk.isPressed()) {
-
-      okPressStart = millis();
-      okHeld = true;
-
-      // Send UI event only if NOT in fault
-      if (!overTempFault) {
-        evt = UI_EVT_OK;
-        xQueueSend(uiEventQueue, &evt, 0);
+      // Detect OK press start
+      if (btnOk.isPressed()) {
+        okPressStart = millis();
+        okHeld = true;
       }
-    }
 
-    // Detect release
-    if (btnOk.isReleased()) {
+      // Detect OK release
+      if (btnOk.isReleased()) {
 
-      if (overTempFault && okHeld) {
-
-        // Long press ≥ 3 seconds
-        if (millis() - okPressStart >= 3000) {
+        if (okHeld && (millis() - okPressStart >= 3000)) {
 
           overTempFault = false;
 
-          // Ensure outputs remain OFF after reset
           heaterOn = false;
           humidifierOn = false;
 
@@ -570,9 +549,30 @@ void task_buttons(void* pvParameters) {
 
           Serial.println("[FAULT] Manual Reset");
         }
+
+        okHeld = false;
       }
 
-      okHeld = false;
+      // Ignore all other buttons during fault
+      vTaskDelay(pdMS_TO_TICKS(10));
+      continue;
+    }
+
+    /* ================= NORMAL MODE ================= */
+
+    if (btnUp.isPressed()) {
+      evt = UI_EVT_UP;
+      xQueueSend(uiEventQueue, &evt, 0);
+    }
+
+    if (btnDown.isPressed()) {
+      evt = UI_EVT_DOWN;
+      xQueueSend(uiEventQueue, &evt, 0);
+    }
+
+    if (btnOk.isPressed()) {
+      evt = UI_EVT_OK;
+      xQueueSend(uiEventQueue, &evt, 0);
     }
 
     vTaskDelay(pdMS_TO_TICKS(10));
