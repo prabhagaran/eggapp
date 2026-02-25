@@ -119,7 +119,6 @@ enum ControlMode {
   MODE_AUTO = 0,
   MODE_MANUAL
 };
-
 ControlMode heaterMode = MODE_AUTO;
 
 
@@ -128,8 +127,6 @@ typedef struct {
   float temp_ds18b20;  // Main temperature
   float humidity_dht;  // Humidity only
 } SensorData_t;
-
-
 SensorData_t gSensorData;
 SemaphoreHandle_t sensorMutex;
 
@@ -138,7 +135,6 @@ typedef struct {
   DateTime now;
   uint32_t epoch;
 } RtcTime_t;
-
 RtcTime_t gRtcTime;
 SemaphoreHandle_t rtcMutex;
 
@@ -146,7 +142,6 @@ typedef struct {
   char type[20];
   char message[60];
 } ErrorMsg_t;
-
 QueueHandle_t errorQueue;
 
 
@@ -187,10 +182,6 @@ bool heaterManualOn = false;
 unsigned long lastSensorErrorSent = 0;
 unsigned long lastHttpErrorSent = 0;
 unsigned long lastHeartbeatSent = 0;
-
-
-
-
 
 
 String googleScriptURL =
