@@ -517,7 +517,7 @@ void oled_show_incubation_day_set(int selected, int day, int month, int year, bo
     // Row 1: Start Date
     display.setCursor(0, 18);
     display.print(selected == 0 ? "> " : "  ");
-    display.print("Start Date : ");
+    display.print("Date : ");
     char buf[16];
     snprintf(buf, sizeof(buf), "%02d/%02d/%04d", d, m, y);
     display.print(buf);
@@ -533,11 +533,9 @@ void oled_show_incubation_day_set(int selected, int day, int month, int year, bo
     if (editing) {
         const char* fieldName = (editField == 0) ? "Day" : (editField == 1) ? "Month" : "Year";
         char hint[32];
-        snprintf(hint, sizeof(hint), "Edit: %s  UP/DN change  OK next", fieldName);
+        snprintf(hint, sizeof(hint), "Edit: %s  UP/DN change", fieldName);
         display.print(hint);
-    } else {
-        display.print("UP/DN scroll  OK select");
-    }
+    } 
 
     display.display();
 }

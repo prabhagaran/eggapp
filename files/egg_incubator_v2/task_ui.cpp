@@ -38,8 +38,6 @@ static int editDay   = 1;
 static int editMonth = 1;
 static int editYear  = 2024;
 static int editField = 0;  // 0=day, 1=month, 2=year
-// Force entering edit mode for incubation screen when set from menu
-static bool incubForceEdit = false;
 
 // Home screen refresh tracking
 static int           lastMinute         = -1;
@@ -327,9 +325,32 @@ void task_ui(void* pvParameters) {
                     if (envMenuIdx == 3) {
                     // Incubation start date
                         uiState = UI_ENV_INCUBATION_DAY;
-                        // request that the incubation handler open directly into edit mode
-                        incubForceEdit = true;
-                        lastMenuIdx = -1;
+                        // Immediately reset UI state and render the screen so the
+                        // first OK press isn't lost — do not wait for next event.
+                        editField = 0;
+                        // read snapshot from settings or RTC for immediate render
+                        {
+                            uint32_t sEpoch = 0;
+                            int d = 1, m = 1, y = 2024;
+                            if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+                                sEpoch = gSettings.startEpoch;
+                                xSemaphoreGive(settingsMutex);
+                            }
+                            if (sEpoch != 0) {
+                                DateTime sd((uint32_t)sEpoch);
+                                d = sd.day(); m = sd.month(); y = sd.year();
+                            } else {
+                                DateTime now(2024,1,1);
+                                if (xSemaphoreTake(rtcMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+                                    now = gRtcTime.now;
+                                    xSemaphoreGive(rtcMutex);
+                                }
+                                d = now.day(); m = now.month(); y = now.year();
+                            }
+                            // mark selection on Start Date (index 0) and draw
+                            lastMenuIdx = 0;
+                            oled_show_incubation_day_set(0, d, m, y, false, 0);
+                        }
                     } else if (envMenuIdx == 4) {
                         uiState = UI_ENV_EGG_TYPE;
                         if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
@@ -598,29 +619,8 @@ void task_ui(void* pvParameters) {
                     }
                     dispDay = now.day(); dispMonth = now.month(); dispYear = now.year();
                 }
-                // If caller requested immediate edit (single-press from menu), enter edit mode
-                if (incubForceEdit) {
-                    incubForceEdit = false;
-                    mode = IM_EDIT;
-                    // load edit values from saved or RTC
-                    if (sEpoch != 0) {
-                        DateTime sd((uint32_t)sEpoch);
-                        editDay = sd.day(); editMonth = sd.month(); editYear = sd.year();
-                    } else {
-                        DateTime now(2024,1,1);
-                        if (xSemaphoreTake(rtcMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
-                            now = gRtcTime.now;
-                            xSemaphoreGive(rtcMutex);
-                        }
-                        editDay = now.day(); editMonth = now.month(); editYear = now.year();
-                    }
-                    editField = 0;
-                    lastMenuIdx = 0;
-                    oled_show_incubation_day_set(0, editDay, editMonth, editYear, true, editField);
-                    continue;
-                }
-
-                mode = IM_NAV; navIdx = 0;
+                // Always start in navigation mode on entry; do not preload edit values
+                mode = IM_NAV; navIdx = 0; editField = 0;
                 lastMenuIdx = navIdx;
                 oled_show_incubation_day_set(navIdx, dispDay, dispMonth, dispYear, false, 0);
                 continue;
