@@ -704,7 +704,7 @@ void task_ui(void* pvParameters) {
                         }
 
                         // Return to navigation mode
-                        mode = IM_NAV; navIdx = 0; lastMenuIdx = -1;
+                        mode = IM_NAV; navIdx = 0; lastMenuIdx = navIdx;
                         oled_show_incubation_day_set(navIdx, dispDay, dispMonth, dispYear, false, 0);
                     }
                 }

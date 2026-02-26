@@ -121,7 +121,7 @@ void oled_show_home_incubator(const DateTime& now,
     display.setCursor(0, 55);
     display.print("Hm:");
     display.print(humidifierOn ? "ON " : "OFF");
-    display.setCursor(52, 55);
+    display.setCursor(64, 55);
     display.print("Tr:");
     display.print(turnerOn ? "ON " : "OFF");
     if (!wifiOk) {
@@ -265,7 +265,7 @@ void oled_show_menu(int selected) {
     display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
 
     for (int i = 0; i < 4; i++) {
-        display.setCursor(0, 14 + i * 12);
+        display.setCursor(0, 16 + i * 12);
         display.print(i == selected ? "> " : "  ");
         display.print(items[i]);
     }
@@ -290,7 +290,7 @@ void oled_show_controller_mode(int selected, ProfileType activeProfile) {
     display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
 
     // Show active profile indicator
-    display.setCursor(0, 12);
+    display.setCursor(0, 16);
     display.print("Active: ");
     display.print(activeProfile == PROFILE_EGG_INCUBATOR ? "Incubator" : "Climate");
 
@@ -346,7 +346,7 @@ void oled_show_set_environment(int selected, ProfileType profile) {
     // Render window
     for (int r = 0; r < maxRows; r++) {
         int idx = start + r;
-        display.setCursor(0, 14 + r * 10);
+        display.setCursor(0, 16 + r * 10);
         display.print(idx == selected ? "> " : "  ");
         display.print(fullItems[idx]);
     }
