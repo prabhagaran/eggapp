@@ -483,59 +483,61 @@ void oled_show_egg_type(int selected) {
 // ─────────────────────────────────────────────────────────────────────────────
 // INCUBATION START DATE SET
 // ─────────────────────────────────────────────────────────────────────────────
-void oled_show_incubation_day_set(int day, int month, int year) {
+void oled_show_incubation_day_set(int selected, int day, int month, int year, bool editing, int editField) {
     display.clearDisplay();
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE);
 
     display.setCursor(0, 0);
-    display.print("START DATE");
+    display.print("INCUBATION");
     display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
 
-    display.setCursor(0, 18);
-    display.print("Set incubation start:");
-
-    display.setTextSize(1);
-    display.setCursor(10, 32);
-    // Display selection rules:
-    // - If the caller is in edit mode it will pass the edit values (show them).
-    // - Otherwise prefer saved startEpoch (if non-zero).
-    // - If no saved startEpoch, show current RTC date.
-    uint32_t startEpoch = 0;
-    if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
-        startEpoch = gSettings.startEpoch;
-        xSemaphoreGive(settingsMutex);
-    }
-
+    // Determine display date: prefer passed (edit) values when editing,
+    // otherwise prefer saved startEpoch, and fall back to RTC date.
     int d = day, m = month, y = year;
-
-    if (startEpoch != 0) {
-        // Use saved date from settings (do not rely on caller's edit vars)
-        DateTime sd((uint32_t)startEpoch);
-        d = sd.day(); m = sd.month(); y = sd.year();
-    } else {
-        // No saved start date — use RTC current date
-        DateTime now(2024,1,1);
-        if (xSemaphoreTake(rtcMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
-            now = gRtcTime.now;
-            xSemaphoreGive(rtcMutex);
+    if (!editing) {
+        uint32_t startEpoch = 0;
+        if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
+            startEpoch = gSettings.startEpoch;
+            xSemaphoreGive(settingsMutex);
         }
-        d = now.day(); m = now.month(); y = now.year();
+        if (startEpoch != 0) {
+            DateTime sd((uint32_t)startEpoch);
+            d = sd.day(); m = sd.month(); y = sd.year();
+        } else {
+            DateTime now(2024,1,1);
+            if (xSemaphoreTake(rtcMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
+                now = gRtcTime.now;
+                xSemaphoreGive(rtcMutex);
+            }
+            d = now.day(); m = now.month(); y = now.year();
+        }
     }
 
-    // If caller passed edit values that differ from the chosen display
-    // (i.e., caller likely in edit mode), prefer the passed values.
-    if (day != d || month != m || year != y) {
-        d = day; m = month; y = year;
-    }
-
-    char buf[12];
+    // Row 1: Start Date
+    display.setCursor(0, 18);
+    display.print(selected == 0 ? "> " : "  ");
+    display.print("Start Date : ");
+    char buf[16];
     snprintf(buf, sizeof(buf), "%02d/%02d/%04d", d, m, y);
     display.print(buf);
 
+    // Row 2: Back
+    display.setCursor(0, 34);
+    display.print(selected == 1 ? "> " : "  ");
+    display.print("Back");
+
+    // Footer: editing hints when in edit mode
     display.setTextSize(1);
     display.setCursor(0, 54);
-    display.print("UP/DN day  OK confirm");
+    if (editing) {
+        const char* fieldName = (editField == 0) ? "Day" : (editField == 1) ? "Month" : "Year";
+        char hint[32];
+        snprintf(hint, sizeof(hint), "Edit: %s  UP/DN change  OK next", fieldName);
+        display.print(hint);
+    } else {
+        display.print("UP/DN scroll  OK select");
+    }
 
     display.display();
 }

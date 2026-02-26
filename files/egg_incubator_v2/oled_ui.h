@@ -66,7 +66,7 @@ void oled_show_hysteresis_menu(int selected, float tempHyst, float humHyst);
 // EGG INCUBATOR SCREENS
 // ─────────────────────────────────────────────────────────────────────────────
 void oled_show_egg_type(int selected);
-void oled_show_incubation_day_set(int day, int month, int year);
+void oled_show_incubation_day_set(int selected, int day, int month, int year, bool editing, int editField);
 void oled_show_turner_settings(int selected,
                                 uint16_t intervalMin,
                                 uint16_t durationSec,

@@ -38,6 +38,8 @@ static int editDay   = 1;
 static int editMonth = 1;
 static int editYear  = 2024;
 static int editField = 0;  // 0=day, 1=month, 2=year
+// Force entering edit mode for incubation screen when set from menu
+static bool incubForceEdit = false;
 
 // Home screen refresh tracking
 static int           lastMinute         = -1;
@@ -323,10 +325,11 @@ void task_ui(void* pvParameters) {
                 // Egg incubator items 3-7
                 else if (profile == PROFILE_EGG_INCUBATOR) {
                     if (envMenuIdx == 3) {
-                        // Incubation start date
+                    // Incubation start date
                         uiState = UI_ENV_INCUBATION_DAY;
-                        editDay = 1; editMonth = 1; editYear = 2024; editField = 0;
-                        oled_show_incubation_day_set(editDay, editMonth, editYear);
+                        // request that the incubation handler open directly into edit mode
+                        incubForceEdit = true;
+                        lastMenuIdx = -1;
                     } else if (envMenuIdx == 4) {
                         uiState = UI_ENV_EGG_TYPE;
                         if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
@@ -568,40 +571,142 @@ void task_ui(void* pvParameters) {
         }
 
         // ═════════════════════════════════════════════════════════════════════
-        // INCUBATION START DATE
-        // Cycles through day / month / year fields
-        // ═════════════════════════════════════════════════════════════════════
+        // INCUBATION START DATE (two-item menu: Start Date / Back)
+        // Navigation mode vs Edit mode (separate)
         else if (uiState == UI_ENV_INCUBATION_DAY) {
-            if (evt == UI_EVT_UP) {
-                if (editField == 0) { editDay++;   if (editDay   > 31) editDay   = 1;  }
-                if (editField == 1) { editMonth++; if (editMonth > 12) editMonth = 1;  }
-                if (editField == 2) { editYear++;  if (editYear  > 2099) editYear = 2024; }
-                oled_show_incubation_day_set(editDay, editMonth, editYear);
-            } else if (evt == UI_EVT_DOWN) {
-                if (editField == 0) { editDay--;   if (editDay   < 1)  editDay   = 31; }
-                if (editField == 1) { editMonth--; if (editMonth < 1)  editMonth = 12; }
-                if (editField == 2) { editYear--;  if (editYear  < 2020) editYear = 2099; }
-                oled_show_incubation_day_set(editDay, editMonth, editYear);
-            } else if (evt == UI_EVT_OK) {
-                editField++;
-                if (editField < 3) {
-                    // Advance to next field
-                    oled_show_incubation_day_set(editDay, editMonth, editYear);
+            enum IncubMode { IM_NAV = 0, IM_EDIT };
+            static IncubMode mode = IM_NAV;
+            static int navIdx = 0; // 0=Start Date, 1=Back
+            static int dispDay = 1, dispMonth = 1, dispYear = 2024;
+
+            // Initialize screen on entry
+            if (lastMenuIdx == -1) {
+                // load snapshot from settings or RTC
+                uint32_t sEpoch = 0;
+                if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+                    sEpoch = gSettings.startEpoch;
+                    xSemaphoreGive(settingsMutex);
+                }
+                if (sEpoch != 0) {
+                    DateTime sd((uint32_t)sEpoch);
+                    dispDay = sd.day(); dispMonth = sd.month(); dispYear = sd.year();
                 } else {
-                    // Confirmed: build epoch from RTC for correct timezone
-                    DateTime startDate(editYear, editMonth, editDay, 0, 0, 0);
-                    if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
-                        gSettings.startEpoch = startDate.unixtime();
-                        gSettings.lastTurnEpoch = 0;  // reset turner tracking
-                        xSemaphoreGive(settingsMutex);
+                    DateTime now(2024,1,1);
+                    if (xSemaphoreTake(rtcMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+                        now = gRtcTime.now;
+                        xSemaphoreGive(rtcMutex);
                     }
-                    // Debug: report the epoch just written into gSettings
-                    Serial.printf("[UI] startEpoch set (local) = %lu -> %04d-%02d-%02d\n",
-                                  (unsigned long)startDate.unixtime(), editYear, editMonth, editDay);
-                    saveSettings();
-                    uiState = UI_SET_ENV_MENU; lastMenuIdx = -1;
-                    oled_show_set_environment(envMenuIdx, profile);
-                    lastMenuIdx = envMenuIdx;
+                    dispDay = now.day(); dispMonth = now.month(); dispYear = now.year();
+                }
+                // If caller requested immediate edit (single-press from menu), enter edit mode
+                if (incubForceEdit) {
+                    incubForceEdit = false;
+                    mode = IM_EDIT;
+                    // load edit values from saved or RTC
+                    if (sEpoch != 0) {
+                        DateTime sd((uint32_t)sEpoch);
+                        editDay = sd.day(); editMonth = sd.month(); editYear = sd.year();
+                    } else {
+                        DateTime now(2024,1,1);
+                        if (xSemaphoreTake(rtcMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+                            now = gRtcTime.now;
+                            xSemaphoreGive(rtcMutex);
+                        }
+                        editDay = now.day(); editMonth = now.month(); editYear = now.year();
+                    }
+                    editField = 0;
+                    lastMenuIdx = 0;
+                    oled_show_incubation_day_set(0, editDay, editMonth, editYear, true, editField);
+                    continue;
+                }
+
+                mode = IM_NAV; navIdx = 0;
+                lastMenuIdx = navIdx;
+                oled_show_incubation_day_set(navIdx, dispDay, dispMonth, dispYear, false, 0);
+                continue;
+            }
+
+            if (mode == IM_NAV) {
+                // navigate between Start Date and Back
+                if (evt == UI_EVT_UP)   navIdx = (navIdx - 1 + 2) % 2;
+                else if (evt == UI_EVT_DOWN) navIdx = (navIdx + 1) % 2;
+
+                if (navIdx != lastMenuIdx) {
+                    oled_show_incubation_day_set(navIdx, dispDay, dispMonth, dispYear, false, 0);
+                    lastMenuIdx = navIdx;
+                }
+
+                if (evt == UI_EVT_OK) {
+                    if (navIdx == 0) {
+                        // Enter edit mode: load edit values from saved or RTC
+                        uint32_t sEpoch = 0;
+                        if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+                            sEpoch = gSettings.startEpoch;
+                            xSemaphoreGive(settingsMutex);
+                        }
+                        if (sEpoch != 0) {
+                            DateTime sd((uint32_t)sEpoch);
+                            editDay = sd.day(); editMonth = sd.month(); editYear = sd.year();
+                        } else {
+                            DateTime now(2024,1,1);
+                            if (xSemaphoreTake(rtcMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+                                now = gRtcTime.now;
+                                xSemaphoreGive(rtcMutex);
+                            }
+                            editDay = now.day(); editMonth = now.month(); editYear = now.year();
+                        }
+                        editField = 0;
+                        mode = IM_EDIT;
+                        oled_show_incubation_day_set(0, editDay, editMonth, editYear, true, editField);
+                    } else {
+                        // Back to Set Environment
+                        uiState = UI_SET_ENV_MENU; lastMenuIdx = -1;
+                        oled_show_set_environment(envMenuIdx, profile);
+                        lastMenuIdx = envMenuIdx;
+                        continue;
+                    }
+                }
+            } else { // IM_EDIT
+                // UP/DOWN modify field
+                if (evt == UI_EVT_UP) {
+                    if (editField == 0) { editDay++;   if (editDay   > 31) editDay   = 1;  }
+                    else if (editField == 1) { editMonth++; if (editMonth > 12) editMonth = 1;  }
+                    else if (editField == 2) { editYear++;  if (editYear  > 2099) editYear = 2024; }
+                    oled_show_incubation_day_set(0, editDay, editMonth, editYear, true, editField);
+                } else if (evt == UI_EVT_DOWN) {
+                    if (editField == 0) { editDay--;   if (editDay   < 1)  editDay   = 31; }
+                    else if (editField == 1) { editMonth--; if (editMonth < 1)  editMonth = 12; }
+                    else if (editField == 2) { editYear--;  if (editYear  < 2020) editYear = 2099; }
+                    oled_show_incubation_day_set(0, editDay, editMonth, editYear, true, editField);
+                } else if (evt == UI_EVT_OK) {
+                    editField++;
+                    if (editField < 3) {
+                        oled_show_incubation_day_set(0, editDay, editMonth, editYear, true, editField);
+                    } else {
+                        // Final OK: save startEpoch and reset lastTurnEpoch
+                        DateTime startDate(editYear, editMonth, editDay, 0, 0, 0);
+                        if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+                            gSettings.startEpoch = startDate.unixtime();
+                            gSettings.lastTurnEpoch = 0;
+                            xSemaphoreGive(settingsMutex);
+                        }
+                        saveSettings();
+
+                        // Update navigation snapshot
+                        uint32_t sEpoch = 0;
+                        if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+                            sEpoch = gSettings.startEpoch;
+                            xSemaphoreGive(settingsMutex);
+                        }
+                        if (sEpoch != 0) {
+                            DateTime sd((uint32_t)sEpoch);
+                            dispDay = sd.day(); dispMonth = sd.month(); dispYear = sd.year();
+                        }
+
+                        // Return to navigation mode
+                        mode = IM_NAV; navIdx = 0; lastMenuIdx = -1;
+                        oled_show_incubation_day_set(navIdx, dispDay, dispMonth, dispYear, false, 0);
+                    }
                 }
             }
         }
