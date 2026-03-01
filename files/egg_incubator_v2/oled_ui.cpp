@@ -636,11 +636,38 @@ void oled_show_settings_menu(int selected) {
     display.print("SETTINGS");
     display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
 
-    for (int i = 0; i < 6; i++) {
-        display.setCursor(0, 14 + i * 9);
-        display.print(i == selected ? "> " : "  ");
-        display.print(items[i]);
+    // Build full menu list so we can paginate a window around the selected item
+    const char* fullItems[6];
+    int fullCount = 0;
+    for (int i = 0; i < 6; i++) fullItems[fullCount++] = items[i];
+
+    // Determine visible window size (max rows that fit)
+    int maxRows = 5; // rows at y=16,26,36,46,56 (fits on 64px OLED)
+    if (fullCount < maxRows) maxRows = fullCount;
+
+    // Compute window start so selected stays visible and ideally centered
+    int start = selected - (maxRows / 2);
+    if (start < 0) start = 0;
+    if (start > fullCount - maxRows) start = max(0, fullCount - maxRows);
+
+    // Render only visible rows
+    for (int r = 0; r < maxRows; r++) {
+        int idx = start + r;
+        display.setCursor(0, 16 + r * 10);
+        display.print(idx == selected ? "> " : "  ");
+        display.print(fullItems[idx]);
     }
+
+    // Pager indicator if needed
+    if (fullCount > maxRows) {
+        int page = (start / maxRows) + 1;
+        int totalPages = (fullCount + maxRows - 1) / maxRows;
+        char pbuf[6];
+        snprintf(pbuf, sizeof(pbuf), "%d/%d", page, totalPages);
+        display.setCursor(96, 54);
+        display.print(pbuf);
+    }
+
     display.display();
 }
 
