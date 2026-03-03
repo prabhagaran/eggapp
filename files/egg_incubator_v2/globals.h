@@ -163,6 +163,7 @@ enum UiState : uint8_t {
     UI_CLIMATE_RAMP,
 
     UI_SETTINGS_MENU,
+    UI_WIFI_MENU,
     UI_MODE_MENU,
     UI_MANUAL_CONTROL_MENU,
     UI_DEVICE_INFO,
@@ -221,6 +222,9 @@ extern QueueHandle_t errorQueue;
 
 extern volatile bool overTempFault;
 extern portMUX_TYPE  faultMux;
+
+extern volatile bool wifiUserEnabled;   // true = user has enabled Wi-Fi
+extern volatile bool wifiPortalActive;  // true = config portal is running
 
 extern TaskHandle_t hTaskTurner;
 extern TaskHandle_t hTaskFan;

@@ -97,6 +97,8 @@ void oled_show_device_info(const char* deviceId,
                             const char* profileName,
                             uint32_t    uptimeSec);
 
+void oled_show_wifi_menu(int selected, bool connected);
+
 void oled_show_factory_reset_confirm(void);
 
 #endif // OLED_UI_H

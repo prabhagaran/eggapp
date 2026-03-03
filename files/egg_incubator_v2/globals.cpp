@@ -23,8 +23,11 @@ QueueHandle_t     errorQueue    = nullptr;
 // ─────────────────────────────────────────────────────────────────────────────
 // FAULT STATE — written/read under faultMux critical section
 // ─────────────────────────────────────────────────────────────────────────────
-volatile bool overTempFault = false;
-portMUX_TYPE  faultMux      = portMUX_INITIALIZER_UNLOCKED;
+volatile bool overTempFault  = false;
+portMUX_TYPE  faultMux       = portMUX_INITIALIZER_UNLOCKED;
+
+volatile bool wifiUserEnabled  = false;  // true = user has enabled Wi-Fi
+volatile bool wifiPortalActive = false;  // true = config portal is running
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TASK HANDLES — needed for suspend/resume on profile switch

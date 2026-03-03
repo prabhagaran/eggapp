@@ -1,8 +1,8 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <WiFi.h>
-#include <WiFiManager.h>
 #include <Preferences.h>
+
 #include "RTClib.h"
 
 #include "config.h"
@@ -14,11 +14,13 @@
 #include "task_ui.h"
 #include "task_cloud.h"
 #include "task_incubator.h"
+#include "task_wifi_manager.h"
 
 // Explicit C++ prototypes — required because these .cpp files include Arduino.h
 // after their own header, causing C-linkage/C++-linkage mismatch with this TU.
 void task_rtc(void* pvParameters);
 void task_cloud(void* pvParameters);
+void task_wifi_manager(void* pvParameters);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HARDWARE OBJECTS (extern'd where needed)
@@ -261,19 +263,13 @@ void setup() {
         }
     }
 
-    // ── WiFi (non-blocking portal with timeout) ───────────────────────────────
+    // ── WiFi (non-blocking — try stored credentials only, never blocks) ─────
+    //   Portal is NOT opened automatically.  The user can start it manually
+    //   via Settings → WiFi → Connect.  If no stored credentials exist,
+    //   WiFi.begin() returns quickly and the device boots offline.
     WiFi.mode(WIFI_STA);
-    WiFiManager wm;
-    wm.setConfigPortalTimeout(WIFI_PORTAL_TIMEOUT_SEC);
-
-    Serial.println("[SETUP] Starting WiFiManager...");
-    if (!wm.autoConnect("INCUBATOR_SETUP")) {
-        Serial.println("[SETUP] WiFi not configured — continuing offline");
-        WiFi.mode(WIFI_OFF);
-    } else {
-        Serial.print("[SETUP] WiFi connected: ");
-        Serial.println(WiFi.localIP());
-    }
+    WiFi.begin();   // attempt stored SSID/password; returns immediately
+    Serial.println("[SETUP] WiFi.begin() called (non-blocking)");
 
     // ── Create all tasks ─────────────────────────────────────────────────────
     //                              function                 name           stack   param  prio  handle   core
@@ -295,6 +291,9 @@ void setup() {
 
     // Cloud on Core 0
     xTaskCreatePinnedToCore(task_cloud,                  "Cloud",       12288, nullptr, 1, nullptr,            0);
+
+    // WiFi manager on Core 0 (lowest priority — never blocks other tasks)
+    xTaskCreatePinnedToCore(task_wifi_manager,           "WifiMgr",     8192,  nullptr, 1, nullptr,            0);
 
     // ── Apply profile: suspend tasks that don't belong to active profile ─────
     ProfileType p = PROFILE_EGG_INCUBATOR;

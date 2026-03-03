@@ -947,3 +947,35 @@ void oled_show_factory_reset_confirm(void) {
 
     display.display();
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WIFI MENU
+// selected: 0 = Connect/Disconnect,  1 = Back
+// connected: current WiFi.status() == WL_CONNECTED
+// ─────────────────────────────────────────────────────────────────────────────
+void oled_show_wifi_menu(int selected, bool connected) {
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+
+    display.setCursor(0, 0);
+    display.print("WiFi");
+    display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
+
+    // Status row (informational, not selectable)
+    display.setCursor(0, 14);
+    display.print("Status: ");
+    display.print(connected ? "Connected" : "Disconnected");
+
+    // Action row
+    display.setCursor(0, 28);
+    display.print(selected == 0 ? "> " : "  ");
+    display.print(connected ? "Disconnect" : "Connect");
+
+    // Back row
+    display.setCursor(0, 40);
+    display.print(selected == 1 ? "> " : "  ");
+    display.print("Back");
+
+    display.display();
+}

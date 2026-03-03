@@ -4,6 +4,7 @@
 #include "oled_ui.h"
 #include "incubator_logic.h"
 #include "task_incubator.h"
+#include "task_wifi_manager.h"
 #include <WiFi.h>
 #include <Arduino.h>
 
@@ -28,6 +29,7 @@ static int      eggTypeIdx       = 0;
 static int      turnerMenuIdx    = 0;
 static int      fanMenuIdx       = 0;
 static int      climateModeIdx   = 0;
+static int      wifiMenuIdx      = 0;  // WiFi menu: 0=Connect/Disconnect, 1=Back
 static int      climateSchedIdx  = 0;
 static int      climateCyclicIdx = 0;
 static int      climateRampIdx   = 0;
@@ -1101,6 +1103,13 @@ void task_ui(void* pvParameters) {
 
             if (evt == UI_EVT_OK) {
                 switch ((SettingsMenuItem)settingsMenuIdx) {
+                    case SET_WIFI:
+                        uiState     = UI_WIFI_MENU;
+                        wifiMenuIdx = 0;
+                        lastMenuIdx = -1;
+                        oled_show_wifi_menu(wifiMenuIdx, WiFi.status() == WL_CONNECTED);
+                        lastMenuIdx = wifiMenuIdx;
+                        break;
                     case SET_MODE:
                         uiState = UI_MODE_MENU;
                         modeMenuIdx = (ctrlMode == MODE_AUTO) ? 0 : 1;
@@ -1128,6 +1137,41 @@ void task_ui(void* pvParameters) {
                         break;
                     default:
                         break;
+                }
+            }
+        }
+
+        // ═════════════════════════════════════════════════════════════════════
+        // WiFi MENU  (Settings → WiFi)
+        // ═════════════════════════════════════════════════════════════════════
+        else if (uiState == UI_WIFI_MENU) {
+            bool connected = (WiFi.status() == WL_CONNECTED);
+            if      (evt == UI_EVT_UP)   wifiMenuIdx = (wifiMenuIdx - 1 + 2) % 2;
+            else if (evt == UI_EVT_DOWN) wifiMenuIdx = (wifiMenuIdx + 1) % 2;
+
+            if (wifiMenuIdx != lastMenuIdx) {
+                oled_show_wifi_menu(wifiMenuIdx, connected);
+                lastMenuIdx = wifiMenuIdx;
+            }
+
+            if (evt == UI_EVT_OK) {
+                if (wifiMenuIdx == 0) {
+                    // Toggle connect / disconnect
+                    if (connected) {
+                        wifi_request_disconnect();
+                    } else {
+                        wifi_request_connect();
+                    }
+                    // Refresh display immediately to reflect the new (requested) state
+                    bool nowConnected = (WiFi.status() == WL_CONNECTED);
+                    oled_show_wifi_menu(wifiMenuIdx, nowConnected);
+                    lastMenuIdx = wifiMenuIdx;
+                } else {
+                    // Back
+                    uiState = UI_SETTINGS_MENU;
+                    lastMenuIdx = -1;
+                    oled_show_settings_menu(settingsMenuIdx);
+                    lastMenuIdx = settingsMenuIdx;
                 }
             }
         }

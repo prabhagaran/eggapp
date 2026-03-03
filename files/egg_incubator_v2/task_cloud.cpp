@@ -42,6 +42,12 @@ void task_cloud(void* pvParameters) {
     for (;;) {
 
         // ── WiFi check ───────────────────────────────────────────────────────
+        // Only proceed if user has enabled Wi-Fi; never auto-reconnect otherwise.
+        if (!wifiUserEnabled) {
+            vTaskDelay(pdMS_TO_TICKS(5000));
+            continue;
+        }
+
         if (WiFi.status() != WL_CONNECTED) {
             Serial.println("[CLOUD] WiFi disconnected, reconnecting...");
             WiFi.reconnect();
