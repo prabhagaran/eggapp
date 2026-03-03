@@ -65,12 +65,7 @@ void task_cloud(void* pvParameters) {
         ErrorMsg_t incomingErr;
         while (xQueueReceive(errorQueue, &incomingErr, 0) == pdTRUE) {
 
-            WiFiClientSecure client;
-            client.setInsecure();  // skip TLS cert validation
-
-            HTTPClient http;
-            http.setTimeout(5000);
-
+            // Build URL for this error
             String url = String(GOOGLE_SCRIPT_URL)
                 + "?id="    + String(DEVICE_ID)
                 + "&fw="    + String(FW_VERSION)
@@ -83,12 +78,43 @@ void task_cloud(void* pvParameters) {
 
             Serial.printf("[CLOUD] Error log: %s — %s\n", incomingErr.type, incomingErr.message);
 
-            http.begin(client, url);
-            int code = http.GET();
+            // send with retries/backoff and detailed logging
+            auto sendWithRetries = [&](const String &reqUrl) -> int {
+                for (int attempt = 0; attempt < CLOUD_HTTP_MAX_RETRIES; ++attempt) {
+                    WiFiClientSecure client;
+                    client.setInsecure();
+
+                    HTTPClient http;
+                    http.setTimeout(10000);
+                    http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+                    http.begin(client, reqUrl);
+
+                    Serial.printf("[CLOUD] Request: %s (attempt %d)\n", reqUrl.c_str(), attempt+1);
+                    int code = http.GET();
+
+                    String body = "";
+                    if (code > 0) body = http.getString();
+
+                    if (code > 0) {
+                        Serial.printf("[CLOUD] Response code: %d\n", code);
+                        if (body.length() > 0) Serial.printf("[CLOUD] Body: %s\n", body.c_str());
+                        http.end();
+                        return code;
+                    } else {
+                        Serial.printf("[CLOUD] HTTP failed: %s\n", http.errorToString(code).c_str());
+                        http.end();
+                        // backoff before next attempt
+                        uint32_t backoff = CLOUD_HTTP_BACKOFF_MS * (1UL << attempt);
+                        vTaskDelay(pdMS_TO_TICKS(backoff));
+                    }
+                }
+                return -1;
+            };
+
+            int code = sendWithRetries(url);
             if (code <= 0) {
-                Serial.printf("[CLOUD] Error send failed: %d\n", code);
+                Serial.printf("[CLOUD] Error send failed after retries: %d\n", code);
             }
-            http.end();
 
             vTaskDelay(pdMS_TO_TICKS(500));  // brief gap between error sends
         }
@@ -174,33 +200,57 @@ void task_cloud(void* pvParameters) {
         }
 
         // ── Send telemetry ───────────────────────────────────────────────────
-        WiFiClientSecure client;
-        client.setInsecure();
-
-        HTTPClient http;
-        http.setTimeout(5000);
-        http.begin(client, url);
-
         Serial.println("[CLOUD] Sending telemetry...");
-        int httpCode = http.GET();
+
+        auto sendWithRetries = [&](const String &reqUrl) -> int {
+            for (int attempt = 0; attempt < CLOUD_HTTP_MAX_RETRIES; ++attempt) {
+                WiFiClientSecure client;
+                client.setInsecure();
+
+                HTTPClient http;
+                http.setTimeout(10000);
+                http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+                http.begin(client, reqUrl);
+
+                Serial.printf("[CLOUD] Request: %s (attempt %d)\n", reqUrl.c_str(), attempt+1);
+                int code = http.GET();
+
+                String body = "";
+                if (code > 0) body = http.getString();
+
+                if (code > 0) {
+                    Serial.printf("[CLOUD] Response code: %d\n", code);
+                    if (body.length() > 0) Serial.printf("[CLOUD] Body: %s\n", body.c_str());
+                    http.end();
+                    return code;
+                } else {
+                    Serial.printf("[CLOUD] HTTP failed: %s\n", http.errorToString(code).c_str());
+                    http.end();
+                    // backoff
+                    uint32_t backoff = CLOUD_HTTP_BACKOFF_MS * (1UL << attempt);
+                    vTaskDelay(pdMS_TO_TICKS(backoff));
+                }
+            }
+            return -1;
+        };
+
+        int httpCode = sendWithRetries(url);
 
         if (httpCode > 0) {
             Serial.printf("[CLOUD] HTTP %d\n", httpCode);
-            if (httpCode != 200 && httpCode != 302) {
+            if (httpCode != 200) {
                 if (millis() - lastHttpErrorMs > HTTP_ERROR_THROTTLE_MS) {
                     pushError("SERVER_ERROR", ("HTTP " + String(httpCode)).c_str());
                     lastHttpErrorMs = millis();
                 }
             }
         } else {
-            Serial.printf("[CLOUD] HTTP failed: %s\n", http.errorToString(httpCode).c_str());
+            Serial.printf("[CLOUD] HTTP failed after retries: %d\n", httpCode);
             if (millis() - lastHttpErrorMs > HTTP_ERROR_THROTTLE_MS) {
                 pushError("HTTP_FAIL", "Upload failed");
                 lastHttpErrorMs = millis();
             }
         }
-
-        http.end();
 
         vTaskDelay(pdMS_TO_TICKS(CLOUD_TELEMETRY_INTERVAL_MS));
     }

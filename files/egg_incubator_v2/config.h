@@ -133,6 +133,10 @@
 #define ERROR_QUEUE_SIZE               20
 #define UI_EVENT_QUEUE_SIZE            10
 
+// Cloud HTTP retry/backoff configuration
+#define CLOUD_HTTP_MAX_RETRIES          3
+#define CLOUD_HTTP_BACKOFF_MS        2000UL  // base backoff in ms (exponential)
+
 // ─────────────────────────────────────────────────────────────────────────────
 // SETPOINT EDITING LIMITS
 // ─────────────────────────────────────────────────────────────────────────────
@@ -151,9 +155,10 @@
 // GOOGLE APPS SCRIPT URL — replace with your deployment URL
 // ─────────────────────────────────────────────────────────────────────────────
 #define GOOGLE_SCRIPT_URL \
-  "https://script.google.com/macros/s/YOUR_SCRIPT_ID_HERE/exec"
+  "https://script.google.com/macros/s/AKfycbyA-CXZL_GveJRRvon-KZzAfsdXJidMS27sZOz1lDj68bImDuDqWnH8d-nfqzCR_pUi3w/exec"
 
 // Optional shared secret token (empty string = disabled)
-#define CLOUD_TOKEN  ""
+// Generated token for cloud uploads
+#define CLOUD_TOKEN  "a1b2c3d4e5f60718293a4b5c6d7e8f90"
 
 #endif // CONFIG_H

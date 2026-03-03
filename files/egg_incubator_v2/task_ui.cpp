@@ -327,32 +327,12 @@ void task_ui(void* pvParameters) {
                     if (envMenuIdx == 3) {
                     // Incubation start date
                         uiState = UI_ENV_INCUBATION_DAY;
-                        // Immediately reset UI state and render the screen so the
-                        // first OK press isn't lost — do not wait for next event.
+                        // Force the UI state's own initialization path to run on the
+                        // next loop iteration so static edit/navigation state is reset
+                        // (prevents stale mode/editField from previous visits).
                         editField = 0;
-                        // read snapshot from settings or RTC for immediate render
-                        {
-                            uint32_t sEpoch = 0;
-                            int d = 1, m = 1, y = 2024;
-                            if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
-                                sEpoch = gSettings.startEpoch;
-                                xSemaphoreGive(settingsMutex);
-                            }
-                            if (sEpoch != 0) {
-                                DateTime sd((uint32_t)sEpoch);
-                                d = sd.day(); m = sd.month(); y = sd.year();
-                            } else {
-                                DateTime now(2024,1,1);
-                                if (xSemaphoreTake(rtcMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
-                                    now = gRtcTime.now;
-                                    xSemaphoreGive(rtcMutex);
-                                }
-                                d = now.day(); m = now.month(); y = now.year();
-                            }
-                            // mark selection on Start Date (index 0) and draw
-                            lastMenuIdx = 0;
-                            oled_show_incubation_day_set(0, d, m, y, false, 0);
-                        }
+                        lastMenuIdx = -1;
+                        continue;
                     } else if (envMenuIdx == 4) {
                         uiState = UI_ENV_EGG_TYPE;
                         if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
@@ -633,10 +613,9 @@ void task_ui(void* pvParameters) {
                 if (evt == UI_EVT_UP)   navIdx = (navIdx - 1 + 2) % 2;
                 else if (evt == UI_EVT_DOWN) navIdx = (navIdx + 1) % 2;
 
-                if (navIdx != lastMenuIdx) {
-                    oled_show_incubation_day_set(navIdx, dispDay, dispMonth, dispYear, false, 0);
-                    lastMenuIdx = navIdx;
-                }
+                // always redraw navigation row so a single UP/DOWN press updates immediately
+                oled_show_incubation_day_set(navIdx, dispDay, dispMonth, dispYear, false, 0);
+                lastMenuIdx = navIdx;
 
                 if (evt == UI_EVT_OK) {
                     if (navIdx == 0) {
