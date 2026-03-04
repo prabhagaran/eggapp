@@ -165,13 +165,30 @@
 #define HUM_HYST_MAX          10.0f
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GOOGLE APPS SCRIPT URL — replace with your deployment URL
+// CLOUD SECRETS
+//
+// Sensitive values (cloud endpoint URL, shared token and optional PEM for
+// certificate verification) should live in a local, gitignored file named
+// `secrets.h`. If that file is not present the macros below default to empty
+// values to avoid accidentally committing secrets into source control.
+//
+// Create `secrets.h` by copying `secrets.h.example` and filling in the
+// placeholders. Add `secrets.h` to your local gitignore (the workspace
+// already contains an entry for it created by the CI assistant).
 // ─────────────────────────────────────────────────────────────────────────────
-#define GOOGLE_SCRIPT_URL \
-  "https://script.google.com/macros/s/AKfycbyA-CXZL_GveJRRvon-KZzAfsdXJidMS27sZOz1lDj68bImDuDqWnH8d-nfqzCR_pUi3w/exec"
 
-// Optional shared secret token (empty string = disabled)
-// Generated token for cloud uploads
-#define CLOUD_TOKEN  "a1b2c3d4e5f60718293a4b5c6d7e8f90"
+#if defined(__has_include)
+#  if __has_include("secrets.h")
+#    include "secrets.h"
+#  else
+// Default fallbacks (empty -> disabled). Provide a secrets.h to enable cloud.
+#    define GOOGLE_SCRIPT_URL ""
+#    define CLOUD_TOKEN        ""
+#    define CLOUD_ROOT_CA      ""
+#  endif
+#else
+// Fallback for toolchains without __has_include
+#  include "secrets.h"
+#endif
 
 #endif // CONFIG_H

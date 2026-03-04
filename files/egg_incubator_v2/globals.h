@@ -262,5 +262,7 @@ inline float round1(float v) { return roundf(v * 10.0f) / 10.0f; }
 // ─────────────────────────────────────────────────────────────────────────────
 void setRelay(uint8_t pin, bool on);
 void allRelaysOff(void);
+// LEDC-based fan PWM helper (implemented in task_incubator.cpp)
+void setFanSpeed(uint8_t percent);
 
 #endif // GLOBALS_H

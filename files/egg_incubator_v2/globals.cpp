@@ -64,7 +64,6 @@ void setRelay(uint8_t pin, bool on) {
             case RELAY_HEATER:     gRelayState.heaterOn    = on; break;
             case RELAY_COOLER:     gRelayState.coolerOn    = on; break;
             case RELAY_HUMIDIFIER: gRelayState.humidifierOn= on; break;
-            case RELAY_FAN:        gRelayState.fanOn       = on; break;
             case RELAY_PUMP:       gRelayState.pumpOn      = on; break;
             case RELAY_TURNER:     gRelayState.turnerOn    = on; break;
         }
@@ -79,7 +78,8 @@ void allRelaysOff(void) {
     setRelay(RELAY_HEATER,     false);
     setRelay(RELAY_COOLER,     false);
     setRelay(RELAY_HUMIDIFIER, false);
-    setRelay(RELAY_FAN,        false);
+    // Use PWM helper to stop the fan (do not call digitalWrite on PWM pin)
+    setFanSpeed(0);
     setRelay(RELAY_PUMP,       false);
     setRelay(RELAY_TURNER,     false);
 }

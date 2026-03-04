@@ -70,18 +70,31 @@ void task_turner(void* pvParameters) {
 
             setRelay(RELAY_TURNER, false);
 
-            // Save new lastTurnEpoch
-            if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
-                gSettings.lastTurnEpoch = nowEpoch;
-                xSemaphoreGive(settingsMutex);
-            }
-
-            // Persist only this single key to NVS to avoid writing all settings here
+            // Re-read RTC now that the turn completed, and save new lastTurnEpoch
             {
-                Preferences prefs;
-                prefs.begin("incubator", false);
-                prefs.putULong("lastTurn", nowEpoch);
-                prefs.end();
+                uint32_t finishedEpoch = 0;
+                if (xSemaphoreTake(rtcMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+                    finishedEpoch = gRtcTime.epoch;
+                    xSemaphoreGive(rtcMutex);
+                }
+
+                if (finishedEpoch == 0) {
+                    // Fallback to previous value if RTC not available
+                    finishedEpoch = nowEpoch;
+                }
+
+                if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+                    gSettings.lastTurnEpoch = finishedEpoch;
+                    xSemaphoreGive(settingsMutex);
+                }
+
+                // Persist only this single key to NVS to avoid writing all settings here
+                {
+                    Preferences prefs;
+                    prefs.begin("incubator", false);
+                    prefs.putULong("lastTurn", finishedEpoch);
+                    prefs.end();
+                }
             }
 
             // Also persist to NVS via main saveSettings — signal via a flag
@@ -164,6 +177,12 @@ void setFanSpeed(uint8_t percent) {
     uint32_t duty = (uint32_t)((uint32_t)percent * 255U / 100U);
     ledc_set_duty(LEDC_HIGH_SPEED_MODE, (ledc_channel_t)channel, duty);
     ledc_update_duty(LEDC_HIGH_SPEED_MODE, (ledc_channel_t)channel);
+
+    // Mirror PWM-on state into gRelayState.fanOn under controlMutex
+    if (xSemaphoreTake(controlMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+        gRelayState.fanOn = (percent > 0);
+        xSemaphoreGive(controlMutex);
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
