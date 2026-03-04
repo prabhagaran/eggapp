@@ -116,7 +116,7 @@
 #define HUM_CALIB_OFFSET               0.0f
 
 // Enable raw DHT read debug output over Serial (1 = enabled, 0 = disabled)
-#define DHT_DEBUG_RAW                  1
+#define DHT_DEBUG_RAW                  0
 // ─────────────────────────────────────────────────────────────────────────────
 // CLIMATE CHAMBER DEFAULTS
 // ─────────────────────────────────────────────────────────────────────────────

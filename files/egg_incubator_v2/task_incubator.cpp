@@ -3,6 +3,7 @@
 #include "config.h"
 #include "incubator_logic.h"
 #include <Arduino.h>
+#include <Preferences.h>
 // ESP32 Arduino LEDC helpers and IDF driver
 #include <esp32-hal-ledc.h>
 #include <driver/ledc.h>
@@ -49,6 +50,13 @@ void task_turner(void* pvParameters) {
                 gSettings.lastTurnEpoch = nowEpoch;
                 xSemaphoreGive(settingsMutex);
             }
+            // Persist initial lastTurnEpoch so a reboot doesn't re-run an early turn
+            {
+                Preferences prefs;
+                prefs.begin("incubator", false);
+                prefs.putULong("lastTurn", nowEpoch);
+                prefs.end();
+            }
             vTaskDelay(pdMS_TO_TICKS(30000));
             continue;
         }
@@ -66,6 +74,14 @@ void task_turner(void* pvParameters) {
             if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
                 gSettings.lastTurnEpoch = nowEpoch;
                 xSemaphoreGive(settingsMutex);
+            }
+
+            // Persist only this single key to NVS to avoid writing all settings here
+            {
+                Preferences prefs;
+                prefs.begin("incubator", false);
+                prefs.putULong("lastTurn", nowEpoch);
+                prefs.end();
             }
 
             // Also persist to NVS via main saveSettings — signal via a flag
