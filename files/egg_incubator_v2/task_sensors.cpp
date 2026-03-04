@@ -68,32 +68,71 @@ void task_ds18b20(void* pvParameters) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DHT11 HUMIDITY TASK
-// Polls every 2 s. On NaN, retains last valid humidity (stale-hold strategy).
-// Writes humidity_dht and hum_valid under sensorMutex.
+// DHT HUMIDITY TASK
+// Polls regularly. Performs several quick attempts per cycle, averages valid
+// samples, applies optional calibration offset, and uses stale-hold on failure.
+// Writes humidity_dht and hum_valid under sensorMutex. Pushes a SENSOR_ERROR
+// if failures persist.
 // ─────────────────────────────────────────────────────────────────────────────
 void task_sensor(void* pvParameters) {
     dht.begin();
 
     float lastValidHum = 50.0f;  // safe default until first valid reading
+    int consecutiveBad = 0;
+    static unsigned long lastHumErrorMs = 0;
+
+    const int READ_ATTEMPTS = 3;
+    const int READ_DELAY_MS = 200; // ms between quick attempts
+    const int CYCLE_MS = 2000;     // target cycle period
 
     for (;;) {
-        float h = dht.readHumidity();
+        float sum = 0.0f;
+        int count = 0;
 
-        if (isnan(h) || h < 0.0f || h > 100.0f) {
-            // Stale hold — log but don't crash control
-            Serial.println("[DHT11] Bad reading — holding last value");
+        for (int i = 0; i < READ_ATTEMPTS; ++i) {
+            float h = dht.readHumidity();
+#if DHT_DEBUG_RAW
+            if (isnan(h)) {
+                Serial.printf("[DHT RAW] attempt %d: NaN\n", i + 1);
+            } else {
+                Serial.printf("[DHT RAW] attempt %d: %.2f %%\n", i + 1, h);
+            }
+#endif
+            if (!isnan(h) && h >= 0.0f && h <= 100.0f) {
+                sum += h;
+                ++count;
+            }
+            vTaskDelay(pdMS_TO_TICKS(READ_DELAY_MS));
+        }
+
+        bool valid = false;
+        float reportedHum = lastValidHum;
+
+        if (count > 0) {
+            reportedHum = (sum / count) + HUM_CALIB_OFFSET;
+            if (reportedHum < 0.0f) reportedHum = 0.0f;
+            if (reportedHum > 100.0f) reportedHum = 100.0f;
+            lastValidHum = reportedHum;
+            valid = true;
+            consecutiveBad = 0;
+            Serial.printf("[DHT] Humidity: %.1f %% (avg of %d)\n", reportedHum, count);
         } else {
-            lastValidHum = h;
-            Serial.printf("[DHT11] Humidity: %.1f %%\n", h);
+            ++consecutiveBad;
+            Serial.println("[DHT] Bad reading — holding last value");
+            if (consecutiveBad >= 5 && (millis() - lastHumErrorMs) > SENSOR_ERROR_THROTTLE_MS) {
+                pushError("SENSOR_ERROR", "DHT persistent failures");
+                lastHumErrorMs = millis();
+            }
         }
 
         if (xSemaphoreTake(sensorMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
             gSensorData.humidity_dht = lastValidHum;
-            gSensorData.hum_valid    = !isnan(h);
+            gSensorData.hum_valid    = valid;
             xSemaphoreGive(sensorMutex);
         }
 
-        vTaskDelay(pdMS_TO_TICKS(2000));
+        int extraDelay = CYCLE_MS - (READ_ATTEMPTS * READ_DELAY_MS);
+        if (extraDelay < 0) extraDelay = 0;
+        vTaskDelay(pdMS_TO_TICKS(extraDelay));
     }
 }

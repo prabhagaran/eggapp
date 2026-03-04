@@ -101,4 +101,14 @@ void oled_show_wifi_menu(int selected, bool connected);
 
 void oled_show_factory_reset_confirm(void);
 
+// ─────────────────────────────────────────────────────────────────────────────
+// TIME & DATE SCREENS
+// ─────────────────────────────────────────────────────────────────────────────
+// selected: 0=Manual Set, 1=WiFi Sync, 2=Back
+void oled_show_time_date_menu(int selected);
+// field: 0=Hour 1=Min 2=Sec 3=Day 4=Month 5=Year 6=SAVE?
+void oled_show_time_edit(int field, int h, int m, int s, int d, int mo, int y);
+// status: 0=Syncing 1=Time Updated 2=WiFi Not Connected
+void oled_show_time_wifi_sync(int status);
+
 #endif // OLED_UI_H

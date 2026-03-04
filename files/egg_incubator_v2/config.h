@@ -111,6 +111,12 @@
 // Pump triggers when humidity is this many % below (setpoint - hysteresis)
 #define PUMP_TRIGGER_EXTRA_DEFICIT     5.0f
 
+// Humidity calibration offset (additive, in %RH). Use to correct a consistent
+// bias in the DHT readings. Positive values raise reported humidity.
+#define HUM_CALIB_OFFSET               0.0f
+
+// Enable raw DHT read debug output over Serial (1 = enabled, 0 = disabled)
+#define DHT_DEBUG_RAW                  1
 // ─────────────────────────────────────────────────────────────────────────────
 // CLIMATE CHAMBER DEFAULTS
 // ─────────────────────────────────────────────────────────────────────────────

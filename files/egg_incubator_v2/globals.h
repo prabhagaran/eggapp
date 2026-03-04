@@ -131,9 +131,11 @@ typedef struct {
 // UI EVENTS
 // ─────────────────────────────────────────────────────────────────────────────
 enum UiEvent : uint8_t {
+    UI_EVT_NONE,
     UI_EVT_UP,
     UI_EVT_DOWN,
-    UI_EVT_OK
+    UI_EVT_OK,
+    UI_EVT_LONGOK
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -168,6 +170,11 @@ enum UiState : uint8_t {
     UI_MANUAL_CONTROL_MENU,
     UI_DEVICE_INFO,
     UI_FACTORY_RESET_CONFIRM,
+
+    // Time & Date editing states
+    UI_TIME_DATE_MENU,      // submenu: Manual Set / WiFi Sync / Back
+    UI_TIME_MANUAL_EDIT,    // step-by-step field editor
+    UI_TIME_WIFI_SYNC,      // NTP sync progress / result screen
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

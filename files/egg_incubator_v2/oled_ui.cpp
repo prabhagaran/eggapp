@@ -265,7 +265,7 @@ void oled_show_menu(int selected) {
     display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
 
     for (int i = 0; i < 4; i++) {
-        display.setCursor(0, 16 + i * 12);
+           display.setCursor(0, 16 + i * 10);
         display.print(i == selected ? "> " : "  ");
         display.print(items[i]);
     }
@@ -434,7 +434,7 @@ void oled_show_hysteresis_menu(int selected, float tempHyst, float humHyst) {
     display.print("HYSTERESIS");
     display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
 
-    display.setCursor(0, 14);
+    display.setCursor(0, 16);
     display.print(selected == 0 ? "> " : "  ");
     display.print("Temp: +-");
     display.print(tempHyst, 1);
@@ -473,7 +473,7 @@ void oled_show_egg_type(int selected) {
     display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
 
     for (int i = 0; i < 5; i++) {
-        display.setCursor(0, 14 + i * 10);
+        display.setCursor(0, 16 + i * 10);
         display.print(i == selected ? "> " : "  ");
         display.print(items[i]);
     }
@@ -559,7 +559,7 @@ void oled_show_turner_settings(int selected,
     display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
 
     // Interval row
-    display.setCursor(0, 14);
+    display.setCursor(0, 16);
     display.print(selected == 0 ? "> " : "  ");
     display.print("Interval: ");
     display.print(intervalMin);
@@ -603,7 +603,7 @@ void oled_show_fan_settings(int selected, uint8_t speedPercent)
     display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
 
     // Speed row (0 = Speed, 1 = Back)
-    display.setCursor(0, 14);
+    display.setCursor(0, 16);
     display.print(selected == 0 ? "> " : "  ");
     display.print("Speed: ");
     display.print((int)speedPercent);
@@ -863,7 +863,7 @@ void oled_show_climate_ramp(int selected,
     int startIdx = max(0, selected - 1);
     int shown    = 0;
     for (int i = startIdx; i < (int)stepCount && shown < 4; i++, shown++) {
-        display.setCursor(0, 14 + shown * 12);
+        display.setCursor(0, 16 + shown * 12);
         display.print(i == selected ? ">" : " ");
         display.print(i + 1);
         display.print(":");
@@ -896,7 +896,7 @@ void oled_show_device_info(const char* deviceId,
     display.print("DEVICE INFO");
     display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
 
-    display.setCursor(0, 14);
+    display.setCursor(0, 16);
     display.print("ID: ");
     display.print(deviceId);
 
@@ -963,7 +963,7 @@ void oled_show_wifi_menu(int selected, bool connected) {
     display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
 
     // Status row (informational, not selectable)
-    display.setCursor(0, 14);
+    display.setCursor(0, 16);
     display.print("Status: ");
     display.print(connected ? "Connected" : "Disconnected");
 
@@ -976,6 +976,112 @@ void oled_show_wifi_menu(int selected, bool connected) {
     display.setCursor(0, 40);
     display.print(selected == 1 ? "> " : "  ");
     display.print("Back");
+
+    display.display();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TIME & DATE MENU  (Settings → Time & Date)
+// selected: 0=Manual Set  1=WiFi Sync  2=Back
+// ─────────────────────────────────────────────────────────────────────────────
+void oled_show_time_date_menu(int selected) {
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+
+    display.setCursor(0, 0);
+    display.print("TIME & DATE");
+    display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
+
+    const char* items[] = { "Manual Set", "WiFi Sync", "Back" };
+    for (int i = 0; i < 3; i++) {
+        display.setCursor(0, 16 + i * 10);
+        display.print(i == selected ? "> " : "  ");
+        display.print(items[i]);
+    }
+
+    display.display();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TIME MANUAL EDIT
+// field: 0=Hour 1=Min 2=Sec 3=Day 4=Month 5=Year 6=SAVE?
+// Shows all 6 editable fields; highlights the active one.
+// field==6 shows a save-confirmation prompt.
+// ─────────────────────────────────────────────────────────────────────────────
+void oled_show_time_edit(int field, int h, int m, int s, int d, int mo, int y) {
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+
+    if (field == 6) {
+        // Save confirmation screen
+        display.setCursor(0, 0);
+        display.print("SET TIME & DATE");
+        display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
+        display.setCursor(0, 16);
+        display.print("Save changes?");
+        display.setCursor(0, 32);
+        display.printf("  %02d:%02d:%02d", h, m, s);
+        display.setCursor(0, 42);
+        display.printf("  %02d/%02d/%04d", d, mo, y);
+        display.setCursor(0, 54);
+        display.print("OK=Save  DN=Cancel");
+        display.display();
+        return;
+    }
+
+    display.setCursor(0, 0);
+    display.print("SET TIME & DATE");
+    display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
+
+    // Labels and values for each field
+    const char* labels[] = { "Hour  ", "Minute", "Second", "Day   ", "Month ", "Year  " };
+    int values[]          = {  h,        m,        s,        d,        mo,       y        };
+
+    for (int i = 0; i < 6; i++) {
+        int y_pos = 12 + i * 9;
+        display.setCursor(0, y_pos);
+        if (i == field) {
+            display.print(">");
+        } else {
+            display.print(" ");
+        }
+        display.print(labels[i]);
+        display.print(":");
+        if (i == 5) {
+            display.printf(" %04d", values[i]);
+        } else {
+            display.printf(" %02d", values[i]);
+        }
+        if (i == field) {
+            display.print(" <");
+        }
+    }
+
+    display.display();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TIME WIFI SYNC SCREEN
+// status: 0=Syncing  1=Time Updated  2=WiFi Not Connected
+// ─────────────────────────────────────────────────────────────────────────────
+void oled_show_time_wifi_sync(int status) {
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+
+    display.setCursor(0, 0);
+    display.print("WiFi Time Sync");
+    display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
+
+    display.setCursor(0, 24);
+    switch (status) {
+        case 0: display.print("Syncing Time...");      break;
+        case 1: display.print("Time Updated!");        break;
+        case 2: display.print("WiFi Not Connected");   break;
+        default: display.print("Sync Failed");         break;
+    }
 
     display.display();
 }

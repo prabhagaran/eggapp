@@ -66,16 +66,19 @@ void task_buttons(void* pvParameters) {
         if (btnUp.isPressed()) {
             evt = UI_EVT_UP;
             xQueueSend(uiEventQueue, &evt, 0);
+            Serial.printf("[BTN] UP pressed -> queued UI_EVT_UP (ms=%lu)\n", millis());
         }
 
         if (btnDown.isPressed()) {
             evt = UI_EVT_DOWN;
             xQueueSend(uiEventQueue, &evt, 0);
+            Serial.printf("[BTN] DOWN pressed -> queued UI_EVT_DOWN (ms=%lu)\n", millis());
         }
 
         if (btnOk.isPressed()) {
             evt = UI_EVT_OK;
             xQueueSend(uiEventQueue, &evt, 0);
+            Serial.printf("[BTN] OK pressed -> queued UI_EVT_OK (ms=%lu)\n", millis());
         }
 
         vTaskDelay(pdMS_TO_TICKS(10));

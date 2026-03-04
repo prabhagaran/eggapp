@@ -7,6 +7,37 @@
 #include "task_wifi_manager.h"
 #include <WiFi.h>
 #include <Arduino.h>
+#include <time.h>
+
+extern RTC_DS1307 rtc;  // defined in egg_incubator_v2.ino
+ 
+// Helper: stringify UI events/states for logging
+static const char* uiEventName(UiEvent e) {
+    switch (e) {
+        case UI_EVT_NONE: return "NONE";
+        case UI_EVT_UP:   return "UP";
+        case UI_EVT_DOWN: return "DOWN";
+        case UI_EVT_OK:   return "OK";
+        case UI_EVT_LONGOK: return "LONGOK";
+        default: return "?";
+    }
+}
+
+static const char* uiStateName(UiState s) {
+    switch (s) {
+        case UI_HOME: return "HOME";
+        case UI_MAIN_MENU: return "MAIN_MENU";
+        case UI_CONTROLLER_MODE_MENU: return "CONTROLLER_MODE_MENU";
+        case UI_SET_ENV_MENU: return "SET_ENV_MENU";
+        case UI_SETTINGS_MENU: return "SETTINGS_MENU";
+        case UI_ENV_TEMPERATURE: return "ENV_TEMPERATURE";
+        case UI_ENV_HUMIDITY: return "ENV_HUMIDITY";
+        case UI_ENV_INCUBATION_DAY: return "ENV_INCUBATION_DAY";
+        case UI_ENV_EGG_TYPE: return "ENV_EGG_TYPE";
+        case UI_ENV_TURNER: return "ENV_TURNER";
+        default: return "OTHER";
+    }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Forward declarations for NVS functions (defined in main .ino)
@@ -40,6 +71,12 @@ static int editDay   = 1;
 static int editMonth = 1;
 static int editYear  = 2024;
 static int editField = 0;  // 0=day, 1=month, 2=year
+
+// Time & Date RTC editor state
+static int  timeDateMenuIdx = 0;     // index in Time & Date sub-menu (0,1,2)
+static int  tEditField      = 0;     // 0=H,1=M,2=S,3=D,4=Mo,5=Y,6=SAVE?
+static int  tH = 12, tM = 0, tS = 0; // edit buffer – time
+static int  tD = 1,  tMo = 1, tY = 2024; // edit buffer – date
 
 // Home screen refresh tracking
 static int           lastMinute         = -1;
@@ -187,6 +224,10 @@ void task_ui(void* pvParameters) {
             continue;
         }
 
+        // Verbose UI event logging to help debug missed OK/enter issues
+        Serial.printf("[UI] Event received: %s  State: %s  lastMenuIdx=%d  ms=%lu\n",
+                      uiEventName(evt), uiStateName(uiState), lastMenuIdx, millis());
+
         // Read current settings snapshot for use in any state below
         float tempSP = DEFAULT_TEMP_SETPOINT, tempHyst = DEFAULT_TEMP_HYSTERESIS;
         float humSP  = DEFAULT_HUM_SETPOINT,  humHyst  = DEFAULT_HUM_HYSTERESIS;
@@ -211,6 +252,7 @@ void task_ui(void* pvParameters) {
                 uiState = UI_MAIN_MENU;
                 mainMenuIdx = 0; lastMenuIdx = -1;
                 oled_show_menu(mainMenuIdx);
+                    Serial.printf("[UI] Enter MAIN_MENU (from HOME) mainMenuIdx=%d\n", mainMenuIdx);
                 lastMenuIdx = mainMenuIdx;
             }
         }
@@ -288,8 +330,10 @@ void task_ui(void* pvParameters) {
         // SET ENVIRONMENT MENU
         // ═════════════════════════════════════════════════════════════════════
         else if (uiState == UI_SET_ENV_MENU) {
-            // Number of items depends on profile
-            int itemCount = (profile == PROFILE_EGG_INCUBATOR) ? 9 : 6;
+            // Number of items depends on profile:
+            // Incubator: Temperature, Hysteresis, Humidity, Inc.Start Day, Egg Type, Turner, Fan, Back = 8
+            // Climate:   Temperature, Hysteresis, Humidity, Climate Profile, Back = 5
+            int itemCount = (profile == PROFILE_EGG_INCUBATOR) ? 8 : 5;
             if      (evt == UI_EVT_UP)   envMenuIdx = (envMenuIdx - 1 + itemCount) % itemCount;
             else if (evt == UI_EVT_DOWN) envMenuIdx = (envMenuIdx + 1) % itemCount;
 
@@ -332,6 +376,7 @@ void task_ui(void* pvParameters) {
                         // (prevents stale mode/editField from previous visits).
                         editField = 0;
                         lastMenuIdx = -1;
+                        Serial.println("[UI] Request enter INCUBATION screen (will init next loop)");
                         continue;
                     } else if (envMenuIdx == 4) {
                         uiState = UI_ENV_EGG_TYPE;
@@ -584,6 +629,8 @@ void task_ui(void* pvParameters) {
 
             // Initialize screen on entry
             if (lastMenuIdx == -1) {
+                Serial.println("[UI] INCUBATION screen init");
+                lastOkUiMs = 0;  // clear rate-limiter on every fresh entry
                 // load snapshot from settings or RTC
                 uint32_t sEpoch = 0;
                 if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
@@ -605,7 +652,10 @@ void task_ui(void* pvParameters) {
                 mode = IM_NAV; navIdx = 0; editField = 0;
                 lastMenuIdx = navIdx;
                 oled_show_incubation_day_set(navIdx, dispDay, dispMonth, dispYear, false, 0);
-                continue;
+                // Do NOT continue here — fall through so the triggering event
+                // is processed immediately by the IM_NAV handler below.
+                // (Previously this `continue` caused the first button press to
+                // be silently discarded, requiring a double-press to enter.)
             }
 
             if (mode == IM_NAV) {
@@ -1082,6 +1132,15 @@ void task_ui(void* pvParameters) {
 
             if (evt == UI_EVT_OK) {
                 switch ((SettingsMenuItem)settingsMenuIdx) {
+                    case SET_TIME_DATE: {
+                        // Initialise submenu index and open Time & Date menu
+                        timeDateMenuIdx = 0;
+                        uiState     = UI_TIME_DATE_MENU;
+                        lastMenuIdx = -1;
+                        oled_show_time_date_menu(timeDateMenuIdx);
+                        lastMenuIdx = timeDateMenuIdx;
+                        break;
+                    }
                     case SET_WIFI:
                         uiState     = UI_WIFI_MENU;
                         wifiMenuIdx = 0;
@@ -1271,6 +1330,149 @@ void task_ui(void* pvParameters) {
                 factoryReset();
             } else if (evt == UI_EVT_DOWN) {
                 uiState = UI_SETTINGS_MENU; lastMenuIdx = -1;
+                oled_show_settings_menu(settingsMenuIdx);
+                lastMenuIdx = settingsMenuIdx;
+            }
+        }
+
+        // ═════════════════════════════════════════════════════════════════
+        // TIME & DATE MENU  (Settings → Time & Date)
+        // Items: 0=Manual Set  1=WiFi Sync  2=Back
+        // ═════════════════════════════════════════════════════════════════
+        else if (uiState == UI_TIME_DATE_MENU) {
+            if      (evt == UI_EVT_UP)   timeDateMenuIdx = (timeDateMenuIdx - 1 + 3) % 3;
+            else if (evt == UI_EVT_DOWN) timeDateMenuIdx = (timeDateMenuIdx + 1) % 3;
+
+            if (timeDateMenuIdx != lastMenuIdx) {
+                oled_show_time_date_menu(timeDateMenuIdx);
+                lastMenuIdx = timeDateMenuIdx;
+            }
+
+            if (evt == UI_EVT_OK) {
+                if (timeDateMenuIdx == 0) {
+                    // MANUAL SET: seed edit buffer from current RTC time
+                    DateTime now;
+                    if (xSemaphoreTake(rtcMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+                        now = gRtcTime.now;
+                        xSemaphoreGive(rtcMutex);
+                    }
+                    tH  = now.hour();   tM  = now.minute(); tS = now.second();
+                    tD  = now.day();    tMo = now.month();  tY = now.year();
+                    tEditField = 0;
+                    uiState = UI_TIME_MANUAL_EDIT;
+                    lastMenuIdx = -1;
+                    oled_show_time_edit(tEditField, tH, tM, tS, tD, tMo, tY);
+
+                } else if (timeDateMenuIdx == 1) {
+                    // WIFI SYNC: attempt NTP and stay in sync-result screen
+                    oled_show_time_wifi_sync(0);  // "Syncing Time..."
+                    int syncResult = 2;
+                    if (WiFi.status() == WL_CONNECTED) {
+                        configTime(19800, 0, "pool.ntp.org");
+                        struct tm timeinfo;
+                        // getLocalTime is RTOS-aware (uses sntp internal semaphore)
+                        if (getLocalTime(&timeinfo, 5000)) {
+                            rtc.adjust(DateTime(
+                                timeinfo.tm_year + 1900,
+                                timeinfo.tm_mon  + 1,
+                                timeinfo.tm_mday,
+                                timeinfo.tm_hour,
+                                timeinfo.tm_min,
+                                timeinfo.tm_sec
+                            ));
+                            Serial.printf("[NTP] RTC updated: %04d-%02d-%02d %02d:%02d:%02d\n",
+                                timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
+                                timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+                            syncResult = 1;  // success
+                        } else {
+                            Serial.println("[NTP] getLocalTime timed out");
+                        }
+                    } else {
+                        Serial.println("[NTP] WiFi not connected");
+                    }
+                    oled_show_time_wifi_sync(syncResult);
+                    // Display result for ~2 seconds using RTOS-aware delay
+                    vTaskDelay(pdMS_TO_TICKS(2000));
+                    uiState = UI_SETTINGS_MENU;
+                    lastMenuIdx = -1;
+                    oled_show_settings_menu(settingsMenuIdx);
+                    lastMenuIdx = settingsMenuIdx;
+
+                } else {
+                    // BACK
+                    uiState = UI_SETTINGS_MENU;
+                    lastMenuIdx = -1;
+                    oled_show_settings_menu(settingsMenuIdx);
+                    lastMenuIdx = settingsMenuIdx;
+                }
+            }
+        }
+
+        // ═════════════════════════════════════════════════════════════════
+        // TIME MANUAL EDIT
+        // field 0-5: H/M/S/D/Mo/Y  —  field 6: SAVE ? prompt
+        // UP/DOWN change value, OK advances field, OK on field-6 saves to RTC
+        // DOWN on field-6 cancels without saving
+        // ═════════════════════════════════════════════════════════════════
+        else if (uiState == UI_TIME_MANUAL_EDIT) {
+            if (tEditField < 6) {
+                // Editing a field value
+                if (evt == UI_EVT_UP) {
+                    switch (tEditField) {
+                        case 0: tH  = (tH  + 1) % 24;                        break;
+                        case 1: tM  = (tM  + 1) % 60;                        break;
+                        case 2: tS  = (tS  + 1) % 60;                        break;
+                        case 3: tD  = (tD  % 31) + 1;                        break;  // 1-31
+                        case 4: tMo = (tMo % 12) + 1;                        break;  // 1-12
+                        case 5: tY  = min(2099, tY + 1);                     break;
+                    }
+                } else if (evt == UI_EVT_DOWN) {
+                    switch (tEditField) {
+                        case 0: tH  = (tH  - 1 + 24) % 24;                   break;
+                        case 1: tM  = (tM  - 1 + 60) % 60;                   break;
+                        case 2: tS  = (tS  - 1 + 60) % 60;                   break;
+                        case 3: tD  = ((tD  - 2 + 31) % 31) + 1;             break;
+                        case 4: tMo = ((tMo - 2 + 12) % 12) + 1;             break;
+                        case 5: tY  = max(2000, tY - 1);                     break;
+                    }
+                } else if (evt == UI_EVT_OK) {
+                    // advance to next field
+                    tEditField++;
+                }
+                oled_show_time_edit(tEditField, tH, tM, tS, tD, tMo, tY);
+
+            } else {
+                // field == 6: SAVE? prompt
+                if (evt == UI_EVT_OK) {
+                    // Write to DS1307 RTC
+                    rtc.adjust(DateTime(tY, tMo, tD, tH, tM, tS));
+                    Serial.printf("[RTC] Manually set to %04d-%02d-%02d %02d:%02d:%02d\n",
+                                  tY, tMo, tD, tH, tM, tS);
+                    uiState = UI_SETTINGS_MENU;
+                    lastMenuIdx = -1;
+                    oled_show_settings_menu(settingsMenuIdx);
+                    lastMenuIdx = settingsMenuIdx;
+                } else if (evt == UI_EVT_DOWN) {
+                    // Cancel — discard edits
+                    uiState = UI_SETTINGS_MENU;
+                    lastMenuIdx = -1;
+                    oled_show_settings_menu(settingsMenuIdx);
+                    lastMenuIdx = settingsMenuIdx;
+                }
+                // UP has no effect on save prompt
+            }
+        }
+
+        // ═════════════════════════════════════════════════════════════════
+        // TIME WIFI SYNC (fallback: any button exits after NTP result is shown)
+        // Note: main NTP sync is performed inline in UI_TIME_DATE_MENU handler.
+        // This state is only entered if the device returns here from that flow.
+        // ═════════════════════════════════════════════════════════════════
+        else if (uiState == UI_TIME_WIFI_SYNC) {
+            // Any button dismisses the result screen
+            if (evt == UI_EVT_OK || evt == UI_EVT_DOWN || evt == UI_EVT_UP) {
+                uiState = UI_SETTINGS_MENU;
+                lastMenuIdx = -1;
                 oled_show_settings_menu(settingsMenuIdx);
                 lastMenuIdx = settingsMenuIdx;
             }
