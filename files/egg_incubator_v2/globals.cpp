@@ -19,6 +19,7 @@ SemaphoreHandle_t controlMutex  = nullptr;
 SemaphoreHandle_t settingsMutex = nullptr;
 QueueHandle_t     uiEventQueue  = nullptr;
 QueueHandle_t     errorQueue    = nullptr;
+QueueHandle_t     telemetryQueue = nullptr;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FAULT STATE — written/read under faultMux critical section

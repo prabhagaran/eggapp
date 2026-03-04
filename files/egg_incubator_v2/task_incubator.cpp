@@ -98,8 +98,8 @@ void task_turner(void* pvParameters) {
 // ─────────────────────────────────────────────────────────────────────────────
 // TASK: EXHAUST FAN
 //
-// Runs fan on a periodic duty cycle: ON for fanDurationSec every fanIntervalMin.
-// Suspended when climate chamber profile is active.
+// Runs fan using PWM speed from `gSettings.fanSpeedPercent`.
+// Ensures fan is disabled when not in the incubator profile.
 // ─────────────────────────────────────────────────────────────────────────────
 void task_fan(void* pvParameters) {
 

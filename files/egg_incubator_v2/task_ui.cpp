@@ -7,6 +7,7 @@
 #include "task_wifi_manager.h"
 #include <WiFi.h>
 #include <Arduino.h>
+#include <Preferences.h>
 #include <time.h>
 
 extern RTC_DS1307 rtc;  // defined in egg_incubator_v2.ino
@@ -716,12 +717,21 @@ void task_ui(void* pvParameters) {
                     } else {
                         // Final OK: save startEpoch and reset lastTurnEpoch
                         DateTime startDate(editYear, editMonth, editDay, 0, 0, 0);
+                        uint32_t newStart = startDate.unixtime();
                         if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
-                            gSettings.startEpoch = startDate.unixtime();
+                            gSettings.startEpoch = newStart;
                             gSettings.lastTurnEpoch = 0;
                             xSemaphoreGive(settingsMutex);
                         }
-                        saveSettings();
+
+                        // Persist only the startEpoch and lastTurn keys to NVS
+                        {
+                            Preferences prefs;
+                            prefs.begin("incubator", false);
+                            prefs.putULong("startEpoch", newStart);
+                            prefs.putULong("lastTurn", 0);
+                            prefs.end();
+                        }
 
                         // Update navigation snapshot
                         uint32_t sEpoch = 0;

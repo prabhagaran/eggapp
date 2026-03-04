@@ -142,6 +142,13 @@
 // Cloud HTTP retry/backoff configuration
 #define CLOUD_HTTP_MAX_RETRIES          3
 #define CLOUD_HTTP_BACKOFF_MS        2000UL  // base backoff in ms (exponential)
+// Telemetry queue size (messages held for retry)
+#define TELEMETRY_QUEUE_SIZE           16
+
+// Root CA certificate for cloud server (PEM format). Leave empty to disable
+// strict verification (not recommended). Example:
+// "-----BEGIN CERTIFICATE-----\nMIID...\n-----END CERTIFICATE-----\n"
+#define CLOUD_ROOT_CA ""
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SETPOINT EDITING LIMITS

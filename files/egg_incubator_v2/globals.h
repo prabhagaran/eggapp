@@ -109,8 +109,7 @@ typedef struct {
     uint16_t      turnerIntervalMin;
     uint16_t      turnerDurationSec;
     uint32_t      lastTurnEpoch;
-    uint16_t      fanIntervalMin;
-    uint16_t      fanDurationSec;
+    // fanIntervalMin and fanDurationSec removed — PWM speed-only control
     uint8_t       fanSpeedPercent;
     uint16_t      pumpDurationSec;
 
@@ -226,6 +225,14 @@ extern SemaphoreHandle_t settingsMutex;
 
 extern QueueHandle_t uiEventQueue;
 extern QueueHandle_t errorQueue;
+extern QueueHandle_t telemetryQueue;
+
+// Telemetry message for queued uploads (fixed-size to avoid heap alloc)
+typedef struct {
+    char     url[768];
+    uint8_t  attempts;
+    uint32_t nextAttemptMs;
+} TelemetryMsg_t;
 
 extern volatile bool overTempFault;
 extern portMUX_TYPE  faultMux;

@@ -56,8 +56,6 @@ void loadSettings(void) {
         gSettings.turnerIntervalMin   = prefs.getUInt("turnerIntv", DEFAULT_TURNER_INTERVAL_MIN);
         gSettings.turnerDurationSec   = prefs.getUInt("turnerDur",  DEFAULT_TURNER_DURATION_SEC);
         gSettings.lastTurnEpoch       = prefs.getULong("lastTurn",  0);
-        gSettings.fanIntervalMin      = prefs.getUInt("fanIntv",    DEFAULT_FAN_INTERVAL_MIN);
-        gSettings.fanDurationSec      = prefs.getUInt("fanDur",     DEFAULT_FAN_DURATION_SEC);
         gSettings.fanSpeedPercent     = prefs.getUInt("fanSpeed",   DEFAULT_FAN_SPEED_PERCENT);
         gSettings.pumpDurationSec     = prefs.getUInt("pumpDur",    DEFAULT_PUMP_DURATION_SEC);
 
@@ -119,8 +117,6 @@ void saveSettings(void) {
     prefs.putUInt("turnerIntv", snap.turnerIntervalMin);
     prefs.putUInt("turnerDur",  snap.turnerDurationSec);
     prefs.putULong("lastTurn",  snap.lastTurnEpoch);
-    prefs.putUInt("fanIntv",    snap.fanIntervalMin);
-    prefs.putUInt("fanDur",     snap.fanDurationSec);
     prefs.putUInt("fanSpeed",   snap.fanSpeedPercent);
     prefs.putUInt("pumpDur",    snap.pumpDurationSec);
 
@@ -241,6 +237,7 @@ void setup() {
     settingsMutex = xSemaphoreCreateMutex();
     uiEventQueue  = xQueueCreate(UI_EVENT_QUEUE_SIZE,  sizeof(UiEvent));
     errorQueue    = xQueueCreate(ERROR_QUEUE_SIZE, sizeof(ErrorMsg_t));
+    telemetryQueue = xQueueCreate(TELEMETRY_QUEUE_SIZE, sizeof(TelemetryMsg_t));
 
     // ── Load settings from NVS ───────────────────────────────────────────────
     loadSettings();
