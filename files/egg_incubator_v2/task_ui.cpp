@@ -1082,7 +1082,7 @@ void task_ui(void* pvParameters) {
         // ═════════════════════════════════════════════════════════════════════
         else if (uiState == UI_CLIMATE_CHAMBER_MENU) {
             const int CLIM_COUNT   = 6;
-            const int CLIM_VISIBLE = 5;
+            const int CLIM_VISIBLE = 4;
             if      (evt == UI_EVT_UP)   climMenuIdx = (climMenuIdx - 1 + CLIM_COUNT) % CLIM_COUNT;
             else if (evt == UI_EVT_DOWN) climMenuIdx = (climMenuIdx + 1) % CLIM_COUNT;
             if (climMenuIdx < climMenuTop)
@@ -1153,7 +1153,7 @@ void task_ui(void* pvParameters) {
         // ═════════════════════════════════════════════════════════════════════
         else if (uiState == UI_SYSTEM_MENU) {
             const int SYS_COUNT   = 6;
-            const int SYS_VISIBLE = 5;
+            const int SYS_VISIBLE = 4;
             if      (evt == UI_EVT_UP)   sysMenuIdx = (sysMenuIdx - 1 + SYS_COUNT) % SYS_COUNT;
             else if (evt == UI_EVT_DOWN) sysMenuIdx = (sysMenuIdx + 1) % SYS_COUNT;
             if (sysMenuIdx < sysMenuTop)
