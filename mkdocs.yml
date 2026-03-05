@@ -31,7 +31,14 @@ nav:
   - Software:
       - Software Overview: software/software_overview.md
       - RTOS Architecture: software/rtos_architecture.md
-      - FSM Design: software/fsm_design.md
+      - Code Walkthrough: software/code_explanation.md
+     - FSM Design:
+         - Overview: software/fsm_design.md
+         - System Supervisor: software/fsm_system_supervisor.md
+         - Temperature Control: software/fsm_temperature.md
+         - Humidity Control: software/fsm_humidity.md
+         - Water Level: software/fsm_water.md
+         - Alarm: software/fsm_alarm.md
       - Profiles: software/profiles.md
 
   - User Interface:

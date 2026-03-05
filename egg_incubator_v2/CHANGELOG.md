@@ -2,6 +2,22 @@
 
 All notable changes and fixes for the egg_incubator_v2 workspace.
 
+## v2 — 2026-03-05 — Released
+
+- Release `v2`: consolidated documentation, updated README, added per-FSM
+  design pages, and included a host-run unit-test scaffold for the
+  Temperature FSM. See entries below for detailed changes.
+
+
+
+## 2026-03-05 — Documentation
+
+- Formalized and clarified the repository `README.md` with a concise project
+  overview, structured quick-start instructions, repository layout, and
+  guidance for configuration and contribution.
+
+
+
 ## 2026-03-04 — Maintenance & fixes
 
 - Fan / PWM (RELAY_FAN) conflict — applied FIX Option A
