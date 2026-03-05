@@ -158,6 +158,12 @@ enum UiState : uint8_t {
     UI_ENV_TURNER,
     UI_ENV_FAN,
 
+    // Profile-grouped setting menus
+    UI_EGG_INCUBATOR_MENU,
+    UI_CLIMATE_CHAMBER_MENU,
+    UI_SYSTEM_MENU,
+    UI_PUMP_SETTINGS,
+
     UI_CLIMATE_MODE_MENU,
     UI_CLIMATE_SCHEDULE,
     UI_CLIMATE_CYCLIC,
@@ -180,10 +186,10 @@ enum UiState : uint8_t {
 // MENU INDEX ENUMS
 // ─────────────────────────────────────────────────────────────────────────────
 enum MainMenuItem : uint8_t {
-    MENU_CONTROLLER_MODE = 0,
-    MENU_SET_ENVIRONMENT,
-    MENU_SETTINGS,
-    MENU_EXIT,
+    MENU_EGG_INCUBATOR = 0,
+    MENU_CLIMATE_CHAMBER,
+    MENU_SYSTEM,
+    MENU_BACK,
     MENU_COUNT
 };
 
@@ -225,7 +231,6 @@ extern SemaphoreHandle_t settingsMutex;
 
 extern QueueHandle_t uiEventQueue;
 extern QueueHandle_t errorQueue;
-extern QueueHandle_t telemetryQueue;
 
 // Telemetry message for queued uploads (fixed-size to avoid heap alloc)
 typedef struct {
@@ -234,11 +239,14 @@ typedef struct {
     uint32_t nextAttemptMs;
 } TelemetryMsg_t;
 
+extern QueueHandle_t telemetryQueue;
+
 extern volatile bool overTempFault;
 extern portMUX_TYPE  faultMux;
 
 extern volatile bool wifiUserEnabled;   // true = user has enabled Wi-Fi
 extern volatile bool wifiPortalActive;  // true = config portal is running
+extern volatile bool rtcEpochValid;     // true = RTC epoch is sane (> Nov 2023)
 
 extern TaskHandle_t hTaskTurner;
 extern TaskHandle_t hTaskFan;
@@ -246,6 +254,7 @@ extern TaskHandle_t hTaskPump;
 extern TaskHandle_t hTaskMilestone;
 extern TaskHandle_t hTaskTempControl;
 extern TaskHandle_t hTaskClimateControl;
+extern SemaphoreHandle_t milestoneMutex;  // guards gMilestoneLabel; created in setup()
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPER: push an error onto errorQueue (safe from any task)

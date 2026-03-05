@@ -198,11 +198,18 @@ void task_pump(void* pvParameters) {
     unsigned long lastPumpMs = 0;
 
     for (;;) {
-
         float currentHum = 0.0f;
+        bool  humValid   = false;
         if (xSemaphoreTake(sensorMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
             currentHum = gSensorData.humidity_dht;
+            humValid   = gSensorData.hum_valid;
             xSemaphoreGive(sensorMutex);
+        }
+
+        // If humidity reading is not valid, skip pump logic to avoid acting on stale data
+        if (!humValid) {
+            vTaskDelay(pdMS_TO_TICKS(30000));
+            continue;
         }
 
         float    humSP       = DEFAULT_HUM_SETPOINT;
@@ -249,8 +256,6 @@ char gMilestoneLabel[24] = { 0 };
 SemaphoreHandle_t milestoneMutex = nullptr;
 
 void task_milestone(void* pvParameters) {
-
-    milestoneMutex = xSemaphoreCreateMutex();
 
     uint32_t lastCheckEpoch = 0;
     bool     lockdownApplied = false;
@@ -301,6 +306,13 @@ void task_milestone(void* pvParameters) {
                 if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
                     gSettings.humSetpoint = gSettings.lockdownHumidity;
                     xSemaphoreGive(settingsMutex);
+                }
+                // Persist only the humidity setpoint to NVS so lockdown survives power cycles
+                {
+                    Preferences prefs;
+                    prefs.begin("incubator", false);
+                    prefs.putFloat("setHum", gSettings.humSetpoint);
+                    prefs.end();
                 }
                 Serial.println("[MILESTONE] Humidity raised for lockdown");
             }

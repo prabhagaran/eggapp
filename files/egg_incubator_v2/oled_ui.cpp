@@ -6,6 +6,59 @@
 
 static Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
+// ─────────────────────────────────────────────────────────────────────────────
+// SHARED MENU PRIMITIVES
+// Layout (128×64): title y=0..9 | divider y=10 | 4 item rows y=12..63 (13 px each)
+// Scrollbar: 3 px wide at x=125
+// ─────────────────────────────────────────────────────────────────────────────
+static const int MENU_Y0   = 16;   // y of first highlight bar (text at y+2=18)
+static const int ITEM_H    = 13;   // row height (12 px content + 1 px gap)
+static const int MENU_ROWS = 4;    // visible rows
+static const int SB_X      = 125;  // scrollbar left edge (3 px wide: 125-127)
+static const int SB_Y0     = 16;
+static const int SB_Y1     = 63;
+
+static void drawMenuTitle(const char* title) {
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(0, 0);
+    display.print(title);
+    display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
+}
+
+// Render up to MENU_ROWS items with highlight bar + optional scrollbar.
+// items/total : full array.  selected : absolute highlighted index.
+// topIdx      : first visible index.
+static void drawMenuItems(const char** items, int total, int selected, int topIdx) {
+    bool sb    = (total > MENU_ROWS);
+    int  textW = sb ? (SB_X - 2) : 123;
+
+    for (int row = 0; row < MENU_ROWS; row++) {
+        int idx = topIdx + row;
+        if (idx >= total) break;
+        int y = MENU_Y0 + row * ITEM_H;
+        if (idx == selected) {
+            display.fillRect(0, y, textW + 1, ITEM_H - 1, SSD1306_WHITE);
+            display.setTextColor(SSD1306_BLACK);
+        } else {
+            display.setTextColor(SSD1306_WHITE);
+        }
+        display.setCursor(2, y + 2);
+        display.print(items[idx]);
+    }
+    display.setTextColor(SSD1306_WHITE);
+
+    if (sb) {
+        int trackH = SB_Y1 - SB_Y0 + 1;
+        int thumbH = max(4, trackH * MENU_ROWS / total);
+        int thumbY = (total > 1)
+                   ? SB_Y0 + (trackH - thumbH) * selected / (total - 1)
+                   : SB_Y0;
+        display.drawRect(SB_X, SB_Y0, 3, trackH, SSD1306_WHITE);
+        display.fillRect(SB_X, thumbY, 3, thumbH, SSD1306_WHITE);
+    }
+}
+
 static const char* MONTH_NAMES[] = {
     "Jan","Feb","Mar","Apr","May","Jun",
     "Jul","Aug","Sep","Oct","Nov","Dec"
@@ -251,24 +304,11 @@ void oled_show_fault_screen(float currentTemp) {
 // ─────────────────────────────────────────────────────────────────────────────
 void oled_show_menu(int selected) {
     static const char* items[] = {
-        "Controller Mode",
-        "Set Environment",
-        "Settings",
-        "Exit"
+        "Egg Incubator", "Climate Chamber", "System", "Back"
     };
     display.clearDisplay();
-    display.setTextSize(1);
-    display.setTextColor(SSD1306_WHITE);
-
-    display.setCursor(0, 0);
-    display.print("MAIN MENU");
-    display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
-
-    for (int i = 0; i < 4; i++) {
-           display.setCursor(0, 16 + i * 10);
-        display.print(i == selected ? "> " : "  ");
-        display.print(items[i]);
-    }
+    drawMenuTitle("MAIN MENU");
+    drawMenuItems(items, 4, selected, 0);
     display.display();
 }
 
@@ -276,29 +316,27 @@ void oled_show_menu(int selected) {
 // CONTROLLER MODE MENU
 // ─────────────────────────────────────────────────────────────────────────────
 void oled_show_controller_mode(int selected, ProfileType activeProfile) {
-    static const char* items[] = {
-        "Egg Incubator",
-        "Climate Chamber",
-        "Back"
-    };
+    static const char* items[] = { "Egg Incubator", "Climate Chamber", "Back" };
     display.clearDisplay();
-    display.setTextSize(1);
+    drawMenuTitle("CONTROLLER MODE");
+    // Info row (non-selectable)
     display.setTextColor(SSD1306_WHITE);
-
-    display.setCursor(0, 0);
-    display.print("CONTROLLER MODE");
-    display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
-
-    // Show active profile indicator
-    display.setCursor(0, 16);
+    display.setCursor(2, MENU_Y0 + 2);
     display.print("Active: ");
     display.print(activeProfile == PROFILE_EGG_INCUBATOR ? "Incubator" : "Climate");
-
-    for (int i = 0; i < 3; i++) {
-        display.setCursor(0, 26 + i * 12);
-        display.print(i == selected ? "> " : "  ");
-        display.print(items[i]);
+    // Selectable rows offset one row below the info row
+    for (int row = 0; row < 3; row++) {
+        int y = MENU_Y0 + ITEM_H * (row + 1);
+        if (row == selected) {
+            display.fillRect(0, y, 123, ITEM_H - 1, SSD1306_WHITE);
+            display.setTextColor(SSD1306_BLACK);
+        } else {
+            display.setTextColor(SSD1306_WHITE);
+        }
+        display.setCursor(2, y + 2);
+        display.print(items[row]);
     }
+    display.setTextColor(SSD1306_WHITE);
     display.display();
 }
 
@@ -425,31 +463,13 @@ void oled_show_humidity(float current, float setpoint) {
 // HYSTERESIS MENU
 // ─────────────────────────────────────────────────────────────────────────────
 void oled_show_hysteresis_menu(int selected, float tempHyst, float humHyst) {
-    static const char* items[] = { "Temp Hyst", "Hum  Hyst", "Back" };
     display.clearDisplay();
-    display.setTextSize(1);
-    display.setTextColor(SSD1306_WHITE);
-
-    display.setCursor(0, 0);
-    display.print("HYSTERESIS");
-    display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
-
-    display.setCursor(0, 16);
-    display.print(selected == 0 ? "> " : "  ");
-    display.print("Temp: +-");
-    display.print(tempHyst, 1);
-    display.print(" C");
-
-    display.setCursor(0, 28);
-    display.print(selected == 1 ? "> " : "  ");
-    display.print("Hum : +-");
-    display.print(humHyst, 0);
-    display.print(" %");
-
-    display.setCursor(0, 42);
-    display.print(selected == 2 ? "> " : "  ");
-    display.print("Back");
-
+    drawMenuTitle("HYSTERESIS");
+    char t[22], h[22];
+    snprintf(t, sizeof(t), "Temp: +-%.1f C", tempHyst);
+    snprintf(h, sizeof(h), "Hum : +-%.0f %%", humHyst);
+    const char* items[] = { t, h, "Back" };
+    drawMenuItems(items, 3, selected, 0);
     display.display();
 }
 
@@ -464,19 +484,14 @@ void oled_show_egg_type(int selected) {
         "Custom",
         "Back"
     };
+    const int total = 5;
+    int top = selected - MENU_ROWS / 2;
+    if (top < 0) top = 0;
+    if (top > total - MENU_ROWS) top = total - MENU_ROWS;
+    if (top < 0) top = 0;
     display.clearDisplay();
-    display.setTextSize(1);
-    display.setTextColor(SSD1306_WHITE);
-
-    display.setCursor(0, 0);
-    display.print("EGG TYPE");
-    display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
-
-    for (int i = 0; i < 5; i++) {
-        display.setCursor(0, 16 + i * 10);
-        display.print(i == selected ? "> " : "  ");
-        display.print(items[i]);
-    }
+    drawMenuTitle("EGG TYPE");
+    drawMenuItems(items, total, selected, top);
     display.display();
 }
 
@@ -549,43 +564,14 @@ void oled_show_turner_settings(int selected,
                                 int editState,
                                 bool toggleState)
 {
-    // editState: 0=nav,1=edit-interval,2=edit-duration,3=toggle
     display.clearDisplay();
-    display.setTextSize(1);
-    display.setTextColor(SSD1306_WHITE);
-
-    display.setCursor(0, 0);
-    display.print("TURNER SETTINGS");
-    display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
-
-    // Interval row
-    display.setCursor(0, 16);
-    display.print(selected == 0 ? "> " : "  ");
-    display.print("Interval: ");
-    display.print(intervalMin);
-    display.print(" min");
-    // edit indicator removed per user request
-
-    // Duration row
-    display.setCursor(0, 26);
-    display.print(selected == 1 ? "> " : "  ");
-    display.print("Duration: ");
-    display.print(durationSec);
-    display.print(" sec");
-    // edit indicator removed per user request
-
-    // Turn Now row — show toggle state when in toggle mode
-    display.setCursor(0, 38);
-    display.print(selected == 2 ? "> " : "  ");
-    display.print("Turn Now: ");
-    display.print(toggleState ? "ON" : "OFF");
-    // toggle indicator removed per user request
-
-    // Back row
-    display.setCursor(0, 50);
-    display.print(selected == 3 ? "> " : "  ");
-    display.print("Back");
-
+    drawMenuTitle("TURNER SETTINGS");
+    char intv[22], dur[22], tnow[16];
+    snprintf(intv, sizeof(intv), "Interval: %d min",  (int)intervalMin);
+    snprintf(dur,  sizeof(dur),  "Duration: %d sec",  (int)durationSec);
+    snprintf(tnow, sizeof(tnow), "Turn Now: %s",      toggleState ? "ON" : "OFF");
+    const char* items[] = { intv, dur, tnow, "Back" };
+    drawMenuItems(items, 4, selected, 0);
     display.display();
 }
 
@@ -595,24 +581,11 @@ void oled_show_turner_settings(int selected,
 void oled_show_fan_settings(int selected, uint8_t speedPercent)
 {
     display.clearDisplay();
-    display.setTextSize(1);
-    display.setTextColor(SSD1306_WHITE);
-
-    display.setCursor(0, 0);
-    display.print("FAN SETTINGS");
-    display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
-
-    // Speed row (0 = Speed, 1 = Back)
-    display.setCursor(0, 16);
-    display.print(selected == 0 ? "> " : "  ");
-    display.print("Speed: ");
-    display.print((int)speedPercent);
-    display.print(" %");
-
-    display.setCursor(0, 34);
-    display.print(selected == 1 ? "> " : "  ");
-    display.print("Back");
-
+    drawMenuTitle("FAN SETTINGS");
+    char spd[18];
+    snprintf(spd, sizeof(spd), "Speed: %d %%", (int)speedPercent);
+    const char* items[] = { spd, "Back" };
+    drawMenuItems(items, 2, selected, 0);
     display.display();
 }
 
@@ -621,53 +594,16 @@ void oled_show_fan_settings(int selected, uint8_t speedPercent)
 // ─────────────────────────────────────────────────────────────────────────────
 void oled_show_settings_menu(int selected) {
     static const char* items[] = {
-        "Time & Date",
-        "WiFi",
-        "Heater Control",
-        "Device Info",
-        "Factory Reset",
-        "Back"
+        "Time & Date", "WiFi", "Heater Control",
+        "Device Info", "Factory Reset", "Back"
     };
+    const int total = 6;
+    int top = selected - MENU_ROWS / 2;
+    if (top < 0) top = 0;
+    if (top > total - MENU_ROWS) top = total - MENU_ROWS;
     display.clearDisplay();
-    display.setTextSize(1);
-    display.setTextColor(SSD1306_WHITE);
-
-    display.setCursor(0, 0);
-    display.print("SETTINGS");
-    display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
-
-    // Build full menu list so we can paginate a window around the selected item
-    const char* fullItems[6];
-    int fullCount = 0;
-    for (int i = 0; i < 6; i++) fullItems[fullCount++] = items[i];
-
-    // Determine visible window size (max rows that fit)
-    int maxRows = 5; // rows at y=16,26,36,46,56 (fits on 64px OLED)
-    if (fullCount < maxRows) maxRows = fullCount;
-
-    // Compute window start so selected stays visible and ideally centered
-    int start = selected - (maxRows / 2);
-    if (start < 0) start = 0;
-    if (start > fullCount - maxRows) start = max(0, fullCount - maxRows);
-
-    // Render only visible rows
-    for (int r = 0; r < maxRows; r++) {
-        int idx = start + r;
-        display.setCursor(0, 16 + r * 10);
-        display.print(idx == selected ? "> " : "  ");
-        display.print(fullItems[idx]);
-    }
-
-    // Pager indicator if needed
-    if (fullCount > maxRows) {
-        int page = (start / maxRows) + 1;
-        int totalPages = (fullCount + maxRows - 1) / maxRows;
-        char pbuf[6];
-        snprintf(pbuf, sizeof(pbuf), "%d/%d", page, totalPages);
-        display.setCursor(96, 54);
-        display.print(pbuf);
-    }
-
+    drawMenuTitle("SETTINGS");
+    drawMenuItems(items, total, selected, top);
     display.display();
 }
 
@@ -677,18 +613,8 @@ void oled_show_settings_menu(int selected) {
 void oled_show_mode_menu(int selected) {
     static const char* items[] = { "Auto", "Manual", "Back" };
     display.clearDisplay();
-    display.setTextSize(1);
-    display.setTextColor(SSD1306_WHITE);
-
-    display.setCursor(0, 0);
-    display.print("CONTROL MODE");
-    display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
-
-    for (int i = 0; i < 3; i++) {
-        display.setCursor(0, 18 + i * 14);
-        display.print(i == selected ? "> " : "  ");
-        display.print(items[i]);
-    }
+    drawMenuTitle("CONTROL MODE");
+    drawMenuItems(items, 3, selected, 0);
     display.display();
 }
 
@@ -731,28 +657,17 @@ void oled_show_manual_control(int selected, bool heaterOn, bool coolerOn, Profil
 // CLIMATE MODE MENU
 // ─────────────────────────────────────────────────────────────────────────────
 void oled_show_climate_mode_menu(int selected, ClimateModeType active) {
-    static const char* items[] = { "Fixed Schedule", "Cyclic Period", "Ramp Profile", "Back" };
+    static const char* items[] = {
+        "Fixed Schedule", "Cyclic Period", "Ramp Profile", "Back"
+    };
     display.clearDisplay();
+    // Show active mode in title area
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE);
-
     display.setCursor(0, 0);
     display.print("CLIMATE PROFILE");
     display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
-
-    display.setCursor(0, 12);
-    display.print("Active: ");
-    switch (active) {
-        case CLIMATE_FIXED_SCHEDULE: display.print("Fixed"); break;
-        case CLIMATE_CYCLIC:         display.print("Cyclic"); break;
-        case CLIMATE_RAMP:           display.print("Ramp"); break;
-    }
-
-    for (int i = 0; i < 4; i++) {
-        display.setCursor(0, 26 + i * 10);
-        display.print(i == selected ? "> " : "  ");
-        display.print(items[i]);
-    }
+    drawMenuItems(items, 4, selected, 0);
     display.display();
 }
 
@@ -955,28 +870,27 @@ void oled_show_factory_reset_confirm(void) {
 // ─────────────────────────────────────────────────────────────────────────────
 void oled_show_wifi_menu(int selected, bool connected) {
     display.clearDisplay();
-    display.setTextSize(1);
+    drawMenuTitle("WiFi");
+    // Status info row (non-selectable)
     display.setTextColor(SSD1306_WHITE);
-
-    display.setCursor(0, 0);
-    display.print("WiFi");
-    display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
-
-    // Status row (informational, not selectable)
-    display.setCursor(0, 16);
+    display.setCursor(2, MENU_Y0 + 2);
     display.print("Status: ");
     display.print(connected ? "Connected" : "Disconnected");
-
-    // Action row
-    display.setCursor(0, 28);
-    display.print(selected == 0 ? "> " : "  ");
-    display.print(connected ? "Disconnect" : "Connect");
-
-    // Back row
-    display.setCursor(0, 40);
-    display.print(selected == 1 ? "> " : "  ");
-    display.print("Back");
-
+    // Selectable rows start one row below the info row
+    const char* act = connected ? "Disconnect" : "Connect";
+    const char* rows[] = { act, "Back" };
+    for (int row = 0; row < 2; row++) {
+        int y = MENU_Y0 + ITEM_H * (row + 1);
+        if (row == selected) {
+            display.fillRect(0, y, 123, ITEM_H - 1, SSD1306_WHITE);
+            display.setTextColor(SSD1306_BLACK);
+        } else {
+            display.setTextColor(SSD1306_WHITE);
+        }
+        display.setCursor(2, y + 2);
+        display.print(rows[row]);
+    }
+    display.setTextColor(SSD1306_WHITE);
     display.display();
 }
 
@@ -985,21 +899,10 @@ void oled_show_wifi_menu(int selected, bool connected) {
 // selected: 0=Manual Set  1=WiFi Sync  2=Back
 // ─────────────────────────────────────────────────────────────────────────────
 void oled_show_time_date_menu(int selected) {
+    static const char* items[] = { "Manual Set", "WiFi Sync", "Back" };
     display.clearDisplay();
-    display.setTextSize(1);
-    display.setTextColor(SSD1306_WHITE);
-
-    display.setCursor(0, 0);
-    display.print("TIME & DATE");
-    display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
-
-    const char* items[] = { "Manual Set", "WiFi Sync", "Back" };
-    for (int i = 0; i < 3; i++) {
-        display.setCursor(0, 16 + i * 10);
-        display.print(i == selected ? "> " : "  ");
-        display.print(items[i]);
-    }
-
+    drawMenuTitle("TIME & DATE");
+    drawMenuItems(items, 3, selected, 0);
     display.display();
 }
 
@@ -1059,6 +962,75 @@ void oled_show_time_edit(int field, int h, int m, int s, int d, int mo, int y) {
         }
     }
 
+    display.display();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EGG INCUBATOR MENU — 10-item list, 4 visible at a time, scrollable
+// Items: Control Mode / Set Temperature / Set Humidity / Hysteresis /
+//        Egg Type / Incubation Day / Turner / Fan / Pump Duration / Back
+// ─────────────────────────────────────────────────────────────────────────────
+void oled_show_egg_incubator_menu(int selected, int topIdx) {
+    static const char* items[] = {
+        "Control Mode",  "Set Temperature", "Set Humidity", "Hysteresis",
+        "Egg Type",      "Incubation Day",  "Turner",       "Fan",
+        "Pump Duration", "Back"
+    };
+    display.clearDisplay();
+    drawMenuTitle("EGG INCUBATOR");
+    drawMenuItems(items, 10, selected, topIdx);
+    display.display();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CLIMATE CHAMBER MENU
+// Items: Control Mode / Set Temperature / Set Humidity / Hysteresis /
+//        Climate Mode / Back
+// ─────────────────────────────────────────────────────────────────────────────
+void oled_show_climate_chamber_menu(int selected, int topIdx) {
+    static const char* items[] = {
+        "Control Mode",  "Set Temperature", "Set Humidity",
+        "Hysteresis",    "Climate Mode",    "Back"
+    };
+    display.clearDisplay();
+    drawMenuTitle("CLIMATE CHAMBER");
+    drawMenuItems(items, 6, selected, topIdx);
+    display.display();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SYSTEM MENU
+// Items: Switch Profile / WiFi / Time & Date / Device Info / Factory Reset / Back
+// ─────────────────────────────────────────────────────────────────────────────
+void oled_show_system_menu(int selected, int topIdx) {
+    static const char* items[] = {
+        "Switch Profile", "WiFi",           "Time & Date",
+        "Device Info",    "Factory Reset",  "Back"
+    };
+    display.clearDisplay();
+    drawMenuTitle("SYSTEM");
+    drawMenuItems(items, 6, selected, topIdx);
+    display.display();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PUMP SETTINGS
+// menuIdx 0 = Duration row, 1 = Back row
+// editing = true -> show value in brackets, UP/DOWN adjust
+// ─────────────────────────────────────────────────────────────────────────────
+void oled_show_pump_settings(int menuIdx, uint16_t durSec, bool editing) {
+    display.clearDisplay();
+    drawMenuTitle("PUMP DURATION");
+    char dur[24];
+    if (editing)
+        snprintf(dur, sizeof(dur), "Duration: [%ds]", (int)durSec);
+    else
+        snprintf(dur, sizeof(dur), "Duration: %ds",   (int)durSec);
+    const char* items[] = { dur, "Back" };
+    drawMenuItems(items, 2, menuIdx, 0);
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(0, 56);
+    display.print(editing ? "UP/DN=+/-5s  OK=Save" : "OK=Edit");
     display.display();
 }
 

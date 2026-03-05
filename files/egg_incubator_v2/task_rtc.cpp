@@ -18,6 +18,18 @@ void task_rtc(void* pvParameters) {
             gRtcTime.now   = now;
             gRtcTime.epoch = now.unixtime();
             xSemaphoreGive(rtcMutex);
+
+            // Epoch sanity: DS1307 power-loss returns 2000-01-01 (epoch ~946684800)
+            static unsigned long lastEpochErrMs = 0;
+            if (gRtcTime.epoch < 1700000000UL) {
+                rtcEpochValid = false;
+                if (millis() - lastEpochErrMs > 30000UL) {
+                    lastEpochErrMs = millis();
+                    pushError("FAULT", "RTC epoch invalid");
+                }
+            } else {
+                rtcEpochValid = true;
+            }
         }
 
         static bool rtc_first = true;

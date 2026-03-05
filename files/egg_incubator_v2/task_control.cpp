@@ -2,6 +2,7 @@
 #include "globals.h"
 #include "config.h"
 #include <Arduino.h>
+#include "esp_task_wdt.h"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TASK: TEMPERATURE CONTROL (Egg Incubator profile)

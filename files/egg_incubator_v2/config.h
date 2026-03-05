@@ -85,12 +85,17 @@
 #define QUAIL_DEFAULT_TEMP     37.5f
 #define QUAIL_DEFAULT_HUM      60.0f
 
+// Candling day per egg type (day number when fertility can be checked)
+#define CHICKEN_CANDLE_DAY      7
+#define DUCK_CANDLE_DAY        10
+#define QUAIL_CANDLE_DAY        7
+
 // ─────────────────────────────────────────────────────────────────────────────
 // EGG TURNER DEFAULTS
 // ─────────────────────────────────────────────────────────────────────────────
 #define DEFAULT_TURNER_INTERVAL_MIN   240   // 4 hours
 #define DEFAULT_TURNER_DURATION_SEC    30   // 30 seconds
-#define TURNER_MIN_INTERVAL_MIN         1   // 60 min minimum allowed
+#define TURNER_MIN_INTERVAL_MIN        60   // 60 min minimum allowed
 #define TURNER_MAX_INTERVAL_MIN       720   // 12 hours maximum
 #define TURNER_MIN_DURATION_SEC        10
 #define TURNER_MAX_DURATION_SEC       120
@@ -98,8 +103,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // FAN DEFAULTS
 // ─────────────────────────────────────────────────────────────────────────────
-#define DEFAULT_FAN_INTERVAL_MIN       60   // every 60 minutes
-#define DEFAULT_FAN_DURATION_SEC      300   // on for 5 minutes
 // Default PWM speed percent for fan (0-100)
 #define DEFAULT_FAN_SPEED_PERCENT      100
 
@@ -145,10 +148,8 @@
 // Telemetry queue size (messages held for retry)
 #define TELEMETRY_QUEUE_SIZE           16
 
-// Root CA certificate for cloud server (PEM format). Leave empty to disable
-// strict verification (not recommended). Example:
-// "-----BEGIN CERTIFICATE-----\nMIID...\n-----END CERTIFICATE-----\n"
-#define CLOUD_ROOT_CA ""
+// Root CA certificate is defined in secrets.h (or the fallback block below).
+// See ROOT_CA_EXTRACT.md for instructions on obtaining the PEM.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SETPOINT EDITING LIMITS

@@ -28,6 +28,10 @@ static const char* uiStateName(UiState s) {
     switch (s) {
         case UI_HOME: return "HOME";
         case UI_MAIN_MENU: return "MAIN_MENU";
+        case UI_EGG_INCUBATOR_MENU: return "EGG_INC_MENU";
+        case UI_CLIMATE_CHAMBER_MENU: return "CLIM_MENU";
+        case UI_SYSTEM_MENU: return "SYSTEM_MENU";
+        case UI_PUMP_SETTINGS: return "PUMP_SETTINGS";
         case UI_CONTROLLER_MODE_MENU: return "CONTROLLER_MODE_MENU";
         case UI_SET_ENV_MENU: return "SET_ENV_MENU";
         case UI_SETTINGS_MENU: return "SETTINGS_MENU";
@@ -65,6 +69,16 @@ static int      wifiMenuIdx      = 0;  // WiFi menu: 0=Connect/Disconnect, 1=Bac
 static int      climateSchedIdx  = 0;
 static int      climateCyclicIdx = 0;
 static int      climateRampIdx   = 0;
+static int      eggMenuIdx       = 0;
+static int      eggMenuTop       = 0;
+static int      climMenuIdx      = 0;
+static int      climMenuTop      = 0;
+static int      sysMenuIdx       = 0;
+static int      sysMenuTop       = 0;
+static int      pumpMenuIdx      = 0;
+static UiState  profileMenuParent = UI_EGG_INCUBATOR_MENU;
+static uint16_t editPumpDur      = DEFAULT_PUMP_DURATION_SEC;
+static bool     pumpEditing      = false;
 static int      lastMenuIdx      = -1;
 
 // Date editing state for incubation start
@@ -272,25 +286,25 @@ void task_ui(void* pvParameters) {
 
             if (evt == UI_EVT_OK) {
                 switch ((MainMenuItem)mainMenuIdx) {
-                    case MENU_CONTROLLER_MODE:
-                        uiState = UI_CONTROLLER_MODE_MENU;
-                        controllerModeIdx = 0; lastMenuIdx = -1;
-                        oled_show_controller_mode(controllerModeIdx, profile);
-                        lastMenuIdx = controllerModeIdx;
+                    case MENU_EGG_INCUBATOR:
+                        uiState = UI_EGG_INCUBATOR_MENU;
+                        eggMenuIdx = 0; eggMenuTop = 0; lastMenuIdx = -1;
+                        oled_show_egg_incubator_menu(eggMenuIdx, eggMenuTop);
+                        lastMenuIdx = eggMenuIdx;
                         break;
-                    case MENU_SET_ENVIRONMENT:
-                        uiState = UI_SET_ENV_MENU;
-                        envMenuIdx = 0; lastMenuIdx = -1;
-                        oled_show_set_environment(envMenuIdx, profile);
-                        lastMenuIdx = envMenuIdx;
+                    case MENU_CLIMATE_CHAMBER:
+                        uiState = UI_CLIMATE_CHAMBER_MENU;
+                        climMenuIdx = 0; climMenuTop = 0; lastMenuIdx = -1;
+                        oled_show_climate_chamber_menu(climMenuIdx, climMenuTop);
+                        lastMenuIdx = climMenuIdx;
                         break;
-                    case MENU_SETTINGS:
-                        uiState = UI_SETTINGS_MENU;
-                        settingsMenuIdx = 0; lastMenuIdx = -1;
-                        oled_show_settings_menu(settingsMenuIdx);
-                        lastMenuIdx = settingsMenuIdx;
+                    case MENU_SYSTEM:
+                        uiState = UI_SYSTEM_MENU;
+                        sysMenuIdx = 0; sysMenuTop = 0; lastMenuIdx = -1;
+                        oled_show_system_menu(sysMenuIdx, sysMenuTop);
+                        lastMenuIdx = sysMenuIdx;
                         break;
-                    case MENU_EXIT:
+                    case MENU_BACK:
                         uiState = UI_HOME;
                         lastMinute = -1;
                         break;
@@ -320,9 +334,9 @@ void task_ui(void* pvParameters) {
                     switchProfile(PROFILE_CLIMATE_CHAMBER);
                     uiState = UI_HOME; lastMinute = -1;
                 } else {
-                    uiState = UI_MAIN_MENU; lastMenuIdx = -1;
-                    oled_show_menu(mainMenuIdx);
-                    lastMenuIdx = mainMenuIdx;
+                    uiState = UI_SYSTEM_MENU; lastMenuIdx = -1;
+                    oled_show_system_menu(sysMenuIdx, sysMenuTop);
+                    lastMenuIdx = sysMenuIdx;
                 }
             }
         }
@@ -473,9 +487,15 @@ void task_ui(void* pvParameters) {
 
             if (evt == UI_EVT_OK) {
                 saveSettings();
-                uiState = UI_SET_ENV_MENU; lastMenuIdx = -1;
-                oled_show_set_environment(envMenuIdx, profile);
-                lastMenuIdx = envMenuIdx;
+                if (profileMenuParent == UI_CLIMATE_CHAMBER_MENU) {
+                    uiState = UI_CLIMATE_CHAMBER_MENU; lastMenuIdx = -1;
+                    oled_show_climate_chamber_menu(climMenuIdx, climMenuTop);
+                    lastMenuIdx = climMenuIdx;
+                } else {
+                    uiState = UI_EGG_INCUBATOR_MENU; lastMenuIdx = -1;
+                    oled_show_egg_incubator_menu(eggMenuIdx, eggMenuTop);
+                    lastMenuIdx = eggMenuIdx;
+                }
             }
         }
 
@@ -513,9 +533,15 @@ void task_ui(void* pvParameters) {
 
             if (evt == UI_EVT_OK) {
                 saveSettings();
-                uiState = UI_SET_ENV_MENU; lastMenuIdx = -1;
-                oled_show_set_environment(envMenuIdx, profile);
-                lastMenuIdx = envMenuIdx;
+                if (profileMenuParent == UI_CLIMATE_CHAMBER_MENU) {
+                    uiState = UI_CLIMATE_CHAMBER_MENU; lastMenuIdx = -1;
+                    oled_show_climate_chamber_menu(climMenuIdx, climMenuTop);
+                    lastMenuIdx = climMenuIdx;
+                } else {
+                    uiState = UI_EGG_INCUBATOR_MENU; lastMenuIdx = -1;
+                    oled_show_egg_incubator_menu(eggMenuIdx, eggMenuTop);
+                    lastMenuIdx = eggMenuIdx;
+                }
             }
         }
 
@@ -536,9 +562,15 @@ void task_ui(void* pvParameters) {
                 else if (hysteresisMenuIdx == 1) { uiState = UI_ENV_HYST_HUM_EDIT;  }
                 else {
                     saveSettings();
-                    uiState = UI_SET_ENV_MENU; lastMenuIdx = -1;
-                    oled_show_set_environment(envMenuIdx, profile);
-                    lastMenuIdx = envMenuIdx;
+                    if (profileMenuParent == UI_CLIMATE_CHAMBER_MENU) {
+                        uiState = UI_CLIMATE_CHAMBER_MENU; lastMenuIdx = -1;
+                        oled_show_climate_chamber_menu(climMenuIdx, climMenuTop);
+                        lastMenuIdx = climMenuIdx;
+                    } else {
+                        uiState = UI_EGG_INCUBATOR_MENU; lastMenuIdx = -1;
+                        oled_show_egg_incubator_menu(eggMenuIdx, eggMenuTop);
+                        lastMenuIdx = eggMenuIdx;
+                    }
                 }
             }
         }
@@ -613,9 +645,9 @@ void task_ui(void* pvParameters) {
                     applyEggTypeDefaults((EggType)eggTypeIdx);
                     saveSettings();
                 }
-                uiState = UI_SET_ENV_MENU; lastMenuIdx = -1;
-                oled_show_set_environment(envMenuIdx, profile);
-                lastMenuIdx = envMenuIdx;
+                uiState = UI_EGG_INCUBATOR_MENU; lastMenuIdx = -1;
+                oled_show_egg_incubator_menu(eggMenuIdx, eggMenuTop);
+                lastMenuIdx = eggMenuIdx;
             }
         }
 
@@ -691,10 +723,10 @@ void task_ui(void* pvParameters) {
                         mode = IM_EDIT;
                         oled_show_incubation_day_set(0, editDay, editMonth, editYear, true, editField);
                     } else {
-                        // Back to Set Environment
-                        uiState = UI_SET_ENV_MENU; lastMenuIdx = -1;
-                        oled_show_set_environment(envMenuIdx, profile);
-                        lastMenuIdx = envMenuIdx;
+                        // Back to Egg Incubator menu
+                        uiState = UI_EGG_INCUBATOR_MENU; lastMenuIdx = -1;
+                        oled_show_egg_incubator_menu(eggMenuIdx, eggMenuTop);
+                        lastMenuIdx = eggMenuIdx;
                         continue;
                     }
                 }
@@ -797,9 +829,9 @@ void task_ui(void* pvParameters) {
                         case 2: turnerEditState = T_EDIT_TOGGLE; editTurnNow = false; break;
                         case 3:
                             saveSettings();
-                            uiState = UI_SET_ENV_MENU; lastMenuIdx = -1;
-                            oled_show_set_environment(envMenuIdx, profile);
-                            lastMenuIdx = envMenuIdx;
+                            uiState = UI_EGG_INCUBATOR_MENU; lastMenuIdx = -1;
+                            oled_show_egg_incubator_menu(eggMenuIdx, eggMenuTop);
+                            lastMenuIdx = eggMenuIdx;
                             break;
                     }
                     if (uiState == UI_ENV_TURNER) {
@@ -898,9 +930,9 @@ void task_ui(void* pvParameters) {
                     } else {
                         // Back
                         saveSettings();
-                        uiState = UI_SET_ENV_MENU; lastMenuIdx = -1;
-                        oled_show_set_environment(envMenuIdx, profile);
-                        lastMenuIdx = envMenuIdx;
+                        uiState = UI_EGG_INCUBATOR_MENU; lastMenuIdx = -1;
+                        oled_show_egg_incubator_menu(eggMenuIdx, eggMenuTop);
+                        lastMenuIdx = eggMenuIdx;
                         continue;
                     }
                     oled_show_fan_settings(fanMenuIdx, editSpeed);
@@ -922,6 +954,310 @@ void task_ui(void* pvParameters) {
                     fanEditState = F_NAV;
                 }
                 oled_show_fan_settings(fanMenuIdx, editSpeed);
+            }
+        }
+
+        // ═════════════════════════════════════════════════════════════════════
+        // EGG INCUBATOR MENU (10 items, 4 visible, scrollable)
+        // 0-Control Mode, 1-Set Temp, 2-Set Hum, 3-Hysteresis, 4-Egg Type,
+        // 5-Inc Day, 6-Turner, 7-Fan, 8-Pump Duration, 9-Back
+        // ═════════════════════════════════════════════════════════════════════
+        else if (uiState == UI_EGG_INCUBATOR_MENU) {
+            const int EGG_COUNT   = 10;
+            const int EGG_VISIBLE = 4;
+            if (evt == UI_EVT_UP) {
+                eggMenuIdx = (eggMenuIdx - 1 + EGG_COUNT) % EGG_COUNT;
+            } else if (evt == UI_EVT_DOWN) {
+                eggMenuIdx = (eggMenuIdx + 1) % EGG_COUNT;
+            }
+            // Adjust window to keep selection visible (handles wrap-around too)
+            if (eggMenuIdx < eggMenuTop)
+                eggMenuTop = eggMenuIdx;
+            else if (eggMenuIdx >= eggMenuTop + EGG_VISIBLE)
+                eggMenuTop = eggMenuIdx - EGG_VISIBLE + 1;
+            if (eggMenuTop < 0) eggMenuTop = 0;
+            if (eggMenuTop > EGG_COUNT - EGG_VISIBLE) eggMenuTop = EGG_COUNT - EGG_VISIBLE;
+
+            if (eggMenuIdx != lastMenuIdx) {
+                oled_show_egg_incubator_menu(eggMenuIdx, eggMenuTop);
+                lastMenuIdx = eggMenuIdx;
+            }
+
+            if (evt == UI_EVT_OK) {
+                float curTemp = 0.0f, curHum = 0.0f;
+                if (xSemaphoreTake(sensorMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
+                    curTemp = gSensorData.temp_ds18b20;
+                    curHum  = gSensorData.humidity_dht;
+                    xSemaphoreGive(sensorMutex);
+                }
+                switch (eggMenuIdx) {
+                    case 0:  // Control Mode (Auto/Manual)
+                        profileMenuParent = UI_EGG_INCUBATOR_MENU;
+                        uiState = UI_MODE_MENU;
+                        modeMenuIdx = (ctrlMode == MODE_AUTO) ? 0 : 1;
+                        lastMenuIdx = -1;
+                        oled_show_mode_menu(modeMenuIdx);
+                        lastMenuIdx = modeMenuIdx;
+                        break;
+                    case 1:  // Set Temperature
+                        profileMenuParent = UI_EGG_INCUBATOR_MENU;
+                        uiState = UI_ENV_TEMPERATURE;
+                        lastTempUiRefreshMs = 0;
+                        oled_show_temperature(curTemp, tempSP);
+                        break;
+                    case 2:  // Set Humidity
+                        profileMenuParent = UI_EGG_INCUBATOR_MENU;
+                        uiState = UI_ENV_HUMIDITY;
+                        oled_show_humidity(curHum, humSP);
+                        break;
+                    case 3:  // Hysteresis
+                        profileMenuParent = UI_EGG_INCUBATOR_MENU;
+                        uiState = UI_ENV_HYSTERESIS_MENU;
+                        hysteresisMenuIdx = 0; lastMenuIdx = -1;
+                        oled_show_hysteresis_menu(hysteresisMenuIdx, tempHyst, humHyst);
+                        lastMenuIdx = hysteresisMenuIdx;
+                        break;
+                    case 4:  // Egg Type
+                        uiState = UI_ENV_EGG_TYPE;
+                        if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
+                            eggTypeIdx = (int)gSettings.eggType;
+                            xSemaphoreGive(settingsMutex);
+                        }
+                        oled_show_egg_type(eggTypeIdx);
+                        break;
+                    case 5:  // Incubation Day
+                        uiState = UI_ENV_INCUBATION_DAY;
+                        editField = 0;
+                        lastMenuIdx = -1;
+                        continue;
+                    case 6:  // Turner
+                        uiState = UI_ENV_TURNER;
+                        turnerMenuIdx = 0; lastMenuIdx = -1;
+                        {
+                            uint16_t intv = DEFAULT_TURNER_INTERVAL_MIN, dur = DEFAULT_TURNER_DURATION_SEC;
+                            if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
+                                intv = gSettings.turnerIntervalMin;
+                                dur  = gSettings.turnerDurationSec;
+                                xSemaphoreGive(settingsMutex);
+                            }
+                            oled_show_turner_settings(turnerMenuIdx, intv, dur, 0, false);
+                        }
+                        break;
+                    case 7:  // Fan
+                        uiState = UI_ENV_FAN;
+                        fanMenuIdx = 0; lastMenuIdx = -1;
+                        {
+                            uint8_t speed = DEFAULT_FAN_SPEED_PERCENT;
+                            if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
+                                speed = (uint8_t)gSettings.fanSpeedPercent;
+                                xSemaphoreGive(settingsMutex);
+                            }
+                            oled_show_fan_settings(fanMenuIdx, speed);
+                        }
+                        break;
+                    case 8:  // Pump Duration
+                        uiState = UI_PUMP_SETTINGS;
+                        pumpMenuIdx = 0; pumpEditing = false;
+                        if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
+                            editPumpDur = (uint16_t)gSettings.pumpDurationSec;
+                            xSemaphoreGive(settingsMutex);
+                        }
+                        lastMenuIdx = -1;
+                        oled_show_pump_settings(pumpMenuIdx, editPumpDur, pumpEditing);
+                        lastMenuIdx = pumpMenuIdx;
+                        break;
+                    case 9:  // Back
+                        uiState = UI_MAIN_MENU; lastMenuIdx = -1;
+                        oled_show_menu(mainMenuIdx);
+                        lastMenuIdx = mainMenuIdx;
+                        break;
+                    default: break;
+                }
+            }
+        }
+
+        // ═════════════════════════════════════════════════════════════════════
+        // CLIMATE CHAMBER MENU (6 items)
+        // 0-Control Mode, 1-Set Temp, 2-Set Hum, 3-Hysteresis, 4-Climate Mode, 5-Back
+        // ═════════════════════════════════════════════════════════════════════
+        else if (uiState == UI_CLIMATE_CHAMBER_MENU) {
+            const int CLIM_COUNT   = 6;
+            const int CLIM_VISIBLE = 4;
+            if      (evt == UI_EVT_UP)   climMenuIdx = (climMenuIdx - 1 + CLIM_COUNT) % CLIM_COUNT;
+            else if (evt == UI_EVT_DOWN) climMenuIdx = (climMenuIdx + 1) % CLIM_COUNT;
+            if (climMenuIdx < climMenuTop)
+                climMenuTop = climMenuIdx;
+            else if (climMenuIdx >= climMenuTop + CLIM_VISIBLE)
+                climMenuTop = climMenuIdx - CLIM_VISIBLE + 1;
+            if (climMenuTop < 0) climMenuTop = 0;
+            if (climMenuTop > CLIM_COUNT - CLIM_VISIBLE) climMenuTop = CLIM_COUNT - CLIM_VISIBLE;
+
+            if (climMenuIdx != lastMenuIdx) {
+                oled_show_climate_chamber_menu(climMenuIdx, climMenuTop);
+                lastMenuIdx = climMenuIdx;
+            }
+
+            if (evt == UI_EVT_OK) {
+                float curTemp = 0.0f, curHum = 0.0f;
+                if (xSemaphoreTake(sensorMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
+                    curTemp = gSensorData.temp_ds18b20;
+                    curHum  = gSensorData.humidity_dht;
+                    xSemaphoreGive(sensorMutex);
+                }
+                switch (climMenuIdx) {
+                    case 0:  // Control Mode
+                        profileMenuParent = UI_CLIMATE_CHAMBER_MENU;
+                        uiState = UI_MODE_MENU;
+                        modeMenuIdx = (ctrlMode == MODE_AUTO) ? 0 : 1;
+                        lastMenuIdx = -1;
+                        oled_show_mode_menu(modeMenuIdx);
+                        lastMenuIdx = modeMenuIdx;
+                        break;
+                    case 1:  // Set Temperature
+                        profileMenuParent = UI_CLIMATE_CHAMBER_MENU;
+                        uiState = UI_ENV_TEMPERATURE;
+                        lastTempUiRefreshMs = 0;
+                        oled_show_temperature(curTemp, tempSP);
+                        break;
+                    case 2:  // Set Humidity
+                        profileMenuParent = UI_CLIMATE_CHAMBER_MENU;
+                        uiState = UI_ENV_HUMIDITY;
+                        oled_show_humidity(curHum, humSP);
+                        break;
+                    case 3:  // Hysteresis
+                        profileMenuParent = UI_CLIMATE_CHAMBER_MENU;
+                        uiState = UI_ENV_HYSTERESIS_MENU;
+                        hysteresisMenuIdx = 0; lastMenuIdx = -1;
+                        oled_show_hysteresis_menu(hysteresisMenuIdx, tempHyst, humHyst);
+                        lastMenuIdx = hysteresisMenuIdx;
+                        break;
+                    case 4:  // Climate Mode
+                        uiState = UI_CLIMATE_MODE_MENU;
+                        climateModeIdx = 0; lastMenuIdx = -1;
+                        oled_show_climate_mode_menu(climateModeIdx, climMode);
+                        lastMenuIdx = climateModeIdx;
+                        break;
+                    case 5:  // Back
+                        uiState = UI_MAIN_MENU; lastMenuIdx = -1;
+                        oled_show_menu(mainMenuIdx);
+                        lastMenuIdx = mainMenuIdx;
+                        break;
+                    default: break;
+                }
+            }
+        }
+
+        // ═════════════════════════════════════════════════════════════════════
+        // SYSTEM MENU (6 items)
+        // 0-Switch Profile, 1-WiFi, 2-Time&Date, 3-Device Info, 4-Factory Reset, 5-Back
+        // ═════════════════════════════════════════════════════════════════════
+        else if (uiState == UI_SYSTEM_MENU) {
+            const int SYS_COUNT   = 6;
+            const int SYS_VISIBLE = 4;
+            if      (evt == UI_EVT_UP)   sysMenuIdx = (sysMenuIdx - 1 + SYS_COUNT) % SYS_COUNT;
+            else if (evt == UI_EVT_DOWN) sysMenuIdx = (sysMenuIdx + 1) % SYS_COUNT;
+            if (sysMenuIdx < sysMenuTop)
+                sysMenuTop = sysMenuIdx;
+            else if (sysMenuIdx >= sysMenuTop + SYS_VISIBLE)
+                sysMenuTop = sysMenuIdx - SYS_VISIBLE + 1;
+            if (sysMenuTop < 0) sysMenuTop = 0;
+            if (sysMenuTop > SYS_COUNT - SYS_VISIBLE) sysMenuTop = SYS_COUNT - SYS_VISIBLE;
+
+            if (sysMenuIdx != lastMenuIdx) {
+                oled_show_system_menu(sysMenuIdx, sysMenuTop);
+                lastMenuIdx = sysMenuIdx;
+            }
+
+            if (evt == UI_EVT_OK) {
+                switch (sysMenuIdx) {
+                    case 0:  // Switch Profile
+                        uiState = UI_CONTROLLER_MODE_MENU;
+                        controllerModeIdx = 0; lastMenuIdx = -1;
+                        oled_show_controller_mode(controllerModeIdx, profile);
+                        lastMenuIdx = controllerModeIdx;
+                        break;
+                    case 1:  // WiFi
+                        uiState = UI_WIFI_MENU;
+                        wifiMenuIdx = 0; lastMenuIdx = -1;
+                        oled_show_wifi_menu(wifiMenuIdx, WiFi.status() == WL_CONNECTED);
+                        lastMenuIdx = wifiMenuIdx;
+                        break;
+                    case 2:  // Time & Date
+                        timeDateMenuIdx = 0;
+                        uiState = UI_TIME_DATE_MENU;
+                        lastMenuIdx = -1;
+                        oled_show_time_date_menu(timeDateMenuIdx);
+                        lastMenuIdx = timeDateMenuIdx;
+                        break;
+                    case 3: {  // Device Info
+                        uiState = UI_DEVICE_INFO;
+                        String ip = WiFi.localIP().toString();
+                        uint32_t up = millis() / 1000;
+                        oled_show_device_info(DEVICE_ID, FW_VERSION, ip.c_str(),
+                            profile == PROFILE_EGG_INCUBATOR ? "Incubator" : "Climate", up);
+                        break;
+                    }
+                    case 4:  // Factory Reset
+                        uiState = UI_FACTORY_RESET_CONFIRM;
+                        oled_show_factory_reset_confirm();
+                        break;
+                    case 5:  // Back
+                        uiState = UI_MAIN_MENU; lastMenuIdx = -1;
+                        oled_show_menu(mainMenuIdx);
+                        lastMenuIdx = mainMenuIdx;
+                        break;
+                    default: break;
+                }
+            }
+        }
+
+        // ═════════════════════════════════════════════════════════════════════
+        // PUMP SETTINGS (0=Duration, 1=Back)
+        // Two-layer: navigation mode + edit mode (±5 s steps, 5-120 s bounds)
+        // ═════════════════════════════════════════════════════════════════════
+        else if (uiState == UI_PUMP_SETTINGS) {
+            if (!pumpEditing) {
+                if      (evt == UI_EVT_UP)   pumpMenuIdx = (pumpMenuIdx - 1 + 2) % 2;
+                else if (evt == UI_EVT_DOWN) pumpMenuIdx = (pumpMenuIdx + 1) % 2;
+
+                if (pumpMenuIdx != lastMenuIdx) {
+                    oled_show_pump_settings(pumpMenuIdx, editPumpDur, false);
+                    lastMenuIdx = pumpMenuIdx;
+                }
+
+                if (evt == UI_EVT_OK) {
+                    if (pumpMenuIdx == 0) {
+                        pumpEditing = true;
+                        oled_show_pump_settings(pumpMenuIdx, editPumpDur, true);
+                    } else {
+                        // Back — restore scroll position to Pump Duration row
+                        uiState = UI_EGG_INCUBATOR_MENU;
+                        eggMenuIdx = 8; eggMenuTop = 6;
+                        lastMenuIdx = -1;
+                        oled_show_egg_incubator_menu(eggMenuIdx, eggMenuTop);
+                        lastMenuIdx = eggMenuIdx;
+                    }
+                }
+            } else {
+                // Editing duration
+                if (evt == UI_EVT_UP) {
+                    editPumpDur = (uint16_t)min((int)editPumpDur + 5, 120);
+                } else if (evt == UI_EVT_DOWN) {
+                    editPumpDur = (uint16_t)max((int)editPumpDur - 5, 5);
+                } else if (evt == UI_EVT_OK) {
+                    if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+                        gSettings.pumpDurationSec = editPumpDur;
+                        xSemaphoreGive(settingsMutex);
+                    }
+                    {
+                        Preferences prefs;
+                        prefs.begin("incubator", false);
+                        prefs.putUInt("pumpDur", editPumpDur);
+                        prefs.end();
+                    }
+                    pumpEditing = false;
+                }
+                oled_show_pump_settings(pumpMenuIdx, editPumpDur, pumpEditing);
             }
         }
 
@@ -986,9 +1322,9 @@ void task_ui(void* pvParameters) {
                     }
                     oled_show_climate_ramp(climateRampIdx, sc, rs, asi);
                 } else {
-                    uiState = UI_SET_ENV_MENU; lastMenuIdx = -1;
-                    oled_show_set_environment(envMenuIdx, profile);
-                    lastMenuIdx = envMenuIdx;
+                    uiState = UI_CLIMATE_CHAMBER_MENU; lastMenuIdx = -1;
+                    oled_show_climate_chamber_menu(climMenuIdx, climMenuTop);
+                    lastMenuIdx = climMenuIdx;
                 }
             }
         }
@@ -1216,10 +1552,10 @@ void task_ui(void* pvParameters) {
                     lastMenuIdx = wifiMenuIdx;
                 } else {
                     // Back
-                    uiState = UI_SETTINGS_MENU;
+                    uiState = UI_SYSTEM_MENU;
                     lastMenuIdx = -1;
-                    oled_show_settings_menu(settingsMenuIdx);
-                    lastMenuIdx = settingsMenuIdx;
+                    oled_show_system_menu(sysMenuIdx, sysMenuTop);
+                    lastMenuIdx = sysMenuIdx;
                 }
             }
         }
@@ -1243,9 +1579,15 @@ void task_ui(void* pvParameters) {
                         xSemaphoreGive(settingsMutex);
                     }
                     saveSettings();
-                    uiState = UI_SETTINGS_MENU; lastMenuIdx = -1;
-                    oled_show_settings_menu(settingsMenuIdx);
-                    lastMenuIdx = settingsMenuIdx;
+                    if (profileMenuParent == UI_CLIMATE_CHAMBER_MENU) {
+                        uiState = UI_CLIMATE_CHAMBER_MENU; lastMenuIdx = -1;
+                        oled_show_climate_chamber_menu(climMenuIdx, climMenuTop);
+                        lastMenuIdx = climMenuIdx;
+                    } else {
+                        uiState = UI_EGG_INCUBATOR_MENU; lastMenuIdx = -1;
+                        oled_show_egg_incubator_menu(eggMenuIdx, eggMenuTop);
+                        lastMenuIdx = eggMenuIdx;
+                    }
                 } else if (modeMenuIdx == 1) {
                     if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
                         gSettings.controlMode = MODE_MANUAL;
@@ -1263,9 +1605,15 @@ void task_ui(void* pvParameters) {
                     oled_show_manual_control(manualCtrlIdx, hm, cm, profile);
                     lastMenuIdx = manualCtrlIdx;
                 } else {
-                    uiState = UI_SETTINGS_MENU; lastMenuIdx = -1;
-                    oled_show_settings_menu(settingsMenuIdx);
-                    lastMenuIdx = settingsMenuIdx;
+                    if (profileMenuParent == UI_CLIMATE_CHAMBER_MENU) {
+                        uiState = UI_CLIMATE_CHAMBER_MENU; lastMenuIdx = -1;
+                        oled_show_climate_chamber_menu(climMenuIdx, climMenuTop);
+                        lastMenuIdx = climMenuIdx;
+                    } else {
+                        uiState = UI_EGG_INCUBATOR_MENU; lastMenuIdx = -1;
+                        oled_show_egg_incubator_menu(eggMenuIdx, eggMenuTop);
+                        lastMenuIdx = eggMenuIdx;
+                    }
                 }
             }
         }
@@ -1324,9 +1672,9 @@ void task_ui(void* pvParameters) {
         // ═════════════════════════════════════════════════════════════════════
         else if (uiState == UI_DEVICE_INFO) {
             if (evt == UI_EVT_OK || evt == UI_EVT_DOWN) {
-                uiState = UI_SETTINGS_MENU; lastMenuIdx = -1;
-                oled_show_settings_menu(settingsMenuIdx);
-                lastMenuIdx = settingsMenuIdx;
+                uiState = UI_SYSTEM_MENU; lastMenuIdx = -1;
+                oled_show_system_menu(sysMenuIdx, sysMenuTop);
+                lastMenuIdx = sysMenuIdx;
             }
         }
 
@@ -1339,9 +1687,9 @@ void task_ui(void* pvParameters) {
                 extern void factoryReset(void);
                 factoryReset();
             } else if (evt == UI_EVT_DOWN) {
-                uiState = UI_SETTINGS_MENU; lastMenuIdx = -1;
-                oled_show_settings_menu(settingsMenuIdx);
-                lastMenuIdx = settingsMenuIdx;
+                uiState = UI_SYSTEM_MENU; lastMenuIdx = -1;
+                oled_show_system_menu(sysMenuIdx, sysMenuTop);
+                lastMenuIdx = sysMenuIdx;
             }
         }
 
@@ -1403,17 +1751,17 @@ void task_ui(void* pvParameters) {
                     oled_show_time_wifi_sync(syncResult);
                     // Display result for ~2 seconds using RTOS-aware delay
                     vTaskDelay(pdMS_TO_TICKS(2000));
-                    uiState = UI_SETTINGS_MENU;
+                    uiState = UI_SYSTEM_MENU;
                     lastMenuIdx = -1;
-                    oled_show_settings_menu(settingsMenuIdx);
-                    lastMenuIdx = settingsMenuIdx;
+                    oled_show_system_menu(sysMenuIdx, sysMenuTop);
+                    lastMenuIdx = sysMenuIdx;
 
                 } else {
                     // BACK
-                    uiState = UI_SETTINGS_MENU;
+                    uiState = UI_SYSTEM_MENU;
                     lastMenuIdx = -1;
-                    oled_show_settings_menu(settingsMenuIdx);
-                    lastMenuIdx = settingsMenuIdx;
+                    oled_show_system_menu(sysMenuIdx, sysMenuTop);
+                    lastMenuIdx = sysMenuIdx;
                 }
             }
         }
@@ -1458,16 +1806,16 @@ void task_ui(void* pvParameters) {
                     rtc.adjust(DateTime(tY, tMo, tD, tH, tM, tS));
                     Serial.printf("[RTC] Manually set to %04d-%02d-%02d %02d:%02d:%02d\n",
                                   tY, tMo, tD, tH, tM, tS);
-                    uiState = UI_SETTINGS_MENU;
+                    uiState = UI_SYSTEM_MENU;
                     lastMenuIdx = -1;
-                    oled_show_settings_menu(settingsMenuIdx);
-                    lastMenuIdx = settingsMenuIdx;
+                    oled_show_system_menu(sysMenuIdx, sysMenuTop);
+                    lastMenuIdx = sysMenuIdx;
                 } else if (evt == UI_EVT_DOWN) {
                     // Cancel — discard edits
-                    uiState = UI_SETTINGS_MENU;
+                    uiState = UI_SYSTEM_MENU;
                     lastMenuIdx = -1;
-                    oled_show_settings_menu(settingsMenuIdx);
-                    lastMenuIdx = settingsMenuIdx;
+                    oled_show_system_menu(sysMenuIdx, sysMenuTop);
+                    lastMenuIdx = sysMenuIdx;
                 }
                 // UP has no effect on save prompt
             }
@@ -1481,10 +1829,10 @@ void task_ui(void* pvParameters) {
         else if (uiState == UI_TIME_WIFI_SYNC) {
             // Any button dismisses the result screen
             if (evt == UI_EVT_OK || evt == UI_EVT_DOWN || evt == UI_EVT_UP) {
-                uiState = UI_SETTINGS_MENU;
+                uiState = UI_SYSTEM_MENU;
                 lastMenuIdx = -1;
-                oled_show_settings_menu(settingsMenuIdx);
-                lastMenuIdx = settingsMenuIdx;
+                oled_show_system_menu(sysMenuIdx, sysMenuTop);
+                lastMenuIdx = sysMenuIdx;
             }
         }
 

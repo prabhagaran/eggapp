@@ -92,10 +92,19 @@ bool checkMilestone(uint32_t nowEpoch, char* outLabel, size_t labelLen) {
     }
     if (startEpoch == 0 || totalDays == 0) return false;
 
+    EggType eggType = EGG_CHICKEN;
+    if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+        eggType = gSettings.eggType;
+        xSemaphoreGive(settingsMutex);
+    }
+
     int day = (int)((nowEpoch - startEpoch) / 86400UL) + 1;
 
-    // Fertile candling day (day 7 for all supported types)
-    if (day == 7) {
+    // Fertile candling day (per egg type)
+    int candleDay = CHICKEN_CANDLE_DAY;
+    if      (eggType == EGG_DUCK)  candleDay = DUCK_CANDLE_DAY;
+    else if (eggType == EGG_QUAIL) candleDay = QUAIL_CANDLE_DAY;
+    if (day == candleDay) {
         snprintf(outLabel, labelLen, "Candle Day!");
         return true;
     }

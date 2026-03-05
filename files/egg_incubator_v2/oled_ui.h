@@ -48,6 +48,10 @@ void oled_show_fault_screen(float currentTemp);
 // MENUS
 // ─────────────────────────────────────────────────────────────────────────────
 void oled_show_menu(int selected);
+void oled_show_egg_incubator_menu(int selected, int topIdx);
+void oled_show_climate_chamber_menu(int selected, int topIdx);
+void oled_show_system_menu(int selected, int topIdx);
+void oled_show_pump_settings(int menuIdx, uint16_t durSec, bool editing);
 void oled_show_controller_mode(int selected, ProfileType activeProfile);
 void oled_show_set_environment(int selected, ProfileType profile);
 void oled_show_settings_menu(int selected);
