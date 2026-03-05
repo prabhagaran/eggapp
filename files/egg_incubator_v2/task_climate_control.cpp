@@ -3,6 +3,7 @@
 #include "config.h"
 #include "climate_logic.h"
 #include <Arduino.h>
+#include "esp_task_wdt.h"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TASK: CLIMATE CHAMBER CONTROL

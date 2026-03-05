@@ -29,6 +29,7 @@ portMUX_TYPE  faultMux       = portMUX_INITIALIZER_UNLOCKED;
 
 volatile bool wifiUserEnabled  = false;  // true = user has enabled Wi-Fi
 volatile bool wifiPortalActive = false;  // true = config portal is running
+volatile bool rtcEpochValid    = false;  // true = RTC epoch > Nov 2023
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TASK HANDLES — needed for suspend/resume on profile switch

@@ -1,6 +1,7 @@
 #include "climate_logic.h"
 #include "config.h"
 #include <Arduino.h>
+#include <Preferences.h>
 
 // ─────────────────────────────────────────────────────────────────────────────
 bool scheduleAllowsHeat(uint8_t currentHour) {
@@ -39,6 +40,13 @@ bool cyclicInHeatPhase(uint32_t nowEpoch) {
         if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
             gSettings.cycleStartEpoch = nowEpoch;
             xSemaphoreGive(settingsMutex);
+        }
+        // Persist single cycle start key to NVS so power-cycle preserves phase
+        {
+            Preferences prefs;
+            prefs.begin("incubator", false);
+            prefs.putULong("cycleStart", nowEpoch);
+            prefs.end();
         }
         return true;
     }
@@ -79,6 +87,14 @@ float getRampTargetTemp(uint32_t nowEpoch) {
             gSettings.rampStepStartEpoch = nowEpoch;
             xSemaphoreGive(settingsMutex);
         }
+        // Persist ramp state (index + start epoch) so ramp resumes after reboot
+        {
+            Preferences prefs;
+            prefs.begin("incubator", false);
+            prefs.putULong("rampStart", nowEpoch);
+            prefs.putUInt("rampIdx", (uint32_t)stepIdx);
+            prefs.end();
+        }
         return steps[stepIdx].targetTemp;
     }
 
@@ -91,6 +107,14 @@ float getRampTargetTemp(uint32_t nowEpoch) {
             gSettings.rampStepIdx         = nextIdx;
             gSettings.rampStepStartEpoch  = nowEpoch;
             xSemaphoreGive(settingsMutex);
+        }
+        // Persist updated ramp index/start so progress is durable
+        {
+            Preferences prefs;
+            prefs.begin("incubator", false);
+            prefs.putUInt("rampIdx", (uint32_t)nextIdx);
+            prefs.putULong("rampStart", nowEpoch);
+            prefs.end();
         }
         if (nextIdx >= stepCount) return steps[stepCount - 1].targetTemp;
         return steps[nextIdx].targetTemp;

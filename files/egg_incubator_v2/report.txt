@@ -342,6 +342,12 @@ task_ui.cpp
   [DONE] lastTurnEpoch persisted immediately after each turn and on bootstrap.
          task_incubator.cpp — Preferences single-key write after vTaskDelay.
 
+  [DONE] H-2: lastTurnEpoch now recorded AFTER turn delay, not before.
+         task_incubator.cpp — Re-reads gRtcTime.epoch into finishedEpoch after
+         vTaskDelay(durationSec * 1000UL); uses finishedEpoch for both the
+         in-memory gSettings.lastTurnEpoch and the NVS "lastTurn" key.
+         Fallback to pre-turn nowEpoch if RTC is unavailable post-delay.
+
   [DONE] fanIntervalMin / fanDurationSec removed from Settings_t and NVS.
          globals.h, egg_incubator_v2.ino (loadSettings / saveSettings).
 

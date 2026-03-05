@@ -2,6 +2,7 @@
 #include <Wire.h>
 #include <WiFi.h>
 #include <Preferences.h>
+#include "esp_task_wdt.h"
 
 #include "RTClib.h"
 
@@ -150,6 +151,7 @@ void saveSettings(void) {
 // factoryReset — wipes NVS and reboots
 // ─────────────────────────────────────────────────────────────────────────────
 void factoryReset(void) {
+    allRelaysOff();  // safe hardware state before NVS wipe
     prefs.begin("incubator", false);
     prefs.clear();
     prefs.end();
@@ -235,6 +237,7 @@ void setup() {
     rtcMutex      = xSemaphoreCreateMutex();
     controlMutex  = xSemaphoreCreateMutex();
     settingsMutex = xSemaphoreCreateMutex();
+    milestoneMutex = xSemaphoreCreateMutex();
     uiEventQueue  = xQueueCreate(UI_EVENT_QUEUE_SIZE,  sizeof(UiEvent));
     errorQueue    = xQueueCreate(ERROR_QUEUE_SIZE, sizeof(ErrorMsg_t));
     telemetryQueue = xQueueCreate(TELEMETRY_QUEUE_SIZE, sizeof(TelemetryMsg_t));
@@ -313,6 +316,15 @@ void setup() {
     }
 
     Serial.println("[SETUP] All tasks started");
+
+    // ── Task watchdog: 5 s timeout; panics on expire ─────────────────────────
+    // esp_task_wdt_init() API changed in IDF v5 (esp32 core ≥ 3.x) — needs config struct
+    const esp_task_wdt_config_t wdt_cfg = {
+        .timeout_ms    = 5000,
+        .idle_core_mask = 0,
+        .trigger_panic  = true
+    };
+    esp_task_wdt_init(&wdt_cfg);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

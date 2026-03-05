@@ -251,10 +251,10 @@ void oled_show_fault_screen(float currentTemp) {
 // ─────────────────────────────────────────────────────────────────────────────
 void oled_show_menu(int selected) {
     static const char* items[] = {
-        "Controller Mode",
-        "Set Environment",
-        "Settings",
-        "Exit"
+        "Egg Incubator",
+        "Climate Chamber",
+        "System",
+        "Back"
     };
     display.clearDisplay();
     display.setTextSize(1);
@@ -1057,6 +1057,172 @@ void oled_show_time_edit(int field, int h, int m, int s, int d, int mo, int y) {
         if (i == field) {
             display.print(" <");
         }
+    }
+
+    display.display();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EGG INCUBATOR MENU — 10-item list, 4 visible at a time, scrollable
+// Items: Control Mode / Set Temperature / Set Humidity / Hysteresis /
+//        Egg Type / Incubation Day / Turner / Fan / Pump Duration / Back
+// ─────────────────────────────────────────────────────────────────────────────
+void oled_show_egg_incubator_menu(int selected, int topIdx) {
+    static const char* items[] = {
+        "Control Mode",
+        "Set Temperature",
+        "Set Humidity",
+        "Hysteresis",
+        "Egg Type",
+        "Incubation Day",
+        "Turner",
+        "Fan",
+        "Pump Duration",
+        "Back"
+    };
+    const int TOTAL   = 10;
+    const int VISIBLE = 4;
+
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+
+    display.setCursor(0, 0);
+    display.print("EGG INCUBATOR");
+    display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
+
+    for (int i = 0; i < VISIBLE; i++) {
+        int idx = topIdx + i;
+        if (idx >= TOTAL) break;
+        display.setCursor(0, 16 + i * 12);
+        display.print(idx == selected ? "> " : "  ");
+        display.print(items[idx]);
+    }
+
+    // Scroll indicator: "sel+1 / TOTAL" at lower-right
+    char buf[8];
+    snprintf(buf, sizeof(buf), "%d/%d", selected + 1, TOTAL);
+    display.setCursor(128 - (int)strlen(buf) * 6, 56);
+    display.print(buf);
+
+    display.display();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CLIMATE CHAMBER MENU
+// Items: Control Mode / Set Temperature / Set Humidity / Hysteresis /
+//        Climate Mode / Back
+// ─────────────────────────────────────────────────────────────────────────────
+void oled_show_climate_chamber_menu(int selected, int topIdx) {
+    static const char* items[] = {
+        "Control Mode",
+        "Set Temperature",
+        "Set Humidity",
+        "Hysteresis",
+        "Climate Mode",
+        "Back"
+    };
+    const int TOTAL   = 6;
+    const int VISIBLE = 5;
+
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+
+    display.setCursor(0, 0);
+    display.print("CLIMATE CHAMBER");
+    display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
+
+    for (int i = 0; i < VISIBLE; i++) {
+        int idx = topIdx + i;
+        if (idx >= TOTAL) break;
+        display.setCursor(0, 16 + i * 9);
+        display.print(idx == selected ? "> " : "  ");
+        display.print(items[idx]);
+    }
+    char buf[8];
+    snprintf(buf, sizeof(buf), "%d/%d", selected + 1, TOTAL);
+    display.setCursor(128 - (int)strlen(buf) * 6, 56);
+    display.print(buf);
+    display.display();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SYSTEM MENU
+// Items: Switch Profile / WiFi / Time & Date / Device Info / Factory Reset / Back
+// ─────────────────────────────────────────────────────────────────────────────
+void oled_show_system_menu(int selected, int topIdx) {
+    static const char* items[] = {
+        "Switch Profile",
+        "WiFi",
+        "Time & Date",
+        "Device Info",
+        "Factory Reset",
+        "Back"
+    };
+    const int TOTAL   = 6;
+    const int VISIBLE = 5;
+
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+
+    display.setCursor(0, 0);
+    display.print("SYSTEM");
+    display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
+
+    for (int i = 0; i < VISIBLE; i++) {
+        int idx = topIdx + i;
+        if (idx >= TOTAL) break;
+        display.setCursor(0, 16 + i * 9);
+        display.print(idx == selected ? "> " : "  ");
+        display.print(items[idx]);
+    }
+    char buf[8];
+    snprintf(buf, sizeof(buf), "%d/%d", selected + 1, TOTAL);
+    display.setCursor(128 - (int)strlen(buf) * 6, 56);
+    display.print(buf);
+    display.display();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PUMP SETTINGS
+// menuIdx 0 = Duration row, 1 = Back row
+// editing = true -> show value in brackets, UP/DOWN adjust
+// ─────────────────────────────────────────────────────────────────────────────
+void oled_show_pump_settings(int menuIdx, uint16_t durSec, bool editing) {
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+
+    display.setCursor(0, 0);
+    display.print("PUMP DURATION");
+    display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
+
+    // Duration row
+    display.setCursor(0, 20);
+    display.print(menuIdx == 0 ? "> " : "  ");
+    display.print("Duration: ");
+    if (editing) {
+        display.print("[");
+        display.print(durSec);
+        display.print("s]");
+    } else {
+        display.print(durSec);
+        display.print("s");
+    }
+
+    // Back row
+    display.setCursor(0, 36);
+    display.print(menuIdx == 1 ? "> " : "  ");
+    display.print("Back");
+
+    // Footer hint
+    display.setCursor(0, 54);
+    if (editing) {
+        display.print("UP/DN=+/-5s  OK=Save");
+    } else {
+        display.print("OK=Edit");
     }
 
     display.display();
