@@ -110,12 +110,20 @@ void task_cloud(void* pvParameters) {
         ErrorMsg_t incomingErr;
         while (xQueueReceive(errorQueue, &incomingErr, 0) == pdTRUE) {
 
+            // Read active profile for error context
+            ProfileType errProf = PROFILE_EGG_INCUBATOR;
+            if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+                errProf = gSettings.activeProfile;
+                xSemaphoreGive(settingsMutex);
+            }
+
             // Build URL for this error
             String url = String(GOOGLE_SCRIPT_URL)
-                + "?id="    + String(DEVICE_ID)
-                + "&fw="    + String(FW_VERSION)
-                + "&error=" + urlEncode(String(incomingErr.type))
-                + "&msg="   + urlEncode(String(incomingErr.message));
+                + "?id="      + String(DEVICE_ID)
+                + "&fw="      + String(FW_VERSION)
+                + "&profile=" + (errProf == PROFILE_EGG_INCUBATOR ? "EGG" : "CLIMATE")
+                + "&error="   + urlEncode(String(incomingErr.type))
+                + "&msg="     + urlEncode(String(incomingErr.message));
 
             if (strlen(CLOUD_TOKEN) > 0) {
                 url += "&token=" + urlEncode(String(CLOUD_TOKEN));
