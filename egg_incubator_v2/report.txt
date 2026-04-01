@@ -22,8 +22,8 @@ confirmed on COM3.  TWDT enrolled (5-second timeout).
 REVIEW SUMMARY (2026-04-01)
 ----------------------------
   Issues in previous report (2025-07) .............. 27
-  Issues resolved since last review ................. 17
-  Issues remaining open ............................  9
+  Issues resolved since last review ................. 18
+  Issues remaining open ............................  8
   Net new issues found this review ...................  0
 
 ================================================================================
@@ -135,14 +135,16 @@ M-6  [FIXED] switchProfile() safe-suspend via task notifications
      Files changed: config.h, task_control.cpp, task_climate_control.cpp,
                     task_incubator.cpp (turner/fan/pump/milestone), egg_incubator_v2.ino
 
-M-7  Cloud retry loop over-processes not-yet-due messages
-     File: task_cloud.cpp, retry loop (~lines 40–82)
-     queued = uxQueueMessagesWaiting() snapshot is used as loop bound.
-     Not-yet-due messages are immediately re-enqueued, wasting CPU in a tight
-     loop when backoff items dominate the queue.
-     FIX: Break out of the retry loop on the first message whose
-     nextAttemptMs is still in the future, relying on FIFO ordering to ensure
-     earlier items are processed first.
+M-7  [FIXED] Cloud retry loop over-processes not-yet-due messages
+     Resolved: The retry loop now uses `xQueuePeek()` to inspect the queue
+     head before dequeuing. If the head item's `nextAttemptMs` is still in
+     the future the loop breaks immediately, stopping all re-enqueue churn.
+     FIFO ordering means if the head is not yet due, all remaining items in
+     this pass are not due either.
+     Root cause was: iterating with a snapshot count, dequeuing each item,
+     and re-enqueueing not-yet-due items -- causing tight busy-loop CPU spikes
+     on Core 0 whenever backoff items dominated the queue.
+     Files changed: task_cloud.cpp
 
 M-8  wifiUserEnabled / wifiPortalActive — volatile without memory barriers
      File: globals.h / globals.cpp
@@ -280,8 +282,9 @@ task_rtc.cpp
 
 task_cloud.cpp
   • Good: non-blocking single-attempt pattern; retry queue with exponential
-    backoff; error and telemetry sends separated; CA/insecure fallback.
-  • Open: C-3 (CA still empty by default), M-7 (retry loop over-processes),
+    backoff; error and telemetry sends separated; CA/insecure fallback;
+    retry loop now uses peek+break to stop on first not-yet-due head (M-7).
+  • Open: C-3 (CA still empty by default),
     L-2 (no URL truncation warning), L-10 (body always read).
 
 task_wifi_manager.cpp
@@ -400,6 +403,12 @@ task_rtc.h / task_cloud.h
          egg_incubator_v2.ino — switchProfile() replaced direct vTaskSuspend()
          with xTaskNotify() + 200 ms delay + xTaskNotifyStateClear() before
          vTaskResume(), eliminating the mutex-hold deadlock window entirely.
+
+  [DONE 2026-04] M-7: Cloud retry loop tight-loop fixed with peek+break.
+         task_cloud.cpp — retry loop now calls xQueuePeek() on the head
+         before dequeuing; breaks immediately if head.nextAttemptMs is in
+         the future, eliminating all re-enqueue churn in backoff-dominated
+         queues and removing the Core 0 CPU spike.
 ================================================================================
 
   Priority 1 — Security
@@ -408,8 +417,8 @@ task_rtc.h / task_cloud.h
         Resolves C-3 (currently running MITM-vulnerable with setInsecure()).
 
   Priority 2 — Reliability / correctness
-    2a. Fix cloud retry loop (M-7): break on first not-yet-due message instead
-        of re-enqueuing within the same iteration.
+    2a. Fix cloud retry loop (M-7): DONE — peek+break implemented in
+        task_cloud.cpp; loop stops on first not-yet-due head item.
     2b. Fix SENSOR_INVALID_HIGH to 100.0f (M-4): DONE — set to 100.0f in
       config.h; DS18B20 POR detection remains explicit in task_sensors.cpp.
     2c. Guard wifiUserEnabled / wifiPortalActive with portENTER_CRITICAL or

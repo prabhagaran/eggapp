@@ -42,16 +42,21 @@ void task_cloud(void* pvParameters) {
     for (;;) {
 
         // ── Process queued telemetry messages (retry/backoff) ───────────────
+        // M-7 fix: peek at the queue head before dequeuing. If the earliest
+        // item is not yet due, break immediately — no point iterating; all
+        // items currently in the queue will be due no sooner than the head.
+        // This prevents the tight re-enqueue loop that wasted CPU when the
+        // queue was dominated by not-yet-due backoff items.
         size_t queued = uxQueueMessagesWaiting(telemetryQueue);
         for (size_t i = 0; i < queued; ++i) {
+            // Non-destructive peek: if head not due yet, stop for this cycle.
+            TelemetryMsg_t peek;
+            if (xQueuePeek(telemetryQueue, &peek, 0) != pdTRUE) break;
+            if ((int32_t)(peek.nextAttemptMs - millis()) > 0) break;
+
+            // Head is due — dequeue and attempt
             TelemetryMsg_t msg;
             if (xQueueReceive(telemetryQueue, &msg, 0) != pdTRUE) break;
-
-            // If not yet time, requeue
-            if ((int32_t)(msg.nextAttemptMs - millis()) > 0) {
-                xQueueSend(telemetryQueue, &msg, 0);
-                continue;
-            }
 
             // Try send once
                     WiFiClientSecure client;
