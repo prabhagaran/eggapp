@@ -20,6 +20,11 @@ void task_turner(void* pvParameters) {
 
     for (;;) {
 
+        // ── Safe self-suspend point (profile switch via task notification) ────
+        { uint32_t cmd = 0;
+          if (xTaskNotifyWait(0, 0xFFFFFFFFUL, &cmd, 0) == pdTRUE && cmd == TASK_CMD_SUSPEND)
+              vTaskSuspend(NULL); }
+
         if (!turnerActive()) {
             // Past lockdown — keep relay off and wait
             setRelay(RELAY_TURNER, false);
@@ -120,6 +125,11 @@ void task_fan(void* pvParameters) {
     // Periodically reads `gSettings.fanSpeedPercent` and `gSettings.activeProfile`
     // and applies PWM. Does not block for on-duration.
     for (;;) {
+        // ── Safe self-suspend point (profile switch via task notification) ────
+        { uint32_t cmd = 0;
+          if (xTaskNotifyWait(0, 0xFFFFFFFFUL, &cmd, 0) == pdTRUE && cmd == TASK_CMD_SUSPEND)
+              vTaskSuspend(NULL); }
+
         uint8_t speed = 0;
         ProfileType profile = PROFILE_EGG_INCUBATOR;
 
@@ -198,6 +208,11 @@ void task_pump(void* pvParameters) {
     unsigned long lastPumpMs = 0;
 
     for (;;) {
+        // ── Safe self-suspend point (profile switch via task notification) ────
+        { uint32_t cmd = 0;
+          if (xTaskNotifyWait(0, 0xFFFFFFFFUL, &cmd, 0) == pdTRUE && cmd == TASK_CMD_SUSPEND)
+              vTaskSuspend(NULL); }
+
         float currentHum = 0.0f;
         bool  humValid   = false;
         if (xSemaphoreTake(sensorMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
@@ -261,6 +276,11 @@ void task_milestone(void* pvParameters) {
     bool     lockdownApplied = false;
 
     for (;;) {
+        // ── Safe self-suspend point (profile switch via task notification) ────
+        { uint32_t cmd = 0;
+          if (xTaskNotifyWait(0, 0xFFFFFFFFUL, &cmd, 0) == pdTRUE && cmd == TASK_CMD_SUSPEND)
+              vTaskSuspend(NULL); }
+
         uint32_t nowEpoch = 0;
         if (xSemaphoreTake(rtcMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
             nowEpoch = gRtcTime.epoch;

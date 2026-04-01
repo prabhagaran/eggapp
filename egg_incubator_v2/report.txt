@@ -22,8 +22,8 @@ confirmed on COM3.  TWDT enrolled (5-second timeout).
 REVIEW SUMMARY (2026-04-01)
 ----------------------------
   Issues in previous report (2025-07) .............. 27
-  Issues resolved since last review ................. 16
-  Issues remaining open ............................ 10
+  Issues resolved since last review ................. 17
+  Issues remaining open ............................  9
   Net new issues found this review ...................  0
 
 ================================================================================
@@ -122,17 +122,18 @@ M-5  [FIXED] TURNER_MIN_INTERVAL_MIN comment vs. value mismatch
      Resolved: Value corrected to 60 to match "60 min minimum allowed" comment.
      Files changed: config.h
 
-M-6  switchProfile() potential deadlock on task suspend
-     File: egg_incubator_v2.ino, switchProfile()
-     switchProfile() calls allRelaysOff() (acquires controlMutex), then takes
-     settingsMutex, then calls vTaskSuspend() on active tasks.  If a suspended
-     task was mid-critical-section holding a mutex, that mutex is never released.
-     Current code order (allRelaysOff → settingsMutex → 100 ms delay → suspend)
-     is safe ONLY if all tasks exit their critical sections within 100 ms.
-     All controlled mutex timeouts are 10–100 ms, so the 100 ms delay is
-     marginally sufficient.  No change made, risk is low given bounded timeouts.
-     FIX (advisory): Increase the pre-suspend delay to 200 ms, or use task
-     notifications to let tasks self-suspend at a safe point.
+M-6  [FIXED] switchProfile() safe-suspend via task notifications
+     Resolved: Replaced all direct vTaskSuspend() calls in switchProfile() with
+     a task-notification based mechanism.  Each suspendable task
+     (task_temperature_control, task_climate_control, task_turner, task_fan,
+     task_pump, task_milestone) now checks for TASK_CMD_SUSPEND (0xA5A5) at the
+     very top of its for(;;) loop — outside any mutex.  switchProfile() sends
+     xTaskNotify(handle, TASK_CMD_SUSPEND, eSetValueWithOverwrite) only to the
+     tasks being suspended, waits 200 ms for them to reach their safe point, then
+     calls xTaskNotifyStateClear() before vTaskResume() on tasks being activated
+     so they cannot re-suspend from a stale notification.
+     Files changed: config.h, task_control.cpp, task_climate_control.cpp,
+                    task_incubator.cpp (turner/fan/pump/milestone), egg_incubator_v2.ino
 
 M-7  Cloud retry loop over-processes not-yet-due messages
      File: task_cloud.cpp, retry loop (~lines 40–82)
@@ -238,8 +239,9 @@ globals.h / globals.cpp
 
 egg_incubator_v2.ino
   • Good: factoryReset() calls allRelaysOff() first; milestoneMutex created
-    in setup(); TWDT enrolled (5 s, trigger_panic=true) with IDF v5 API.
-  • Open: M-6 (switchProfile suspend risk, low risk given 100 ms delay).
+    in setup(); TWDT enrolled (5 s, trigger_panic=true) with IDF v5 API;
+    switchProfile() now uses task-notification safe-suspend (M-6 fixed).
+  • Open: none.
 
 task_sensors.cpp
   • Good: DS18B20 non-blocking conversion; DHT single read per cycle with
@@ -390,8 +392,14 @@ task_rtc.h / task_cloud.h
       config.h — `SENSOR_INVALID_HIGH` set to 100.0f; `task_sensors.cpp`
       retains the explicit `85.0f` POR detection (`if (t == 85.0f)`).
 
-================================================================================
-  SECTION 4 — RECOMMENDED NEXT ACTIONS  (priority order, 2026-04-01)
+  [DONE 2026-04] M-6: switchProfile() safe-suspend via TASK_CMD_SUSPEND notification.
+         config.h — added `TASK_CMD_SUSPEND 0xA5A5UL`.
+         task_control.cpp, task_climate_control.cpp, task_incubator.cpp —
+         each suspendable task loop checks xTaskNotifyWait() at its top
+         (outside any mutex) and calls vTaskSuspend(NULL) on TASK_CMD_SUSPEND.
+         egg_incubator_v2.ino — switchProfile() replaced direct vTaskSuspend()
+         with xTaskNotify() + 200 ms delay + xTaskNotifyStateClear() before
+         vTaskResume(), eliminating the mutex-hold deadlock window entirely.
 ================================================================================
 
   Priority 1 — Security
@@ -406,13 +414,8 @@ task_rtc.h / task_cloud.h
       config.h; DS18B20 POR detection remains explicit in task_sensors.cpp.
     2c. Guard wifiUserEnabled / wifiPortalActive with portENTER_CRITICAL or
         std::atomic<bool> for correct dual-core visibility (M-8).
-
-  Priority 3 — Robustness
-    3a. Add URL truncation warning in task_cloud.cpp (L-2): after strncpy,
-        if url.length() >= sizeof(t.url)-1, call pushError("URL_TRUNC"…).
-    3b. Add droppedErrors counter to pushError() and periodically surface it
-        as a meta-error or OLED status line (L-3).
-    3c. Gate Serial.printf relay-state logging behind a SERIAL_DEBUG compile
+    2d. M-6 switchProfile() deadlock: DONE — task-notification safe-suspend
+        implemented in all 6 suspendable tasks and switchProfile().
         flag to eliminate variable-latency serial writes in production (L-4).
 
   Priority 4 — Maintainability

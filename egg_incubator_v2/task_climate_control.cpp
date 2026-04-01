@@ -26,6 +26,12 @@ void task_climate_control(void* pvParameters) {
 
     for (;;) {
 
+        // ── Safe self-suspend point (profile switch via task notification) ────
+        // Called at loop top: no mutex is held here.
+        { uint32_t cmd = 0;
+          if (xTaskNotifyWait(0, 0xFFFFFFFFUL, &cmd, 0) == pdTRUE && cmd == TASK_CMD_SUSPEND)
+              vTaskSuspend(NULL); }
+
         // ── Read sensor data ─────────────────────────────────────────────────
         float currentTemp = -999.0f;
         float currentHum  = 0.0f;

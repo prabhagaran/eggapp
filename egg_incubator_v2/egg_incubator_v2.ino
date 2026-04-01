@@ -161,10 +161,24 @@ void factoryReset(void) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// switchProfile — suspends/resumes appropriate tasks, resets relays
+// switchProfile — safe profile switch using task-notification based suspend
+//
+// Each suspendable task checks for TASK_CMD_SUSPEND at the TOP of its loop
+// (outside any mutex/critical-section), then calls vTaskSuspend(NULL) itself.
+// This eliminates the M-6 deadlock risk caused by direct vTaskSuspend() while
+// a task might be mid-critical-section.
+//
+// Flow:
+//   1. allRelaysOff() — safe hardware state immediately
+//   2. Persist new profile to gSettings
+//   3. Notify only the tasks that need to be suspended (not all tasks)
+//   4. vTaskDelay(200 ms) — window for tasks to reach their safe suspend point
+//   5. Resume the tasks that belong to the new profile, after clearing any
+//      stale TASK_CMD_SUSPEND notification so they don't re-suspend instantly
 // ─────────────────────────────────────────────────────────────────────────────
 void switchProfile(ProfileType newProfile) {
     allRelaysOff();
+    Serial.println("[SYSTEM] Profile switch requested — notifying tasks");
 
     if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
         gSettings.activeProfile = newProfile;
@@ -172,26 +186,42 @@ void switchProfile(ProfileType newProfile) {
     }
 
     if (newProfile == PROFILE_EGG_INCUBATOR) {
-        // Activate incubator tasks
-        if (hTaskTempControl    != nullptr) vTaskResume(hTaskTempControl);
-        if (hTaskTurner         != nullptr) vTaskResume(hTaskTurner);
-        if (hTaskFan            != nullptr) vTaskResume(hTaskFan);
-        if (hTaskPump           != nullptr) vTaskResume(hTaskPump);
-        if (hTaskMilestone      != nullptr) vTaskResume(hTaskMilestone);
-        // Suspend climate task
-        if (hTaskClimateControl != nullptr) vTaskSuspend(hTaskClimateControl);
+        // Request climate control task to self-suspend at its next safe point
+        if (hTaskClimateControl != nullptr)
+            xTaskNotify(hTaskClimateControl, TASK_CMD_SUSPEND, eSetValueWithOverwrite);
+
+        // Give the task time to reach the top-of-loop safe suspend check
+        vTaskDelay(pdMS_TO_TICKS(200));
+
+        // Resume incubator tasks — clear any stale TASK_CMD_SUSPEND notification
+        // before resuming so they do not immediately re-suspend themselves
+        if (hTaskTempControl != nullptr) {
+            xTaskNotifyStateClear(hTaskTempControl);
+            vTaskResume(hTaskTempControl);
+        }
+        if (hTaskTurner    != nullptr) { xTaskNotifyStateClear(hTaskTurner);    vTaskResume(hTaskTurner);    }
+        if (hTaskFan       != nullptr) { xTaskNotifyStateClear(hTaskFan);       vTaskResume(hTaskFan);       }
+        if (hTaskPump      != nullptr) { xTaskNotifyStateClear(hTaskPump);      vTaskResume(hTaskPump);      }
+        if (hTaskMilestone != nullptr) { xTaskNotifyStateClear(hTaskMilestone); vTaskResume(hTaskMilestone); }
 
         Serial.println("[PROFILE] Switched to Egg Incubator");
 
     } else {
-        // Activate climate task
-        if (hTaskClimateControl != nullptr) vTaskResume(hTaskClimateControl);
-        // Suspend incubator-only tasks
-        if (hTaskTempControl    != nullptr) vTaskSuspend(hTaskTempControl);
-        if (hTaskTurner         != nullptr) vTaskSuspend(hTaskTurner);
-        if (hTaskFan            != nullptr) vTaskSuspend(hTaskFan);
-        if (hTaskPump           != nullptr) vTaskSuspend(hTaskPump);
-        if (hTaskMilestone      != nullptr) vTaskSuspend(hTaskMilestone);
+        // Request incubator tasks to self-suspend at their next safe points
+        if (hTaskTempControl != nullptr) xTaskNotify(hTaskTempControl,  TASK_CMD_SUSPEND, eSetValueWithOverwrite);
+        if (hTaskTurner      != nullptr) xTaskNotify(hTaskTurner,       TASK_CMD_SUSPEND, eSetValueWithOverwrite);
+        if (hTaskFan         != nullptr) xTaskNotify(hTaskFan,          TASK_CMD_SUSPEND, eSetValueWithOverwrite);
+        if (hTaskPump        != nullptr) xTaskNotify(hTaskPump,         TASK_CMD_SUSPEND, eSetValueWithOverwrite);
+        if (hTaskMilestone   != nullptr) xTaskNotify(hTaskMilestone,    TASK_CMD_SUSPEND, eSetValueWithOverwrite);
+
+        // Give tasks time to reach their top-of-loop safe suspend checks
+        vTaskDelay(pdMS_TO_TICKS(200));
+
+        // Resume climate task — clear any stale notification first
+        if (hTaskClimateControl != nullptr) {
+            xTaskNotifyStateClear(hTaskClimateControl);
+            vTaskResume(hTaskClimateControl);
+        }
 
         Serial.println("[PROFILE] Switched to Climate Chamber");
     }

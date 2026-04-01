@@ -62,6 +62,13 @@
 #define FAULT_RESET_HOLD_MS   3000    // ms hold time for OK button to reset fault
 
 // ─────────────────────────────────────────────────────────────────────────────
+// TASK COMMAND VALUES  (sent via xTaskNotify)
+// ─────────────────────────────────────────────────────────────────────────────
+// Sent to a task to request it self-suspend at the next safe point.
+// Each suspendable task checks this at the top of its loop (outside any mutex).
+#define TASK_CMD_SUSPEND      0xA5A5UL
+
+// ─────────────────────────────────────────────────────────────────────────────
 // DEFAULT SETPOINTS
 // ─────────────────────────────────────────────────────────────────────────────
 #define DEFAULT_TEMP_SETPOINT     37.5f
