@@ -22,8 +22,8 @@ confirmed on COM3.  TWDT enrolled (5-second timeout).
 REVIEW SUMMARY (2026-04-01)
 ----------------------------
   Issues in previous report (2025-07) .............. 27
-  Issues resolved since last review ................. 18
-  Issues remaining open ............................  8
+  Issues resolved since last review ................. 19
+  Issues remaining open ............................  7
   Net new issues found this review ...................  0
 
 ================================================================================
@@ -237,7 +237,7 @@ globals.h / globals.cpp
   • Good: all shared state behind mutexes; TelemetryMsg_t typedef now precedes
     telemetryQueue extern; setRelay() no longer touches RELAY_FAN;
     allRelaysOff() uses setFanSpeed(0); rtcEpochValid added.
-  • Open: M-8 (volatile flags without memory barriers).
+  • Open: none.
 
 egg_incubator_v2.ino
   • Good: factoryReset() calls allRelaysOff() first; milestoneMutex created
@@ -290,7 +290,7 @@ task_cloud.cpp
 task_wifi_manager.cpp
   • Good: non-blocking portal; user-controlled connect/disconnect; auto-reconnect
     only when wifiUserEnabled; 8-second boot wait.
-  • Open: M-8 (volatile flag cross-core access).
+  • Open: none.
 
 task_ui.cpp
   • Good: state-machine based; confirmed edits write to NVS immediately for
@@ -407,11 +407,19 @@ task_rtc.h / task_cloud.h
   [DONE 2026-04] M-7: Cloud retry loop tight-loop fixed with peek+break.
          task_cloud.cpp — retry loop now calls xQueuePeek() on the head
          before dequeuing; breaks immediately if head.nextAttemptMs is in
-         the future, eliminating all re-enqueue churn in backoff-dominated
-         queues and removing the Core 0 CPU spike.
-================================================================================
+          the future, eliminating all re-enqueue churn in backoff-dominated
+          queues and removing the Core 0 CPU spike.
 
-  Priority 1 — Security
+        [DONE 2026-04] M-8: wifiUserEnabled / wifiPortalActive converted to atomics.
+          globals.h / globals.cpp — `wifiUserEnabled` and `wifiPortalActive`
+          changed from `volatile bool` to `std::atomic<bool>` and defined in
+          globals.cpp.  task_cloud.cpp and task_wifi_manager.cpp updated to use
+          `.load()` / `.store()` with appropriate memory-order semantics to
+          ensure cross-core visibility without heavyweight locking.
+
+      ================================================================================
+
+        Priority 1 — Security
     1a. Populate CLOUD_ROOT_CA in secrets.h with the Google TLS root certificate
         PEM chain.  See ROOT_CA_EXTRACT.md for step-by-step extraction.
         Resolves C-3 (currently running MITM-vulnerable with setInsecure()).
@@ -422,7 +430,8 @@ task_rtc.h / task_cloud.h
     2b. Fix SENSOR_INVALID_HIGH to 100.0f (M-4): DONE — set to 100.0f in
       config.h; DS18B20 POR detection remains explicit in task_sensors.cpp.
     2c. Guard wifiUserEnabled / wifiPortalActive with portENTER_CRITICAL or
-        std::atomic<bool> for correct dual-core visibility (M-8).
+      std::atomic<bool> for correct dual-core visibility (M-8): DONE —
+      converted to `std::atomic<bool>` and updated reads/writes across tasks.
     2d. M-6 switchProfile() deadlock: DONE — task-notification safe-suspend
         implemented in all 6 suspendable tasks and switchProfile().
         flag to eliminate variable-latency serial writes in production (L-4).
