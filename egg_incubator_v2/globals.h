@@ -7,6 +7,7 @@
 #include <freertos/queue.h>
 #include "RTClib.h"
 #include "config.h"
+#include <atomic>
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ENUMS
@@ -244,8 +245,8 @@ extern QueueHandle_t telemetryQueue;
 extern volatile bool overTempFault;
 extern portMUX_TYPE  faultMux;
 
-extern volatile bool wifiUserEnabled;   // true = user has enabled Wi-Fi
-extern volatile bool wifiPortalActive;  // true = config portal is running
+extern std::atomic<bool> wifiUserEnabled;   // true = user has enabled Wi-Fi
+extern std::atomic<bool> wifiPortalActive;  // true = config portal is running
 extern volatile bool rtcEpochValid;     // true = RTC epoch is sane (> Nov 2023)
 
 extern TaskHandle_t hTaskTurner;

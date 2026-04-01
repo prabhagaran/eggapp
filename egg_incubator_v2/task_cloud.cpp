@@ -93,7 +93,7 @@ void task_cloud(void* pvParameters) {
 
         // ── WiFi check ───────────────────────────────────────────────────────
         // Only proceed if user has enabled Wi-Fi; never auto-reconnect otherwise.
-        if (!wifiUserEnabled) {
+        if (!wifiUserEnabled.load(std::memory_order_acquire)) {
             vTaskDelay(pdMS_TO_TICKS(5000));
             continue;
         }
