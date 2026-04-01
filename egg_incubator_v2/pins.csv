@@ -1,0 +1,40 @@
+name,gpio,role,defined_in,defined_line,status,notes
+BTN_UP,32,Button,config.h,13,used,
+BTN_DOWN,33,Button,config.h,14,used,
+BTN_OK,25,Button,config.h,15,used,
+I2C_SDA,21,I2C SDA,config.h,20,used,
+I2C_SCL,22,I2C SCL,config.h,21,used,
+DHT_PIN,4,DHT sensor,config.h,26,used,
+DS18B20_PIN,18,DS18B20 data,config.h,28,used,
+RELAY_HEATER,26,Relay - heater,config.h,33,used,
+RELAY_COOLER,27,Relay - cooler,config.h,34,used,
+RELAY_HUMIDIFIER,14,Relay - humidifier,config.h,35,used,
+RELAY_FAN,13,Relay - fan,config.h,36,used,
+RELAY_PUMP,12,Relay - pump,config.h,37,used,
+RELAY_TURNER,15,Relay - turner,config.h,38,used,
+
+GPIO5,5,General purpose,, ,free,Good candidate for outputs / PWM
+GPIO16,16,General purpose,, ,free,Generally safe for use
+GPIO17,17,General purpose,, ,free,Generally safe for use
+GPIO19,19,General purpose,, ,free,Generally safe for use
+GPIO23,23,General purpose,, ,free,Generally safe for use
+
+GPIO34,34,Input-only,, ,input-only,Input-only pins (no pull-ups, ADC possible)
+GPIO35,35,Input-only,, ,input-only,Input-only pins (no pull-ups, ADC possible)
+GPIO36,36,Input-only,, ,input-only,Input-only pins (no pull-ups, ADC possible)
+GPIO37,37,Input-only,, ,input-only,Input-only pins (no pull-ups, ADC possible)
+GPIO38,38,Input-only,, ,input-only,Input-only pins (no pull-ups, ADC possible)
+GPIO39,39,Input-only,, ,input-only,Input-only pins (no pull-ups, ADC possible)
+
+GPIO1,1,UART TX0,, ,avoid,Serial TX0 (used by `Serial` - avoid if possible)
+GPIO3,3,UART RX0,, ,avoid,Serial RX0 (used by `Serial` - avoid if possible)
+
+GPIO6,6,Flash/SD,, ,avoid,Flash pins - do not use
+GPIO7,7,Flash/SD,, ,avoid,Flash pins - do not use
+GPIO8,8,Flash/SD,, ,avoid,Flash pins - do not use
+GPIO9,9,Flash/SD,, ,avoid,Flash pins - do not use
+GPIO10,10,Flash/SD,, ,avoid,Flash pins - do not use
+GPIO11,11,Flash/SD,, ,avoid,Flash pins - do not use
+
+GPIO0,0,Boot strapping,, ,avoid,Can affect boot (use with caution)
+GPIO2,2,Boot strapping,, ,avoid,Can affect boot / strapping - use with caution
