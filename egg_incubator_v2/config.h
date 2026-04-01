@@ -55,7 +55,10 @@
 #define MAX_TEMP_INCUBATOR    39.5f   // °C — over-temp fault triggers above this
 #define MAX_TEMP_CLIMATE      80.0f   // °C — climate chamber absolute limit
 #define SENSOR_INVALID_LOW   -10.0f   // below this = sensor fault
-#define SENSOR_INVALID_HIGH   85.0f   // above this = sensor fault
+#define SENSOR_INVALID_HIGH   100.0f  // above this = sensor fault
+// Note: DS18B20 power-on-reset (85.0 °C) is still explicitly detected
+// in task_sensors.cpp via `if (t == 85.0f)`; this widens the sentinel to
+// avoid conflating POR with an out-of-range guard.
 #define FAULT_RESET_HOLD_MS   3000    // ms hold time for OK button to reset fault
 
 // ─────────────────────────────────────────────────────────────────────────────
