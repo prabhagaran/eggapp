@@ -111,16 +111,12 @@ M-3  [FIXED] Candling day hardcoded to day 7 for all egg types
      and selects the appropriate candleDay constant.
      Files changed: config.h, incubator_logic.cpp
 
-M-4  SENSOR_INVALID_HIGH = 85.0f clashes with DS18B20 POR sentinel
-     File: config.h
-     DS18B20 power-on reset value (85.0 °C) is explicitly caught in
-     task_sensors.cpp (if t == 85.0f).  SENSOR_INVALID_HIGH = 85.0f means
-     temperatures strictly above 85 °C (e.g. 86 °C) are also flagged invalid.
-     The climate fault threshold (MAX_TEMP_CLIMATE = 80.0 °C) would already
-     trigger before 86 °C appears, so in practice this is benign — but
-     semantically confusing.
-     FIX: Change SENSOR_INVALID_HIGH to 100.0f and rely on the explicit
-     == 85.0f check for DS18B20 POR detection.
+M-4  [FIXED] SENSOR_INVALID_HIGH sentinel widened to avoid DS18B20 POR clash
+  Resolved: `SENSOR_INVALID_HIGH` changed to 100.0f in `config.h`.
+  DS18B20 power-on-reset sentinel (85.0 °C) is still explicitly detected
+  in `task_sensors.cpp` via `if (t == 85.0f)`, so POR handling remains
+  unchanged while the range guard was widened to avoid semantic collision.
+  Files changed: config.h
 
 M-5  [FIXED] TURNER_MIN_INTERVAL_MIN comment vs. value mismatch
      Resolved: Value corrected to 60 to match "60 min minimum allowed" comment.
@@ -232,7 +228,7 @@ config.h
     separated to gitignored secrets.h; per-egg candle-day constants added;
     TURNER_MIN_INTERVAL_MIN corrected to 60; orphaned fan interval/duration
     defines removed; __has_include guard for secrets.h is portable.
-  • Open: M-4 (SENSOR_INVALID_HIGH = 85.0f ambiguity).
+  • Open: none.
 
 globals.h / globals.cpp
   • Good: all shared state behind mutexes; TelemetryMsg_t typedef now precedes
@@ -249,7 +245,7 @@ task_sensors.cpp
   • Good: DS18B20 non-blocking conversion; DHT single read per cycle with
     2.5 s sampling; 5-consecutive-failure auto reinit; stale-hold on DHT;
     per-sensor error throttling via lastErrorMs.
-  • Open: M-4 (SENSOR_INVALID_HIGH), L-5 (index 0 DS18B20 assumption).
+  • Open: L-5 (index 0 DS18B20 assumption).
 
 task_control.cpp / task_climate_control.cpp
   • Good: clean separation of incubator vs. climate logic; fault latch model
@@ -390,6 +386,10 @@ task_rtc.h / task_cloud.h
          extern "C" blocks, and function declarations.
          egg_incubator_v2/task_cloud.h, egg_incubator_v2/task_rtc.h.
 
+    [DONE 2026-04] M-4: SENSOR_INVALID_HIGH sentinel widened to 100.0f.
+      config.h — `SENSOR_INVALID_HIGH` set to 100.0f; `task_sensors.cpp`
+      retains the explicit `85.0f` POR detection (`if (t == 85.0f)`).
+
 ================================================================================
   SECTION 4 — RECOMMENDED NEXT ACTIONS  (priority order, 2026-04-01)
 ================================================================================
@@ -402,8 +402,8 @@ task_rtc.h / task_cloud.h
   Priority 2 — Reliability / correctness
     2a. Fix cloud retry loop (M-7): break on first not-yet-due message instead
         of re-enqueuing within the same iteration.
-    2b. Fix SENSOR_INVALID_HIGH to 100.0f (M-4): relying on explicit == 85.0f
-        check for DS18B20 POR rather than conflating it with a range guard.
+    2b. Fix SENSOR_INVALID_HIGH to 100.0f (M-4): DONE — set to 100.0f in
+      config.h; DS18B20 POR detection remains explicit in task_sensors.cpp.
     2c. Guard wifiUserEnabled / wifiPortalActive with portENTER_CRITICAL or
         std::atomic<bool> for correct dual-core visibility (M-8).
 
