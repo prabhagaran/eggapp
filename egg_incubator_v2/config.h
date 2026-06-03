@@ -24,7 +24,8 @@
 // SENSOR PINS
 // ─────────────────────────────────────────────────────────────────────────────
 #define DHT_PIN            4
-#define DHT_TYPE           DHT11
+//#define DHT_TYPE           DHT11
+#define DHT_TYPE           DHT22
 #define DS18B20_PIN        18
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -60,6 +61,13 @@
 // in task_sensors.cpp via `if (t == 85.0f)`; this widens the sentinel to
 // avoid conflating POR with an out-of-range guard.
 #define FAULT_RESET_HOLD_MS   3000    // ms hold time for OK button to reset fault
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TASK COMMAND VALUES  (sent via xTaskNotify)
+// ─────────────────────────────────────────────────────────────────────────────
+// Sent to a task to request it self-suspend at the next safe point.
+// Each suspendable task checks this at the top of its loop (outside any mutex).
+#define TASK_CMD_SUSPEND      0xA5A5UL
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DEFAULT SETPOINTS

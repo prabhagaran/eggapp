@@ -18,7 +18,7 @@ static WiFiManager wm;
 // Sets wifiPortalActive = true so the task loop calls wm.process() each cycle.
 // ─────────────────────────────────────────────────────────────────────────────
 void wifi_request_connect(void) {
-    if (wifiPortalActive) return;  // portal already running, ignore
+    if (wifiPortalActive.load(std::memory_order_acquire)) return;  // portal already running, ignore
 
     WiFi.mode(WIFI_STA);
     wm.setConfigPortalBlocking(false);   // non-blocking — must call process() in loop
@@ -35,14 +35,14 @@ void wifi_request_connect(void) {
 
     if (connected) {
         // Stored credentials worked — no portal needed
-        wifiUserEnabled  = true;
-        wifiPortalActive = false;
+        wifiUserEnabled.store(true, std::memory_order_release);
+        wifiPortalActive.store(false, std::memory_order_release);
         Serial.print("[WIFI] Connected from stored creds: ");
         Serial.println(WiFi.localIP());
     } else {
         // Could not connect — portal AP is now open (non-blocking)
-        wifiUserEnabled  = true;
-        wifiPortalActive = true;
+        wifiUserEnabled.store(true, std::memory_order_release);
+        wifiPortalActive.store(true, std::memory_order_release);
         Serial.println("[WIFI] Portal open: join 'INCUBATOR_SETUP' to configure");
     }
 }
@@ -54,8 +54,8 @@ void wifi_request_connect(void) {
 // Stops the portal if active, disconnects, and turns WiFi radio off.
 // ─────────────────────────────────────────────────────────────────────────────
 void wifi_request_disconnect(void) {
-    wifiUserEnabled  = false;
-    wifiPortalActive = false;
+    wifiUserEnabled.store(false, std::memory_order_release);
+    wifiPortalActive.store(false, std::memory_order_release);
     wm.stopConfigPortal();
     // Disable automatic reconnect at the WiFi driver level so saved
     // credentials are not re-applied until the user explicitly requests.
@@ -88,7 +88,7 @@ void task_wifi_manager(void* pvParameters) {
             vTaskDelay(pdMS_TO_TICKS(500));
         }
         if (WiFi.status() == WL_CONNECTED) {
-            wifiUserEnabled = true;
+            wifiUserEnabled.store(true, std::memory_order_release);
             Serial.print("[WIFI] Auto-connected at boot: ");
             Serial.println(WiFi.localIP());
         } else {
@@ -99,18 +99,18 @@ void task_wifi_manager(void* pvParameters) {
     for (;;) {
 
         // ── Portal processing ─────────────────────────────────────────────
-        if (wifiPortalActive) {
+        if (wifiPortalActive.load(std::memory_order_acquire)) {
             wm.process();   // non-blocking — hands control back immediately
 
             if (WiFi.status() == WL_CONNECTED) {
-                wifiPortalActive = false;
-                wifiUserEnabled  = true;
+                wifiPortalActive.store(false, std::memory_order_release);
+                wifiUserEnabled.store(true, std::memory_order_release);
                 Serial.print("[WIFI] Connected: ");
                 Serial.println(WiFi.localIP());
             } else if (!wm.getConfigPortalActive()) {
                 // Portal timed out without a connection
-                wifiPortalActive = false;
-                wifiUserEnabled  = false;
+                wifiPortalActive.store(false, std::memory_order_release);
+                wifiUserEnabled.store(false, std::memory_order_release);
                 Serial.println("[WIFI] Portal timed out — staying offline");
             }
 
@@ -119,7 +119,7 @@ void task_wifi_manager(void* pvParameters) {
         }
 
         // ── Auto-reconnect (only if user previously connected) ────────────
-        if (wifiUserEnabled && WiFi.status() != WL_CONNECTED) {
+        if (wifiUserEnabled.load(std::memory_order_acquire) && WiFi.status() != WL_CONNECTED) {
             Serial.println("[WIFI] Reconnecting...");
             WiFi.reconnect();
             vTaskDelay(pdMS_TO_TICKS(5000));

@@ -27,8 +27,8 @@ QueueHandle_t     telemetryQueue = nullptr;
 volatile bool overTempFault  = false;
 portMUX_TYPE  faultMux       = portMUX_INITIALIZER_UNLOCKED;
 
-volatile bool wifiUserEnabled  = false;  // true = user has enabled Wi-Fi
-volatile bool wifiPortalActive = false;  // true = config portal is running
+std::atomic<bool> wifiUserEnabled{false};  // true = user has enabled Wi-Fi
+std::atomic<bool> wifiPortalActive{false}; // true = config portal is running
 volatile bool rtcEpochValid    = false;  // true = RTC epoch > Nov 2023
 
 // ─────────────────────────────────────────────────────────────────────────────

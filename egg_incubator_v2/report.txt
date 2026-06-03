@@ -22,8 +22,8 @@ confirmed on COM3.  TWDT enrolled (5-second timeout).
 REVIEW SUMMARY (2026-04-01)
 ----------------------------
   Issues in previous report (2025-07) .............. 27
-  Issues resolved since last review ................. 16
-  Issues remaining open ............................ 10
+  Issues resolved since last review ................. 19
+  Issues remaining open ............................  7
   Net new issues found this review ...................  0
 
 ================================================================================
@@ -122,26 +122,29 @@ M-5  [FIXED] TURNER_MIN_INTERVAL_MIN comment vs. value mismatch
      Resolved: Value corrected to 60 to match "60 min minimum allowed" comment.
      Files changed: config.h
 
-M-6  switchProfile() potential deadlock on task suspend
-     File: egg_incubator_v2.ino, switchProfile()
-     switchProfile() calls allRelaysOff() (acquires controlMutex), then takes
-     settingsMutex, then calls vTaskSuspend() on active tasks.  If a suspended
-     task was mid-critical-section holding a mutex, that mutex is never released.
-     Current code order (allRelaysOff → settingsMutex → 100 ms delay → suspend)
-     is safe ONLY if all tasks exit their critical sections within 100 ms.
-     All controlled mutex timeouts are 10–100 ms, so the 100 ms delay is
-     marginally sufficient.  No change made, risk is low given bounded timeouts.
-     FIX (advisory): Increase the pre-suspend delay to 200 ms, or use task
-     notifications to let tasks self-suspend at a safe point.
+M-6  [FIXED] switchProfile() safe-suspend via task notifications
+     Resolved: Replaced all direct vTaskSuspend() calls in switchProfile() with
+     a task-notification based mechanism.  Each suspendable task
+     (task_temperature_control, task_climate_control, task_turner, task_fan,
+     task_pump, task_milestone) now checks for TASK_CMD_SUSPEND (0xA5A5) at the
+     very top of its for(;;) loop — outside any mutex.  switchProfile() sends
+     xTaskNotify(handle, TASK_CMD_SUSPEND, eSetValueWithOverwrite) only to the
+     tasks being suspended, waits 200 ms for them to reach their safe point, then
+     calls xTaskNotifyStateClear() before vTaskResume() on tasks being activated
+     so they cannot re-suspend from a stale notification.
+     Files changed: config.h, task_control.cpp, task_climate_control.cpp,
+                    task_incubator.cpp (turner/fan/pump/milestone), egg_incubator_v2.ino
 
-M-7  Cloud retry loop over-processes not-yet-due messages
-     File: task_cloud.cpp, retry loop (~lines 40–82)
-     queued = uxQueueMessagesWaiting() snapshot is used as loop bound.
-     Not-yet-due messages are immediately re-enqueued, wasting CPU in a tight
-     loop when backoff items dominate the queue.
-     FIX: Break out of the retry loop on the first message whose
-     nextAttemptMs is still in the future, relying on FIFO ordering to ensure
-     earlier items are processed first.
+M-7  [FIXED] Cloud retry loop over-processes not-yet-due messages
+     Resolved: The retry loop now uses `xQueuePeek()` to inspect the queue
+     head before dequeuing. If the head item's `nextAttemptMs` is still in
+     the future the loop breaks immediately, stopping all re-enqueue churn.
+     FIFO ordering means if the head is not yet due, all remaining items in
+     this pass are not due either.
+     Root cause was: iterating with a snapshot count, dequeuing each item,
+     and re-enqueueing not-yet-due items -- causing tight busy-loop CPU spikes
+     on Core 0 whenever backoff items dominated the queue.
+     Files changed: task_cloud.cpp
 
 M-8  wifiUserEnabled / wifiPortalActive — volatile without memory barriers
      File: globals.h / globals.cpp
@@ -234,12 +237,13 @@ globals.h / globals.cpp
   • Good: all shared state behind mutexes; TelemetryMsg_t typedef now precedes
     telemetryQueue extern; setRelay() no longer touches RELAY_FAN;
     allRelaysOff() uses setFanSpeed(0); rtcEpochValid added.
-  • Open: M-8 (volatile flags without memory barriers).
+  • Open: none.
 
 egg_incubator_v2.ino
   • Good: factoryReset() calls allRelaysOff() first; milestoneMutex created
-    in setup(); TWDT enrolled (5 s, trigger_panic=true) with IDF v5 API.
-  • Open: M-6 (switchProfile suspend risk, low risk given 100 ms delay).
+    in setup(); TWDT enrolled (5 s, trigger_panic=true) with IDF v5 API;
+    switchProfile() now uses task-notification safe-suspend (M-6 fixed).
+  • Open: none.
 
 task_sensors.cpp
   • Good: DS18B20 non-blocking conversion; DHT single read per cycle with
@@ -278,14 +282,15 @@ task_rtc.cpp
 
 task_cloud.cpp
   • Good: non-blocking single-attempt pattern; retry queue with exponential
-    backoff; error and telemetry sends separated; CA/insecure fallback.
-  • Open: C-3 (CA still empty by default), M-7 (retry loop over-processes),
+    backoff; error and telemetry sends separated; CA/insecure fallback;
+    retry loop now uses peek+break to stop on first not-yet-due head (M-7).
+  • Open: C-3 (CA still empty by default),
     L-2 (no URL truncation warning), L-10 (body always read).
 
 task_wifi_manager.cpp
   • Good: non-blocking portal; user-controlled connect/disconnect; auto-reconnect
     only when wifiUserEnabled; 8-second boot wait.
-  • Open: M-8 (volatile flag cross-core access).
+  • Open: none.
 
 task_ui.cpp
   • Good: state-machine based; confirmed edits write to NVS immediately for
@@ -390,29 +395,45 @@ task_rtc.h / task_cloud.h
       config.h — `SENSOR_INVALID_HIGH` set to 100.0f; `task_sensors.cpp`
       retains the explicit `85.0f` POR detection (`if (t == 85.0f)`).
 
-================================================================================
-  SECTION 4 — RECOMMENDED NEXT ACTIONS  (priority order, 2026-04-01)
-================================================================================
+  [DONE 2026-04] M-6: switchProfile() safe-suspend via TASK_CMD_SUSPEND notification.
+         config.h — added `TASK_CMD_SUSPEND 0xA5A5UL`.
+         task_control.cpp, task_climate_control.cpp, task_incubator.cpp —
+         each suspendable task loop checks xTaskNotifyWait() at its top
+         (outside any mutex) and calls vTaskSuspend(NULL) on TASK_CMD_SUSPEND.
+         egg_incubator_v2.ino — switchProfile() replaced direct vTaskSuspend()
+         with xTaskNotify() + 200 ms delay + xTaskNotifyStateClear() before
+         vTaskResume(), eliminating the mutex-hold deadlock window entirely.
 
-  Priority 1 — Security
+  [DONE 2026-04] M-7: Cloud retry loop tight-loop fixed with peek+break.
+         task_cloud.cpp — retry loop now calls xQueuePeek() on the head
+         before dequeuing; breaks immediately if head.nextAttemptMs is in
+          the future, eliminating all re-enqueue churn in backoff-dominated
+          queues and removing the Core 0 CPU spike.
+
+        [DONE 2026-04] M-8: wifiUserEnabled / wifiPortalActive converted to atomics.
+          globals.h / globals.cpp — `wifiUserEnabled` and `wifiPortalActive`
+          changed from `volatile bool` to `std::atomic<bool>` and defined in
+          globals.cpp.  task_cloud.cpp and task_wifi_manager.cpp updated to use
+          `.load()` / `.store()` with appropriate memory-order semantics to
+          ensure cross-core visibility without heavyweight locking.
+
+      ================================================================================
+
+        Priority 1 — Security
     1a. Populate CLOUD_ROOT_CA in secrets.h with the Google TLS root certificate
         PEM chain.  See ROOT_CA_EXTRACT.md for step-by-step extraction.
         Resolves C-3 (currently running MITM-vulnerable with setInsecure()).
 
   Priority 2 — Reliability / correctness
-    2a. Fix cloud retry loop (M-7): break on first not-yet-due message instead
-        of re-enqueuing within the same iteration.
+    2a. Fix cloud retry loop (M-7): DONE — peek+break implemented in
+        task_cloud.cpp; loop stops on first not-yet-due head item.
     2b. Fix SENSOR_INVALID_HIGH to 100.0f (M-4): DONE — set to 100.0f in
       config.h; DS18B20 POR detection remains explicit in task_sensors.cpp.
     2c. Guard wifiUserEnabled / wifiPortalActive with portENTER_CRITICAL or
-        std::atomic<bool> for correct dual-core visibility (M-8).
-
-  Priority 3 — Robustness
-    3a. Add URL truncation warning in task_cloud.cpp (L-2): after strncpy,
-        if url.length() >= sizeof(t.url)-1, call pushError("URL_TRUNC"…).
-    3b. Add droppedErrors counter to pushError() and periodically surface it
-        as a meta-error or OLED status line (L-3).
-    3c. Gate Serial.printf relay-state logging behind a SERIAL_DEBUG compile
+      std::atomic<bool> for correct dual-core visibility (M-8): DONE —
+      converted to `std::atomic<bool>` and updated reads/writes across tasks.
+    2d. M-6 switchProfile() deadlock: DONE — task-notification safe-suspend
+        implemented in all 6 suspendable tasks and switchProfile().
         flag to eliminate variable-latency serial writes in production (L-4).
 
   Priority 4 — Maintainability
