@@ -166,12 +166,12 @@ However, the review found **2 Critical**, **7 High**, **12 Medium** and **9 Low*
 * **Impact:** Sporadic crashes/heap corruption around connect/disconnect; frozen UI during connect; potential UI-task stack overflow.
 * **Fix applied:** Added module-private `std::atomic<int> wifiReqPending` in `task_wifi_manager.cpp`. `wifi_request_connect()` and `wifi_request_disconnect()` now only store a request value and return immediately — no `wm` calls from the UI task. At the top of each `task_wifi_manager` loop iteration, the request is consumed via `exchange()` and the actual `wm.autoConnect()` / `wm.stopConfigPortal()` / `WiFi.*` calls execute exclusively on Core 0 inside the wifi task.
 
-### BUG-015 — Two independent reconnect drivers fight over the Wi-Fi stack
+### BUG-015 — Two independent reconnect drivers fight over the Wi-Fi stack ✅ FIXED
 * **Severity:** Medium
 * **Location:** [task_cloud.cpp:101-106](egg_incubator_v2/task_cloud.cpp#L101-L106) and [task_wifi_manager.cpp:122-127](egg_incubator_v2/task_wifi_manager.cpp#L122-L127)
 * **Root cause:** Both `task_cloud` and `task_wifi_manager` call `WiFi.reconnect()` on their own 5-s cadence when disconnected (plus `WiFi.setAutoReconnect(true)` makes the driver retry on its own).
 * **Impact:** Overlapping reconnect attempts can repeatedly abort each other’s association, lengthening outages and adding log noise; harder to reason about Wi-Fi state.
-* **Recommended fix:** Centralize all reconnect policy in `task_wifi_manager`; `task_cloud` should only *observe* `WiFi.status()`.
+* **Fix applied:** Removed `WiFi.reconnect()` from `task_cloud`. The cloud task now only observes `WiFi.status()` and waits 5 s before retrying its own work — all reconnect policy is centralized in `task_wifi_manager`.
 
 ### BUG-016 — NTP sync blocks the UI for up to ~7 s; timezone hardcoded to UTC+5:30
 * **Severity:** Medium
