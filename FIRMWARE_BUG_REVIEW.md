@@ -194,12 +194,12 @@ However, the review found **2 Critical**, **7 High**, **12 Medium** and **9 Low*
 * **Impact:** A corrupted or partially-written NVS (power loss during the ~38-key `saveSettings()` sequence, which is not atomic) yields out-of-range setpoints or division/modulo edge cases (`totalCycleSec == 0` is guarded, but e.g. `turnerIntervalMin = 0` → turner runs every 10 s poll; hysteresis 0 → relay chatter).
 * **Fix applied:** Added a validation pass inside the `settingsMutex` block in `loadSettings()`. Enums are bounds-checked against their max values; floats are clamped using the existing `config.h` limits (`TEMP_SETPOINT_MIN/MAX`, `HUM_HYST_MIN/MAX`, etc.); `turnerIntervalMin` and `turnerDurationSec` are clamped to their UI-enforced min/max; `totalDays`/`lockdownDay` inconsistency is corrected; cyclic periods are guarded against zero; ramp index is bounds-checked. Any out-of-range value triggers `pushError("NVS_CORRUPT", …)` and a serial warning.
 
-### BUG-019 — `switchProfile()` proceeds even when it failed to record the new profile
+### BUG-019 — `switchProfile()` proceeds even when it failed to record the new profile ✅ FIXED
 * **Severity:** Medium
 * **Location:** [egg_incubator_v2.ino:186-189](egg_incubator_v2/egg_incubator_v2.ino#L186-L189)
 * **Root cause:** If the 100 ms `settingsMutex` take fails, `gSettings.activeProfile` keeps the old value but the function continues suspending/resuming tasks for the *new* profile, then `saveSettings()` persists the **old** profile.
 * **Impact:** Running task set and persisted/displayed profile disagree; after reboot the device starts the other profile’s tasks. Low probability, but completely silent.
-* **Recommended fix:** Abort (or retry) the switch if the settings update fails; log loudly.
+* **Fix applied:** Converted the `settingsMutex` take from an `if` to an early-return guard. On timeout the function logs loudly (`Serial` + `pushError`), leaves all tasks running in their current state, and returns without touching tasks or NVS. The switch only proceeds once the profile is recorded under the mutex.
 
 ### BUG-020 — Single temperature sensor is a SPOF; DHT22’s temperature channel is unused for cross-checking; heater has no minimum-cycle or maximum-runtime guard
 * **Severity:** Medium (industrial best practice)
