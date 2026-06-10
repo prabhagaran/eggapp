@@ -296,11 +296,14 @@ void setup() {
     Wire.begin(I2C_SDA, I2C_SCL);
 
     // ── RTC ──────────────────────────────────────────────────────────────────
+    // A missing or failed RTC is not fatal: temperature/humidity control works
+    // without wall-clock time. Epoch-dependent logic (turner, milestones, cyclic
+    // phase) is already gated on rtcEpochValid, so it stays dormant until the
+    // clock is set via the UI or NTP.
     if (!rtc.begin()) {
-        Serial.println("[SETUP] RTC not found — halting");
-        while (1) { vTaskDelay(pdMS_TO_TICKS(1000)); }
-    }
-    if (!rtc.isrunning()) {
+        Serial.println("[SETUP] RTC not found — continuing without RTC");
+        rtcEpochValid = false;
+    } else if (!rtc.isrunning()) {
         Serial.println("[SETUP] RTC not running — setting to compile time");
         rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
     }

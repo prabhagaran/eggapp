@@ -65,13 +65,15 @@ static const char* MONTH_NAMES[] = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-void oled_init(void) {
+bool oled_init(void) {
     // Wire is already begun in setup() — do not call Wire.begin() again
     if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR)) {
-        while (1);  // halt on OLED failure
+        Serial.println("[OLED] Init failed — display unavailable");
+        return false;
     }
     display.clearDisplay();
     display.display();
+    return true;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
