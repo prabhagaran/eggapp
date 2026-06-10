@@ -99,8 +99,7 @@ void task_cloud(void* pvParameters) {
         }
 
         if (WiFi.status() != WL_CONNECTED) {
-            Serial.println("[CLOUD] WiFi disconnected, reconnecting...");
-            WiFi.reconnect();
+            // Reconnect is handled exclusively by task_wifi_manager; just wait.
             vTaskDelay(pdMS_TO_TICKS(5000));
             continue;
         }
