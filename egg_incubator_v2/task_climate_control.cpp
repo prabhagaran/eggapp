@@ -4,6 +4,7 @@
 #include "climate_logic.h"
 #include <Arduino.h>
 #include "esp_task_wdt.h"
+#include <Preferences.h>
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TASK: CLIMATE CHAMBER CONTROL
@@ -86,6 +87,8 @@ void task_climate_control(void* pvParameters) {
             portENTER_CRITICAL(&faultMux);
             overTempFault = true;
             portEXIT_CRITICAL(&faultMux);
+
+            { Preferences p; p.begin("incubator", false); p.putBool("otFault", true); p.end(); }
 
             allRelaysOff();
             pushError("OVER_TEMP", "Climate chamber over temperature");

@@ -3,6 +3,7 @@
 #include "config.h"
 #include <Arduino.h>
 #include "esp_task_wdt.h"
+#include <Preferences.h>
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TASK: TEMPERATURE CONTROL (Egg Incubator profile)
@@ -86,6 +87,8 @@ void task_temperature_control(void* pvParameters) {
             portENTER_CRITICAL(&faultMux);
             overTempFault = true;
             portEXIT_CRITICAL(&faultMux);
+
+            { Preferences p; p.begin("incubator", false); p.putBool("otFault", true); p.end(); }
 
             setRelay(RELAY_HEATER,     false);
             setRelay(RELAY_HUMIDIFIER, false);

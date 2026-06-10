@@ -82,6 +82,14 @@ void loadSettings(void) {
         xSemaphoreGive(settingsMutex);
     }
 
+    // Restore over-temperature fault latch — survives power loss / WDT reboot
+    if (prefs.getBool("otFault", false)) {
+        portENTER_CRITICAL(&faultMux);
+        overTempFault = true;
+        portEXIT_CRITICAL(&faultMux);
+        Serial.println("[NVS] Over-temp fault latch restored — hold OK 3 s to clear");
+    }
+
     prefs.end();
     Serial.println("[NVS] Settings loaded");
     Serial.printf("[NVS] startEpoch loaded = %lu\n", (unsigned long)gSettings.startEpoch);
@@ -296,11 +304,14 @@ void setup() {
     Wire.begin(I2C_SDA, I2C_SCL);
 
     // ── RTC ──────────────────────────────────────────────────────────────────
+    // A missing or failed RTC is not fatal: temperature/humidity control works
+    // without wall-clock time. Epoch-dependent logic (turner, milestones, cyclic
+    // phase) is already gated on rtcEpochValid, so it stays dormant until the
+    // clock is set via the UI or NTP.
     if (!rtc.begin()) {
-        Serial.println("[SETUP] RTC not found — halting");
-        while (1) { vTaskDelay(pdMS_TO_TICKS(1000)); }
-    }
-    if (!rtc.isrunning()) {
+        Serial.println("[SETUP] RTC not found — continuing without RTC");
+        rtcEpochValid = false;
+    } else if (!rtc.isrunning()) {
         Serial.println("[SETUP] RTC not running — setting to compile time");
         rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
     }

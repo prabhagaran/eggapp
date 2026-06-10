@@ -154,7 +154,11 @@ static void readSettings(float& tempSP, float& tempHyst,
 // TASK: UI STATE MACHINE
 // ─────────────────────────────────────────────────────────────────────────────
 void task_ui(void* pvParameters) {
-    oled_init();
+    if (!oled_init()) {
+        pushError("FAULT", "OLED init failed — UI disabled");
+        // Idle rather than busy-spin; control tasks on the other core keep running.
+        for (;;) { vTaskDelay(pdMS_TO_TICKS(5000)); }
+    }
 
     for (;;) {
 

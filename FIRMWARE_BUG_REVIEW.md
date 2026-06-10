@@ -115,23 +115,27 @@ However, the review found **2 Critical**, **7 High**, **12 Medium** and **9 Low*
 * **Impact:** (1) An in-flight turner/pump actuation from the *old* profile completes while the *new* profile’s control task is already driving relays — e.g. turner motor running in climate-chamber mode after `allRelaysOff()`. (2) The UI task (which calls `switchProfile`) freezes for up to 35 s with no display feedback and no watchdog. (3) `xTaskNotifyStateClear` on resume can also erase a *newer* pending suspend if profiles are toggled rapidly.
 * **Fix applied:** Every `vTaskDelay` in `task_turner` and `task_pump` replaced with `xTaskNotifyWait(..., same_timeout)`. The suspend notification now wakes the task immediately from any blocking point — idle sleeps, bootstrap wait, and mid-actuation runs alike. On a mid-actuation wake: relay is driven OFF first (`setRelay(RELAY_TURNER/PUMP, false)`), ack bit is set, then `vTaskSuspend(NULL)` is called — the task is fully stopped within milliseconds, not up to 150 s. `TASK_SUSPEND_TIMEOUT_MS` reduced from 35 000 ms to 3 000 ms in `config.h` — now an honest safety net rather than a disguised worst-case wait.
 
-### BUG-009 — Boot halts forever on RTC failure; OLED failure busy-spins and starves tasks
-* **Severity:** High
+### BUG-009 — Boot halts forever on RTC failure; OLED failure busy-spins and starves tasks ✅ FIXED
+* **Severity:** High → **Fixed** (2026-06-10)
 * **Location:** [egg_incubator_v2.ino:299-302](egg_incubator_v2/egg_incubator_v2.ino#L299-L302); [oled_ui.cpp:70-71](egg_incubator_v2/oled_ui.cpp#L70-L71)
 * **Root cause:** `rtc.begin()` failure → infinite halt loop before any task is created. `display.begin()` failure → `while (1);` **without any delay** inside `task_ui` (priority 2, core 1).
 * **Impact:** A failed/loose RTC or OLED — both on the same I²C bus, both common field failures — disables *temperature control entirely* even though the DS18B20, heater and control logic are perfectly healthy. The OLED case is worse: the busy-spin permanently starves all core-1 tasks of priority ≤ 2 (RTC task, turner, fan, pump, milestone — `task_milestone` at priority 1 never runs again), while higher-priority control tasks keep running, producing a half-alive system. For an incubator, days without heat = total loss of the batch.
-* **Recommended fix:** Degrade gracefully: on RTC failure, continue with `rtcEpochValid=false` (temperature/humidity control don’t need wall-clock time; only turner/milestones do). On OLED failure, log, push an error, and let `task_ui` idle in a `vTaskDelay` loop instead of spinning.
+* **Fix applied:**
+  1. `egg_incubator_v2.ino` — RTC failure no longer halts boot. On `rtc.begin()` failure, `rtcEpochValid` is set `false` and `setup()` continues. Temperature/humidity control is fully independent of the RTC; epoch-gated logic (turner, milestones, cyclic phase) is already dormant when `rtcEpochValid=false` (BUG-005 guards). The clock can be set later via the UI or NTP.
+  2. `oled_ui.cpp` — `oled_init()` return type changed from `void` to `bool`; returns `false` instead of `while(1)` on failure.
+  3. `oled_ui.h` — signature updated to `bool oled_init(void)`.
+  4. `task_ui.cpp` — checks `oled_init()` return value; on failure, pushes a `FAULT` error and enters `for(;;) vTaskDelay(5000)` — yields the CPU every 5 s so all other tasks on the core continue running normally.
 
 ---
 
 ## 4. Medium Findings
 
-### BUG-010 — Over-temperature fault latch is not persisted across reboot
+### BUG-010 — Over-temperature fault latch is not persisted across reboot ✅ FIXED
 * **Severity:** Medium
 * **Location:** [globals.cpp:28](egg_incubator_v2/globals.cpp#L28), [task_control.cpp:74-86](egg_incubator_v2/task_control.cpp#L74-L86)
 * **Root cause:** `overTempFault` lives only in RAM. A power blip (or the panic-reboot the WDT would cause once BUG-001 is fixed) clears the latch.
 * **Impact:** A genuine over-temp event followed by a brownout silently re-enables the heater with no operator acknowledgment — defeats the purpose of a *latched* fault.
-* **Recommended fix:** Persist the fault flag (and cause) to NVS when latched; on boot, restore the latched state and require the same 3-s OK hold to clear. Clear the NVS flag only on manual reset.
+* **Fix applied:** NVS key `"otFault"` (namespace `"incubator"`) now tracks the latch. On detection in `task_control.cpp` and `task_climate_control.cpp`, `putBool("otFault", true)` is written immediately after setting `overTempFault`. `loadSettings()` in `egg_incubator_v2.ino` reads the key on boot and restores `overTempFault` under `faultMux`. On the 3-s OK hold clear in `task_buttons.cpp`, `putBool("otFault", false)` clears the NVS flag. Each write uses a short-lived local `Preferences` instance to avoid cross-task sharing of the global `prefs` object.
 
 ### BUG-011 — Lockdown is missed entirely if the device is off (or in the other profile) on the lockdown day
 * **Severity:** Medium

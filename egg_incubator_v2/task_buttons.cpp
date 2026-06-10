@@ -3,6 +3,7 @@
 #include "config.h"
 #include <ezButton.h>
 #include <Arduino.h>
+#include <Preferences.h>
 
 static ezButton btnUp(BTN_UP);
 static ezButton btnDown(BTN_DOWN);
@@ -48,6 +49,8 @@ void task_buttons(void* pvParameters) {
                     portENTER_CRITICAL(&faultMux);
                     overTempFault = false;
                     portEXIT_CRITICAL(&faultMux);
+
+                    { Preferences p; p.begin("incubator", false); p.putBool("otFault", false); p.end(); }
 
                     allRelaysOff();
                     pushError("FAULT_RESET", "Manual fault reset by user");
