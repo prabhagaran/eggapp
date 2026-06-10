@@ -137,12 +137,12 @@ However, the review found **2 Critical**, **7 High**, **12 Medium** and **9 Low*
 * **Impact:** A genuine over-temp event followed by a brownout silently re-enables the heater with no operator acknowledgment — defeats the purpose of a *latched* fault.
 * **Fix applied:** NVS key `"otFault"` (namespace `"incubator"`) now tracks the latch. On detection in `task_control.cpp` and `task_climate_control.cpp`, `putBool("otFault", true)` is written immediately after setting `overTempFault`. `loadSettings()` in `egg_incubator_v2.ino` reads the key on boot and restores `overTempFault` under `faultMux`. On the 3-s OK hold clear in `task_buttons.cpp`, `putBool("otFault", false)` clears the NVS flag. Each write uses a short-lived local `Preferences` instance to avoid cross-task sharing of the global `prefs` object.
 
-### BUG-011 — Lockdown is missed entirely if the device is off (or in the other profile) on the lockdown day
+### BUG-011 — Lockdown is missed entirely if the device is off (or in the other profile) on the lockdown day ✅ FIXED
 * **Severity:** Medium
 * **Location:** [incubator_logic.cpp:111-117](egg_incubator_v2/incubator_logic.cpp#L111-L117) (`day == lockdownDay`), [task_incubator.cpp:329](egg_incubator_v2/task_incubator.cpp#L329)
 * **Root cause:** The milestone test uses exact equality on the day number, and the humidity raise happens only when the milestone task observes that day.
 * **Impact:** Power outage spanning day 18 (or the user browsing in climate profile, where `task_milestone` is suspended) → humidity is never raised for hatch. Turner stopping is independently safe (`turnerActive()` uses `day < lockdownDay`), but the humidity action is one-shot.
-* **Recommended fix:** Use `day >= lockdownDay && !lockdownApplied` (with `lockdownApplied` persisted/derived per batch) so the action is applied late rather than never.
+* **Fix applied:** In `checkMilestone()` (`incubator_logic.cpp`), changed `day == (int)lockdownDay` to `day >= (int)lockdownDay && day < (int)totalDays`. The function now returns `"LOCKDOWN"` for all post-lockdown days until hatch day, so `task_milestone` can apply the action even if the device boots days late. The existing `lockdownApplied` flag in `task_milestone` prevents double-application.
 
 ### BUG-012 — “Turn Now” does not turn now
 * **Severity:** Medium
