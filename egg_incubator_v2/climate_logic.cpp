@@ -35,6 +35,9 @@ bool cyclicInHeatPhase(uint32_t nowEpoch) {
         xSemaphoreGive(settingsMutex);
     }
 
+    // With an invalid epoch any subtraction underflows; hold heat phase as safe default.
+    if (!rtcEpochValid) return true;
+
     // Bootstrap: if no cycle start recorded, start now in heat phase
     if (cycleStart == 0) {
         if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
@@ -76,6 +79,8 @@ float getRampTargetTemp(uint32_t nowEpoch) {
     }
 
     if (stepCount == 0) return fallbackTemp;
+    // With an invalid epoch step advancement would fire immediately; hold current setpoint.
+    if (!rtcEpochValid) return fallbackTemp;
     if (stepIdx >= stepCount) {
         // Ramp finished — hold last step temperature
         return steps[stepCount - 1].targetTemp;

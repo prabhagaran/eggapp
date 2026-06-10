@@ -49,6 +49,7 @@ int calcIncubationDay(void) {
         nowEpoch = gRtcTime.epoch;
         xSemaphoreGive(rtcMutex);
     }
+    if (!rtcEpochValid) return 0;
     if (nowEpoch < startEpoch) return 1;
 
     return (int)((nowEpoch - startEpoch) / 86400UL) + 1;
@@ -91,6 +92,7 @@ bool checkMilestone(uint32_t nowEpoch, char* outLabel, size_t labelLen) {
         xSemaphoreGive(settingsMutex);
     }
     if (startEpoch == 0 || totalDays == 0) return false;
+    if (!rtcEpochValid) return false;
 
     EggType eggType = EGG_CHICKEN;
     if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
