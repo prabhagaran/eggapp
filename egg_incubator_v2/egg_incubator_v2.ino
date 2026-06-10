@@ -392,11 +392,18 @@ void setup() {
     Serial.println("[SETUP] All tasks started");
 
     // ── Task watchdog ────────────────────────────────────────────────────────
-    // Timeout must exceed the longest subscribed-task sleep with margin.
-    // Subscribed tasks: TempCtrl/ClimCtrl (500 ms loop), DHT (2 500 + 1 000 ms
-    // max = 3 500 ms), DS18B20 (800 + 1 000 ms = 1 800 ms). 10 s gives ≈ 2.8×
-    // margin over the DHT worst case. Long-sleep tasks (turner, pump, cloud)
-    // are intentionally NOT subscribed.
+    // Subscribed tasks: the ACTIVE profile's control task (500 ms loop),
+    // DHT (≤ 3 500 ms), DS18B20 (≤ 1 800 ms). 10 s gives ≈ 2.8× margin.
+    // Long-sleep tasks (turner, pump, cloud) are intentionally NOT subscribed.
+    //
+    // Control-task subscription is done here — AFTER the initial vTaskSuspend
+    // calls — so the inactive profile's task is never subscribed while frozen.
+    // Sensor tasks self-subscribe in their own preambles; they are never
+    // suspended by setup(), so that is safe.
+    //
+    // Profile-switch paths in the control tasks handle subscribe/unsubscribe
+    // dynamically: esp_task_wdt_delete(NULL) before vTaskSuspend(NULL) and
+    // esp_task_wdt_add(NULL) immediately after.
     //
     // On Arduino-ESP32 core ≥ 3.x (IDF v5) the TWDT is already initialised by
     // the framework; esp_task_wdt_init() returns ESP_ERR_INVALID_STATE in that
@@ -418,6 +425,15 @@ void setup() {
             Serial.println("[WDT] Initialised (10 s, panic on expire)");
         }
     }
+
+    // Subscribe the active profile's control task now that it is running and
+    // the inactive one has already been suspended.
+    if (p == PROFILE_EGG_INCUBATOR) {
+        if (hTaskTempControl != nullptr)    esp_task_wdt_add(hTaskTempControl);
+    } else {
+        if (hTaskClimateControl != nullptr) esp_task_wdt_add(hTaskClimateControl);
+    }
+    Serial.println("[WDT] Control task subscribed");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

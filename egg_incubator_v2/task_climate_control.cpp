@@ -22,7 +22,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 void task_climate_control(void* pvParameters) {
 
-    esp_task_wdt_add(NULL);   // subscribe to TWDT
+    // WDT subscription is done by setup() via esp_task_wdt_add(hTaskClimateControl)
+    // AFTER the initial profile-based vTaskSuspend calls, so we never subscribe
+    // while frozen (a suspended task cannot call reset()).
 
     static unsigned long lastSensorErrorMs = 0;
 
