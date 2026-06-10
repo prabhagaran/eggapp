@@ -101,12 +101,12 @@ However, the review found **2 Critical**, **7 High**, **12 Medium** and **9 Low*
   2. `task_milestone` (`task_incubator.cpp`): tracks `lastStartEpoch`; every iteration compares the current `gSettings.startEpoch` against it. When it changes (new batch), `lockdownApplied`, `lastCheckEpoch`, and `lastMilestoneEpoch` are all reset — the new batch gets a clean milestone slate and the lockdown humidity raise will fire correctly on its day 18.
   3. `lastMilestoneEpoch` promoted from `static` local to task-scope variable so the new-batch reset can reach it.
 
-### BUG-007 — `setRelay()` silently drops relay commands on mutex timeout
-* **Severity:** High
+### BUG-007 — `setRelay()` silently drops relay commands on mutex timeout ✅ FIXED
+* **Severity:** High → **Fixed** (2026-06-10)
 * **Location:** [globals.cpp:61-73](egg_incubator_v2/globals.cpp#L61-L73)
 * **Root cause:** If `controlMutex` is not obtained within 10 ms, the function returns **without performing the `digitalWrite` at all** — the GPIO write itself, which needs no lock (it is atomic on ESP32), is gated behind the lock that only protects the `gRelayState` mirror.
 * **Impact:** A safety-critical command — e.g. “heater OFF” from the over-temp latch path or the sensor-invalid gate — can be silently discarded under mutex contention. The fault latch then *believes* the heater is off while the relay stays energized; the latch path won’t retry the write because subsequent iterations short-circuit on `fault == true`… they do call `setRelay(false)` each 500 ms cycle, but each of those calls can also fail the same way under sustained contention, and `allRelaysOff()` inherits the same weakness for every channel.
-* **Recommended fix:** Always perform `digitalWrite(pin, …)` unconditionally first; take the mutex only to update the `gRelayState` mirror (and tolerate a missed mirror update or use atomics for the mirror). At minimum, log/push an error when the lock times out so a dropped command is observable.
+* **Fix applied:** `digitalWrite(pin, …)` moved outside and before the mutex block — it now executes unconditionally on every call. The mutex is taken only to update the `gRelayState` software mirror. On mutex timeout the GPIO write still went through; `pushError(“FAULT”, “setRelay: controlMutex timeout”)` makes the contention event visible in the error queue rather than silently swallowing it.
 
 ### BUG-008 — Profile-switch suspend timeout (35 s) is shorter than worst-case task blocking; old-profile tasks can overlap the new profile
 * **Severity:** High
