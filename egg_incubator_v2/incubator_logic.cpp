@@ -110,7 +110,7 @@ bool checkMilestone(uint32_t nowEpoch, char* outLabel, size_t labelLen) {
         snprintf(outLabel, labelLen, "Candle Day!");
         return true;
     }
-    if (day == (int)lockdownDay) {
+    if (day >= (int)lockdownDay && day < (int)totalDays) {
         snprintf(outLabel, labelLen, "LOCKDOWN");
         return true;
     }
