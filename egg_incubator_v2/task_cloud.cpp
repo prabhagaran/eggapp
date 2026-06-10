@@ -8,22 +8,31 @@
 #include <Arduino.h>
 
 // ─────────────────────────────────────────────────────────────────────────────
-// URL-encode a string (replaces all non-alphanumeric chars with %XX)
+// URL-encode src, appending result into dst (null-terminated, bounded by dstLen)
 // ─────────────────────────────────────────────────────────────────────────────
-static String urlEncode(const String& src) {
-    String encoded = "";
-    encoded.reserve(src.length() * 3);
-    for (size_t i = 0; i < src.length(); i++) {
-        char c = src[i];
+static void urlEncodeAppend(char* dst, size_t dstLen, const char* src) {
+    size_t pos = strlen(dst);
+    for (; *src; ++src) {
+        if (pos + 4 >= dstLen) break;
+        char c = *src;
         if (isAlphaNumeric(c) || c == '-' || c == '_' || c == '.' || c == '~') {
-            encoded += c;
+            dst[pos++] = c;
         } else {
-            char buf[4];
-            snprintf(buf, sizeof(buf), "%%%02X", (uint8_t)c);
-            encoded += buf;
+            snprintf(dst + pos, dstLen - pos, "%%%02X", (uint8_t)c);
+            pos += 3;
         }
     }
-    return encoded;
+    dst[pos] = '\0';
+}
+
+// Log a URL, redacting the token value so it never appears in serial output.
+static void logUrl(const char* prefix, const char* url) {
+    const char* tok = strstr(url, "&token=");
+    if (tok) {
+        Serial.printf("%s %.*s [token redacted]\n", prefix, (int)(tok - url), url);
+    } else {
+        Serial.printf("%s %s\n", prefix, url);
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -69,10 +78,9 @@ void task_cloud(void* pvParameters) {
             http.setTimeout(5000);
             http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
             http.begin(client, String(msg.url));
-            Serial.printf("[CLOUD] Retrying telemetry: %s (attempt %d)\n", msg.url, msg.attempts+1);
+            logUrl("[CLOUD] Retrying telemetry:", msg.url);
             int code = http.GET();
-            String body = "";
-            if (code > 0) body = http.getString();
+            if (code > 0) http.getString();  // drain
             http.end();
 
             if (code > 0) {
@@ -121,16 +129,17 @@ void task_cloud(void* pvParameters) {
                 xSemaphoreGive(settingsMutex);
             }
 
-            // Build URL for this error
-            String url = String(GOOGLE_SCRIPT_URL)
-                + "?id="      + String(DEVICE_ID)
-                + "&fw="      + String(FW_VERSION)
-                + "&profile=" + (errProf == PROFILE_EGG_INCUBATOR ? "EGG" : "CLIMATE")
-                + "&error="   + urlEncode(String(incomingErr.type))
-                + "&msg="     + urlEncode(String(incomingErr.message));
-
+            // Build error URL into a stack buffer — no heap String churn
+            char url[768];
+            snprintf(url, sizeof(url), "%s?id=%s&fw=%s&profile=%s&error=",
+                GOOGLE_SCRIPT_URL, DEVICE_ID, FW_VERSION,
+                errProf == PROFILE_EGG_INCUBATOR ? "EGG" : "CLIMATE");
+            urlEncodeAppend(url, sizeof(url), incomingErr.type);
+            strncat(url, "&msg=", sizeof(url) - strlen(url) - 1);
+            urlEncodeAppend(url, sizeof(url), incomingErr.message);
             if (strlen(CLOUD_TOKEN) > 0) {
-                url += "&token=" + urlEncode(String(CLOUD_TOKEN));
+                strncat(url, "&token=", sizeof(url) - strlen(url) - 1);
+                urlEncodeAppend(url, sizeof(url), CLOUD_TOKEN);
             }
 
             Serial.printf("[CLOUD] Error log: %s — %s\n", incomingErr.type, incomingErr.message);
@@ -146,25 +155,21 @@ void task_cloud(void* pvParameters) {
                 HTTPClient http;
                 http.setTimeout(5000);
                 http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
-                http.begin(client, url);
-                Serial.printf("[CLOUD] Request: %s (attempt 1)\n", url.c_str());
+                http.begin(client, String(url));
+                logUrl("[CLOUD] Request:", url);
                 int code = http.GET();
-                String body = "";
-                if (code > 0) body = http.getString();
-                http.end();
-
                 if (code > 0) {
+                    http.getString();  // drain body; response code is sufficient
                     Serial.printf("[CLOUD] Response code: %d\n", code);
-                    if (body.length() > 0) Serial.printf("[CLOUD] Body: %s\n", body.c_str());
                 } else {
                     Serial.printf("[CLOUD] HTTP failed: %s\n", http.errorToString(code).c_str());
-                    // Enqueue for retry
                     TelemetryMsg_t t = {};
-                    strncpy(t.url, url.c_str(), sizeof(t.url) - 1);
+                    strncpy(t.url, url, sizeof(t.url) - 1);
                     t.attempts = 1;
                     t.nextAttemptMs = millis() + CLOUD_HTTP_BACKOFF_MS;
                     xQueueSend(telemetryQueue, &t, 0);
                 }
+                http.end();
             }
 
             vTaskDelay(pdMS_TO_TICKS(500));  // brief gap between error sends
@@ -199,61 +204,57 @@ void task_cloud(void* pvParameters) {
         }
 
         // ── Validate sensor values ───────────────────────────────────────────
-        String tempStr = (temp < -100.0f || temp > 100.0f) ? "NA" : String(temp, 1);
-        String humStr  = (hum < 0.0f    || hum  > 100.0f) ? "NA" : String((int)hum);
+        char tempStr[8], humStr[8];
+        if (temp < -100.0f || temp > 100.0f) strcpy(tempStr, "NA");
+        else snprintf(tempStr, sizeof(tempStr), "%.1f", temp);
+        if (hum < 0.0f || hum > 100.0f) strcpy(humStr, "NA");
+        else snprintf(humStr, sizeof(humStr), "%d", (int)hum);
 
         // ── Incubation-specific data ─────────────────────────────────────────
-        int      day      = 0;
-        int      daysLeft = -1;
+        int      day       = 0;
+        int      daysLeft  = -1;
         uint32_t hatchEpoch = 0;
 
         if (prof == PROFILE_EGG_INCUBATOR) {
-            day       = calcIncubationDay();
-            daysLeft  = calcDaysLeft();
-            hatchEpoch= calcHatchEpoch();
+            day        = calcIncubationDay();
+            daysLeft   = calcDaysLeft();
+            hatchEpoch = calcHatchEpoch();
         }
 
-        // ── Climate phase label ──────────────────────────────────────────────
-        String phaseStr = "";
-        if (prof == PROFILE_CLIMATE_CHAMBER) {
-            if (rs.heaterOn)      phaseStr = "HEAT";
-            else if (rs.coolerOn) phaseStr = "COOL";
-            else                  phaseStr = "IDLE";
-        }
-
-        // ── Build telemetry URL ──────────────────────────────────────────────
-        String url = String(GOOGLE_SCRIPT_URL)
-            + "?id="       + String(DEVICE_ID)
-            + "&fw="       + String(FW_VERSION)
-            + "&profile="  + (prof == PROFILE_EGG_INCUBATOR ? "EGG" : "CLIMATE")
-            + "&temp="     + urlEncode(tempStr)
-            + "&hum="      + urlEncode(humStr)
-            + "&setTemp="  + String(tempSP, 1)
-            + "&setHum="   + String((int)humSP)
-            + "&mode="     + (ctrlMode == MODE_AUTO ? "AUTO" : "MANUAL")
-            + "&heater="   + (rs.heaterOn    ? "1" : "0")
-            + "&cooler="   + (rs.coolerOn    ? "1" : "0")
-            + "&humidifier="+(rs.humidifierOn ? "1" : "0")
-            + "&fan="      + (rs.fanOn       ? "1" : "0")
-            + "&pump="     + (rs.pumpOn      ? "1" : "0")
-            + "&turner="   + (rs.turnerOn    ? "1" : "0");
+        // ── Build telemetry URL into stack buffer — no heap String churn ─────
+        char url[768];
+        snprintf(url, sizeof(url),
+            "%s?id=%s&fw=%s&profile=%s&temp=%s&hum=%s"
+            "&setTemp=%.1f&setHum=%d&mode=%s"
+            "&heater=%d&cooler=%d&humidifier=%d&fan=%d&pump=%d&turner=%d",
+            GOOGLE_SCRIPT_URL, DEVICE_ID, FW_VERSION,
+            prof == PROFILE_EGG_INCUBATOR ? "EGG" : "CLIMATE",
+            tempStr, humStr,
+            tempSP, (int)humSP,
+            ctrlMode == MODE_AUTO ? "AUTO" : "MANUAL",
+            rs.heaterOn ? 1 : 0, rs.coolerOn ? 1 : 0,
+            rs.humidifierOn ? 1 : 0, rs.fanOn ? 1 : 0,
+            rs.pumpOn ? 1 : 0, rs.turnerOn ? 1 : 0);
 
         if (prof == PROFILE_EGG_INCUBATOR) {
-            url += "&day="        + String(day);
-            url += "&daysLeft="   + String(daysLeft);
-            url += "&hatchEpoch=" + String(hatchEpoch);
+            char extra[64];
+            snprintf(extra, sizeof(extra), "&day=%d&daysLeft=%d&hatchEpoch=%lu",
+                     day, daysLeft, (unsigned long)hatchEpoch);
+            strncat(url, extra, sizeof(url) - strlen(url) - 1);
         } else {
-            url += "&phase=" + urlEncode(phaseStr);
+            const char* phase = rs.heaterOn ? "HEAT" : rs.coolerOn ? "COOL" : "IDLE";
+            strncat(url, "&phase=", sizeof(url) - strlen(url) - 1);
+            urlEncodeAppend(url, sizeof(url), phase);
         }
 
         if (strlen(CLOUD_TOKEN) > 0) {
-            url += "&token=" + urlEncode(String(CLOUD_TOKEN));
+            strncat(url, "&token=", sizeof(url) - strlen(url) - 1);
+            urlEncodeAppend(url, sizeof(url), CLOUD_TOKEN);
         }
 
         // ── Send telemetry ───────────────────────────────────────────────────
-        Serial.println("[CLOUD] Sending telemetry...");
+        logUrl("[CLOUD] Sending telemetry:", url);
 
-        // Single-attempt send; on failure enqueue for retry
         {
             WiFiClientSecure client;
             if (strlen(CLOUD_ROOT_CA) > 10) {
@@ -264,25 +265,22 @@ void task_cloud(void* pvParameters) {
             HTTPClient http;
             http.setTimeout(5000);
             http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
-            http.begin(client, url);
-            Serial.printf("[CLOUD] Request: %s (attempt 1)\n", url.c_str());
+            http.begin(client, String(url));
             int code = http.GET();
-            String body = "";
-            if (code > 0) body = http.getString();
-            http.end();
-
             if (code > 0) {
+                http.getString();  // drain response body
                 Serial.printf("[CLOUD] HTTP %d\n", code);
-                if (code != 200) {
-                    if (millis() - lastHttpErrorMs > HTTP_ERROR_THROTTLE_MS) {
-                        pushError("SERVER_ERROR", ("HTTP " + String(code)).c_str());
-                        lastHttpErrorMs = millis();
-                    }
+                if (code != 200 && millis() - lastHttpErrorMs > HTTP_ERROR_THROTTLE_MS) {
+                    char errmsg[16];
+                    snprintf(errmsg, sizeof(errmsg), "HTTP %d", code);
+                    pushError("SERVER_ERROR", errmsg);
+                    lastHttpErrorMs = millis();
                 }
             } else {
-                Serial.printf("[CLOUD] HTTP failed: %s — enqueueing for retry\n", http.errorToString(code).c_str());
+                Serial.printf("[CLOUD] HTTP failed: %s — enqueueing for retry\n",
+                              http.errorToString(code).c_str());
                 TelemetryMsg_t t = {};
-                strncpy(t.url, url.c_str(), sizeof(t.url) - 1);
+                strncpy(t.url, url, sizeof(t.url) - 1);
                 t.attempts = 1;
                 t.nextAttemptMs = millis() + CLOUD_HTTP_BACKOFF_MS;
                 xQueueSend(telemetryQueue, &t, 0);
@@ -291,6 +289,7 @@ void task_cloud(void* pvParameters) {
                     lastHttpErrorMs = millis();
                 }
             }
+            http.end();
         }
 
         vTaskDelay(pdMS_TO_TICKS(CLOUD_TELEMETRY_INTERVAL_MS));
