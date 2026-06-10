@@ -1,6 +1,7 @@
 #include "task_sensors.h"
 #include "globals.h"
 #include "config.h"
+#include "esp_task_wdt.h"
 
 #include <DHT.h>
 #include <OneWire.h>
@@ -20,9 +21,13 @@ void task_ds18b20(void* pvParameters) {
     ds18b20.begin();
     ds18b20.setWaitForConversion(false);  // non-blocking conversion request
 
+    esp_task_wdt_add(NULL);   // subscribe to TWDT (max cycle ≈ 1 800 ms, well under 10 s)
+
     static unsigned long lastErrorMs = 0;
 
     for (;;) {
+        esp_task_wdt_reset();  // pet the watchdog at the top of every cycle
+
         // Request conversion
         ds18b20.requestTemperatures();
         vTaskDelay(pdMS_TO_TICKS(800));  // DS18B20 needs ~750 ms for 12-bit
@@ -76,14 +81,18 @@ void task_ds18b20(void* pvParameters) {
 // ─────────────────────────────────────────────────────────────────────────────
 void task_sensor(void* pvParameters) {
     dht.begin();
-    vTaskDelay(pdMS_TO_TICKS(2000)); // DHT11 warm-up after power-on / begin
+    vTaskDelay(pdMS_TO_TICKS(2000)); // DHT22 warm-up after power-on / begin
+
+    esp_task_wdt_add(NULL);   // subscribe to TWDT (max cycle ≈ 3 500 ms, under 10 s)
 
     float lastValidHum = 50.0f;  // safe default until first valid reading
     int consecutiveBad = 0;
     static unsigned long lastHumErrorMs = 0;
 
     for (;;) {
-        // DHT11 minimum sample period is 1 s (spec); 2.5 s is reliably safe.
+        esp_task_wdt_reset();  // pet the watchdog at the top of every cycle
+
+        // DHT22 minimum sample period is 1 s (spec); 2.5 s is reliably safe.
         // Delay at the top of the loop guarantees the gap is always honoured.
         vTaskDelay(pdMS_TO_TICKS(2500));
 

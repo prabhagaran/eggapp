@@ -391,14 +391,49 @@ void setup() {
 
     Serial.println("[SETUP] All tasks started");
 
-    // ── Task watchdog: 5 s timeout; panics on expire ─────────────────────────
-    // esp_task_wdt_init() API changed in IDF v5 (esp32 core ≥ 3.x) — needs config struct
+    // ── Task watchdog ────────────────────────────────────────────────────────
+    // Subscribed tasks: the ACTIVE profile's control task (500 ms loop),
+    // DHT (≤ 3 500 ms), DS18B20 (≤ 1 800 ms). 10 s gives ≈ 2.8× margin.
+    // Long-sleep tasks (turner, pump, cloud) are intentionally NOT subscribed.
+    //
+    // Control-task subscription is done here — AFTER the initial vTaskSuspend
+    // calls — so the inactive profile's task is never subscribed while frozen.
+    // Sensor tasks self-subscribe in their own preambles; they are never
+    // suspended by setup(), so that is safe.
+    //
+    // Profile-switch paths in the control tasks handle subscribe/unsubscribe
+    // dynamically: esp_task_wdt_delete(NULL) before vTaskSuspend(NULL) and
+    // esp_task_wdt_add(NULL) immediately after.
+    //
+    // On Arduino-ESP32 core ≥ 3.x (IDF v5) the TWDT is already initialised by
+    // the framework; esp_task_wdt_init() returns ESP_ERR_INVALID_STATE in that
+    // case — use esp_task_wdt_reconfigure() instead.
     const esp_task_wdt_config_t wdt_cfg = {
-        .timeout_ms    = 5000,
-        .idle_core_mask = 0,
+        .timeout_ms    = 10000,   // 10 s
+        .idle_core_mask = 0,      // do not watch idle tasks
         .trigger_panic  = true
     };
-    esp_task_wdt_init(&wdt_cfg);
+    {
+        esp_err_t wdt_err = esp_task_wdt_init(&wdt_cfg);
+        if (wdt_err == ESP_ERR_INVALID_STATE) {
+            // Already initialised by the Arduino framework — just reconfigure.
+            wdt_err = esp_task_wdt_reconfigure(&wdt_cfg);
+        }
+        if (wdt_err != ESP_OK) {
+            Serial.printf("[WDT] Init/reconfigure failed: %s\n", esp_err_to_name(wdt_err));
+        } else {
+            Serial.println("[WDT] Initialised (10 s, panic on expire)");
+        }
+    }
+
+    // Subscribe the active profile's control task now that it is running and
+    // the inactive one has already been suspended.
+    if (p == PROFILE_EGG_INCUBATOR) {
+        if (hTaskTempControl != nullptr)    esp_task_wdt_add(hTaskTempControl);
+    } else {
+        if (hTaskClimateControl != nullptr) esp_task_wdt_add(hTaskClimateControl);
+    }
+    Serial.println("[WDT] Control task subscribed");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
