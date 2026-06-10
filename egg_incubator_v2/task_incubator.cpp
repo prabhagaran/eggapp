@@ -31,7 +31,12 @@ void task_turner(void* pvParameters) {
         if (!turnerActive()) {
             // Past lockdown — keep relay off and wait
             setRelay(RELAY_TURNER, false);
-            vTaskDelay(pdMS_TO_TICKS(60000));  // check every minute
+            { uint32_t icmd = 0;
+              if (xTaskNotifyWait(0, 0xFFFFFFFFUL, &icmd, pdMS_TO_TICKS(60000)) == pdTRUE && icmd == TASK_CMD_SUSPEND) {
+                  xEventGroupSetBits(suspendAckGroup, TASK_SUSPEND_BIT_TURNER);
+                  vTaskSuspend(NULL);
+              }
+            }
             continue;
         }
 
@@ -54,7 +59,12 @@ void task_turner(void* pvParameters) {
 
         // Epoch must be sane before any subtraction; DS1307 reset returns year 2000.
         if (!rtcEpochValid) {
-            vTaskDelay(pdMS_TO_TICKS(10000));
+            { uint32_t icmd = 0;
+              if (xTaskNotifyWait(0, 0xFFFFFFFFUL, &icmd, pdMS_TO_TICKS(10000)) == pdTRUE && icmd == TASK_CMD_SUSPEND) {
+                  xEventGroupSetBits(suspendAckGroup, TASK_SUSPEND_BIT_TURNER);
+                  vTaskSuspend(NULL);
+              }
+            }
             continue;
         }
 
@@ -71,7 +81,12 @@ void task_turner(void* pvParameters) {
                 prefs.putULong("lastTurn", nowEpoch);
                 prefs.end();
             }
-            vTaskDelay(pdMS_TO_TICKS(30000));
+            { uint32_t icmd = 0;
+              if (xTaskNotifyWait(0, 0xFFFFFFFFUL, &icmd, pdMS_TO_TICKS(30000)) == pdTRUE && icmd == TASK_CMD_SUSPEND) {
+                  xEventGroupSetBits(suspendAckGroup, TASK_SUSPEND_BIT_TURNER);
+                  vTaskSuspend(NULL);
+              }
+            }
             continue;
         }
 
@@ -80,7 +95,15 @@ void task_turner(void* pvParameters) {
             Serial.printf("[TURNER] Turning eggs for %lu seconds\n", durationSec);
             setRelay(RELAY_TURNER, true);
 
-            vTaskDelay(pdMS_TO_TICKS(durationSec * 1000UL));
+            { uint32_t icmd = 0;
+              if (xTaskNotifyWait(0, 0xFFFFFFFFUL, &icmd, pdMS_TO_TICKS(durationSec * 1000UL)) == pdTRUE && icmd == TASK_CMD_SUSPEND) {
+                  // Profile switch mid-turn — stop motor and suspend immediately
+                  setRelay(RELAY_TURNER, false);
+                  xEventGroupSetBits(suspendAckGroup, TASK_SUSPEND_BIT_TURNER);
+                  vTaskSuspend(NULL);
+                  continue;  // restart loop on resume; lastTurnEpoch left unchanged so turn will re-run
+              }
+            }
 
             setRelay(RELAY_TURNER, false);
 
@@ -118,7 +141,12 @@ void task_turner(void* pvParameters) {
             Serial.println("[TURNER] Done");
         }
 
-        vTaskDelay(pdMS_TO_TICKS(10000));  // check every 10 seconds
+        { uint32_t icmd = 0;
+          if (xTaskNotifyWait(0, 0xFFFFFFFFUL, &icmd, pdMS_TO_TICKS(10000)) == pdTRUE && icmd == TASK_CMD_SUSPEND) {
+              xEventGroupSetBits(suspendAckGroup, TASK_SUSPEND_BIT_TURNER);
+              vTaskSuspend(NULL);
+          }
+        }
     }
 }
 
@@ -240,7 +268,12 @@ void task_pump(void* pvParameters) {
 
         // If humidity reading is not valid, skip pump logic to avoid acting on stale data
         if (!humValid) {
-            vTaskDelay(pdMS_TO_TICKS(30000));
+            { uint32_t icmd = 0;
+              if (xTaskNotifyWait(0, 0xFFFFFFFFUL, &icmd, pdMS_TO_TICKS(30000)) == pdTRUE && icmd == TASK_CMD_SUSPEND) {
+                  xEventGroupSetBits(suspendAckGroup, TASK_SUSPEND_BIT_PUMP);
+                  vTaskSuspend(NULL);
+              }
+            }
             continue;
         }
 
@@ -263,14 +296,27 @@ void task_pump(void* pvParameters) {
             Serial.printf("[PUMP] Low reservoir likely — running pump for %d s\n", pumpDurSec);
             setRelay(RELAY_PUMP, true);
 
-            vTaskDelay(pdMS_TO_TICKS((uint32_t)pumpDurSec * 1000UL));
+            { uint32_t icmd = 0;
+              if (xTaskNotifyWait(0, 0xFFFFFFFFUL, &icmd, pdMS_TO_TICKS((uint32_t)pumpDurSec * 1000UL)) == pdTRUE && icmd == TASK_CMD_SUSPEND) {
+                  // Profile switch mid-pump — stop pump and suspend immediately
+                  setRelay(RELAY_PUMP, false);
+                  xEventGroupSetBits(suspendAckGroup, TASK_SUSPEND_BIT_PUMP);
+                  vTaskSuspend(NULL);
+                  continue;
+              }
+            }
 
             setRelay(RELAY_PUMP, false);
             lastPumpMs = millis();
             Serial.println("[PUMP] Done");
         }
 
-        vTaskDelay(pdMS_TO_TICKS(30000));  // check every 30 seconds
+        { uint32_t icmd = 0;
+          if (xTaskNotifyWait(0, 0xFFFFFFFFUL, &icmd, pdMS_TO_TICKS(30000)) == pdTRUE && icmd == TASK_CMD_SUSPEND) {
+              xEventGroupSetBits(suspendAckGroup, TASK_SUSPEND_BIT_PUMP);
+              vTaskSuspend(NULL);
+          }
+        }
     }
 }
 

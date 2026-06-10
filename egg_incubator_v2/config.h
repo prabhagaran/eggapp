@@ -89,8 +89,9 @@
      TASK_SUSPEND_BIT_FAN       | TASK_SUSPEND_BIT_PUMP   | \
      TASK_SUSPEND_BIT_MILESTONE)
 #define TASK_SUSPEND_BITS_CLIMATE    (TASK_SUSPEND_BIT_CLIM_CTRL)
-// Must exceed the longest task sleep period (task_pump checks every 30 s)
-#define TASK_SUSPEND_TIMEOUT_MS      35000UL
+// All long delays in suspendable tasks are now interruptible via xTaskNotifyWait,
+// so tasks ack within milliseconds. 3 s is a generous safety net.
+#define TASK_SUSPEND_TIMEOUT_MS      3000UL
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DEFAULT SETPOINTS
