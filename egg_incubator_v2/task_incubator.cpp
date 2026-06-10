@@ -289,8 +289,10 @@ SemaphoreHandle_t milestoneMutex = nullptr;
 
 void task_milestone(void* pvParameters) {
 
-    uint32_t lastCheckEpoch = 0;
-    bool     lockdownApplied = false;
+    uint32_t lastCheckEpoch    = 0;
+    uint32_t lastStartEpoch    = 0;   // detect new batch
+    uint32_t lastMilestoneEpoch = 0;  // throttle cloud alerts (moved to task scope for batch reset)
+    bool     lockdownApplied   = false;
 
     for (;;) {
         // ── Safe self-suspend point (profile switch via task notification) ────
@@ -299,6 +301,22 @@ void task_milestone(void* pvParameters) {
               xEventGroupSetBits(suspendAckGroup, TASK_SUSPEND_BIT_MILESTONE);
               vTaskSuspend(NULL);
           }
+        }
+
+        // ── Detect new batch (startEpoch changed) and reset lockdown state ───
+        {
+            uint32_t curStart = 0;
+            if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+                curStart = gSettings.startEpoch;
+                xSemaphoreGive(settingsMutex);
+            }
+            if (curStart != 0 && curStart != lastStartEpoch) {
+                lastStartEpoch       = curStart;
+                lockdownApplied      = false;
+                lastCheckEpoch       = 0;   // re-check milestone soon
+                lastMilestoneEpoch   = 0;   // allow milestone alerts for new batch
+                Serial.println("[MILESTONE] New batch detected — lockdown state reset");
+            }
         }
 
         uint32_t nowEpoch = 0;
@@ -326,7 +344,6 @@ void task_milestone(void* pvParameters) {
             }
 
             // Push cloud alert (throttle: won't re-push same milestone for 23 hours)
-            static uint32_t lastMilestoneEpoch = 0;
             if ((nowEpoch - lastMilestoneEpoch) > (23UL * 3600UL)) {
                 pushError("MILESTONE", label);
                 lastMilestoneEpoch = nowEpoch;

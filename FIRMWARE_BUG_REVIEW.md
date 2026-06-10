@@ -91,12 +91,15 @@ However, the review found **2 Critical**, **7 High**, **12 Medium** and **9 Low*
   - `cyclicInHeatPhase` (`climate_logic.cpp`): returns `true` (heat phase) when epoch is invalid — the temperature setpoint still bounds the heater, avoiding runaway.
   - `getRampTargetTemp` (`climate_logic.cpp`): returns the current `tempSetpoint` when epoch is invalid — ramp step index is frozen, no premature advancement.
 
-### BUG-006 — Lockdown state is never reset: a second batch gets no turning and no lockdown
-* **Severity:** High
+### BUG-006 — Lockdown state is never reset: a second batch gets no turning and no lockdown ✅ FIXED
+* **Severity:** High → **Fixed** (2026-06-10)
 * **Location:** [task_incubator.cpp:284, 329-352](egg_incubator_v2/task_incubator.cpp#L284-L352) (`task_milestone`), start-date save at [task_ui.cpp:754-770](egg_incubator_v2/task_ui.cpp#L754-L770)
 * **Root cause:** On lockdown day `task_milestone` sets the function-local `lockdownApplied = true` and **suspends the turner task with `vTaskSuspend()`**. Neither is ever undone. Setting a new incubation start date only resets `startEpoch`/`lastTurnEpoch`; it does not resume `hTaskTurner` and cannot clear `lockdownApplied`. The turner is only ever resumed by a *profile switch* into the incubator profile.
 * **Impact:** A user who hatches a batch and starts a new one without rebooting gets: turner permanently suspended (eggs never turned → severely reduced hatch rate, discovered weeks later) and no lockdown humidity raise on day 18 of the new batch. Completely silent failure.
-* **Recommended fix:** When a new start date is saved (and on fresh-start detection), resume `hTaskTurner` if suspended and signal `task_milestone` to clear `lockdownApplied` (e.g. a “batch generation” counter in `gSettings` that the milestone task compares against). Also consider restoring the pre-lockdown humidity setpoint on new-batch start, since lockdown permanently overwrote `setHum` in NVS.
+* **Fix applied:**
+  1. `task_ui.cpp` (new-batch save path): calls `vTaskResume(hTaskTurner)` unconditionally after saving the new `startEpoch` — safe even if the turner was never suspended. Also restores `gSettings.humSetpoint` to the egg-type default (reversing the lockdown humidity raise) and persists the corrected `setHum` to NVS.
+  2. `task_milestone` (`task_incubator.cpp`): tracks `lastStartEpoch`; every iteration compares the current `gSettings.startEpoch` against it. When it changes (new batch), `lockdownApplied`, `lastCheckEpoch`, and `lastMilestoneEpoch` are all reset — the new batch gets a clean milestone slate and the lockdown humidity raise will fire correctly on its day 18.
+  3. `lastMilestoneEpoch` promoted from `static` local to task-scope variable so the new-batch reset can reach it.
 
 ### BUG-007 — `setRelay()` silently drops relay commands on mutex timeout
 * **Severity:** High
