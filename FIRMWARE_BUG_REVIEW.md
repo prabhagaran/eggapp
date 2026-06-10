@@ -159,12 +159,12 @@ However, the review found **2 Critical**, **7 High**, **12 Medium** and **9 Low*
 * **Fix applied:** Added `static uint8_t daysInMonth(int m, int y)` helper (leap-year aware) in `task_ui.cpp`. Both date editors now use it: day wraps at `daysInMonth(month, year)` instead of hardcoded 31; when month or year changes, day is clamped down if it exceeds the new month's limit. An additional defensive clamp is applied immediately before `DateTime` construction / `rtc.adjust()` on final save.
 * **Recommended fix:** Clamp day to days-in-month(month, year) whenever day/month/year changes, and validate before calling `unixtime()` / `rtc.adjust()`.
 
-### BUG-014 — WiFiManager object shared by two tasks without synchronization; `autoConnect()` blocks the UI task
+### BUG-014 — WiFiManager object shared by two tasks without synchronization; `autoConnect()` blocks the UI task ✅ FIXED
 * **Severity:** Medium
 * **Location:** [task_wifi_manager.cpp:11, 20-66, 102-118](egg_incubator_v2/task_wifi_manager.cpp#L11-L118); called from UI at [task_ui.cpp:1545-1556](egg_incubator_v2/task_ui.cpp#L1545-L1556)
 * **Root cause:** `wm.autoConnect()` / `wm.stopConfigPortal()` run in the **UI task** while `wm.process()` runs concurrently in the **wifi-manager task** (different core). WiFiManager is not thread-safe; portal start/stop races against `process()` (web-server teardown, internal state flags). `autoConnect()` also blocks the UI task for the duration of the station connect attempt (several seconds), and UI stack is only 6144 B for a WiFiManager call chain.
 * **Impact:** Sporadic crashes/heap corruption around connect/disconnect; frozen UI during connect; potential UI-task stack overflow.
-* **Recommended fix:** Make the wifi task the *sole* owner of `wm`; the UI should only post connect/disconnect requests (atomic flag or queue) that the wifi task executes. This also fixes the blocking and the stack concern.
+* **Fix applied:** Added module-private `std::atomic<int> wifiReqPending` in `task_wifi_manager.cpp`. `wifi_request_connect()` and `wifi_request_disconnect()` now only store a request value and return immediately — no `wm` calls from the UI task. At the top of each `task_wifi_manager` loop iteration, the request is consumed via `exchange()` and the actual `wm.autoConnect()` / `wm.stopConfigPortal()` / `WiFi.*` calls execute exclusively on Core 0 inside the wifi task.
 
 ### BUG-015 — Two independent reconnect drivers fight over the Wi-Fi stack
 * **Severity:** Medium
