@@ -173,6 +173,14 @@
 #define SENSOR_ERROR_THROTTLE_MS       60000UL   // min gap between same error pushes
 #define HTTP_ERROR_THROTTLE_MS        300000UL   // 5 minutes
 #define WIFI_PORTAL_TIMEOUT_SEC           180    // 3-minute WiFi config portal
+// Cross-sensor plausibility alarm (DHT22 vs DS18B20)
+#define SENSOR_PLAUSIBILITY_DELTA_C   5.0f    // alarm if |T_dht - T_ds18b20| exceeds this
+#define SENSOR_PLAUSIBILITY_HOLD_MS  300000UL // must persist 5 min before alarm fires
+
+// Heater max-on / no-temperature-rise watchdog
+#define HEATER_MAX_ON_MS         1800000UL // alarm if heater ON continuously > 30 min
+#define HEATER_RISE_THRESHOLD_C     0.5f   // expected rise over HEATER_MAX_ON_MS window
+
 #define NTP_SERVER                "pool.ntp.org"
 #define NTP_UTC_OFFSET_SEC        19800L          // UTC+5:30 (IST) — change to match your timezone
 

@@ -23,7 +23,12 @@ void task_temperature_control(void* pvParameters) {
     // AFTER the initial profile-based vTaskSuspend calls, so we never subscribe
     // while frozen (a suspended task cannot call reset()).
 
-    static unsigned long lastSensorErrorMs = 0;
+    static unsigned long lastSensorErrorMs    = 0;
+    static unsigned long lastPlausibilityMs   = 0;  // throttle cross-sensor alarm
+    static unsigned long plausibilityBadSince = 0;  // when divergence first detected
+    static unsigned long heaterOnSince        = 0;  // millis() when heater last turned ON
+    static float         tempAtHeaterOn       = 0.0f;
+    static unsigned long lastHeaterAlarmMs    = 0;  // throttle heater max-on alarm
 
     for (;;) {
 
@@ -47,11 +52,15 @@ void task_temperature_control(void* pvParameters) {
         bool  tempValid   = false;
 
         bool  humValid    = false;
+        float dhtTemp     = 0.0f;
+        bool  dhtTempValid = false;
         if (xSemaphoreTake(sensorMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-            currentTemp = gSensorData.temp_ds18b20;
-            currentHum  = gSensorData.humidity_dht;
-            tempValid   = gSensorData.temp_valid;
-            humValid    = gSensorData.hum_valid;
+            currentTemp  = gSensorData.temp_ds18b20;
+            currentHum   = gSensorData.humidity_dht;
+            tempValid    = gSensorData.temp_valid;
+            humValid     = gSensorData.hum_valid;
+            dhtTemp      = gSensorData.temp_dht;
+            dhtTempValid = gSensorData.dht_temp_valid;
             xSemaphoreGive(sensorMutex);
         }
 
@@ -158,6 +167,47 @@ void task_temperature_control(void* pvParameters) {
             } else if (humOn && currentHum >= (humSP + humHyst)) {
                 setRelay(RELAY_HUMIDIFIER, false);
                 Serial.printf("[CTRL] Humidifier OFF (%.0f / %.0f)\n", currentHum, humSP);
+            }
+        }
+
+        // ── 6. Cross-sensor plausibility (DHT22 vs DS18B20) ─────────────────
+        if (tempValid && dhtTempValid) {
+            float delta = currentTemp - dhtTemp;
+            if (delta < 0.0f) delta = -delta;
+            if (delta > SENSOR_PLAUSIBILITY_DELTA_C) {
+                if (plausibilityBadSince == 0) plausibilityBadSince = millis();
+                if ((millis() - plausibilityBadSince) >= SENSOR_PLAUSIBILITY_HOLD_MS &&
+                    (millis() - lastPlausibilityMs)   >= SENSOR_ERROR_THROTTLE_MS) {
+                    pushError("SENSOR_WARN", "DS18B20/DHT22 temp divergence");
+                    Serial.printf("[WARN] Temp divergence: DS18B20=%.1f DHT=%.1f\n", currentTemp, dhtTemp);
+                    lastPlausibilityMs = millis();
+                }
+            } else {
+                plausibilityBadSince = 0;  // reset timer on agreement
+            }
+        }
+
+        // ── 7. Heater max-on / no-temperature-rise watchdog ─────────────────
+        {
+            bool heaterNow = false;
+            if (xSemaphoreTake(controlMutex, pdMS_TO_TICKS(20)) == pdTRUE) {
+                heaterNow = gRelayState.heaterOn;
+                xSemaphoreGive(controlMutex);
+            }
+            if (heaterNow) {
+                if (heaterOnSince == 0) { heaterOnSince = millis(); tempAtHeaterOn = currentTemp; }
+                if ((millis() - heaterOnSince) >= HEATER_MAX_ON_MS && tempValid) {
+                    float rise = currentTemp - tempAtHeaterOn;
+                    if (rise < HEATER_RISE_THRESHOLD_C &&
+                        (millis() - lastHeaterAlarmMs) >= SENSOR_ERROR_THROTTLE_MS) {
+                        pushError("HEATER_WARN", "Heater ON >30 min, no temp rise");
+                        Serial.printf("[WARN] Heater on >30 min; rise=%.2f C (expected>%.1f)\n",
+                                      rise, HEATER_RISE_THRESHOLD_C);
+                        lastHeaterAlarmMs = millis();
+                    }
+                }
+            } else {
+                heaterOnSince = 0;
             }
         }
 
