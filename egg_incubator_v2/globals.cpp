@@ -59,8 +59,11 @@ void pushError(const char* type, const char* message) {
 // setRelay — single point of relay control; mirrors state into gRelayState
 // ─────────────────────────────────────────────────────────────────────────────
 void setRelay(uint8_t pin, bool on) {
+    // GPIO write is atomic on ESP32 — always execute it regardless of mutex state.
+    // The mutex only protects the gRelayState software mirror.
+    digitalWrite(pin, on ? RELAY_ON : RELAY_OFF);
+
     if (xSemaphoreTake(controlMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-        digitalWrite(pin, on ? RELAY_ON : RELAY_OFF);
         switch (pin) {
             case RELAY_HEATER:     gRelayState.heaterOn     = on; break;
             case RELAY_COOLER:     gRelayState.coolerOn     = on; break;
@@ -69,6 +72,8 @@ void setRelay(uint8_t pin, bool on) {
             case RELAY_TURNER:     gRelayState.turnerOn     = on; break;
         }
         xSemaphoreGive(controlMutex);
+    } else {
+        pushError("FAULT", "setRelay: controlMutex timeout");
     }
 }
 
