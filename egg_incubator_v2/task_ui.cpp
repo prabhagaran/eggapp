@@ -1838,7 +1838,9 @@ void task_ui(void* pvParameters) {
                 if (evt == UI_EVT_OK) {
                     // Write to DS1307 RTC (clamp day defensively before adjust)
                     if (tD > daysInMonth(tMo, tY)) tD = daysInMonth(tMo, tY);
-                    rtc.adjust(DateTime(tY, tMo, tD, tH, tM, tS));
+                    DateTime newDt(tY, tMo, tD, tH, tM, tS);
+                    rtc.adjust(newDt);
+                    clampEpochsToNow(newDt.unixtime());
                     Serial.printf("[RTC] Manually set to %04d-%02d-%02d %02d:%02d:%02d\n",
                                   tY, tMo, tD, tH, tM, tS);
                     uiState = UI_SYSTEM_MENU;

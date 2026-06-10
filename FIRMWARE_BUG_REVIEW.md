@@ -180,12 +180,12 @@ However, the review found **2 Critical**, **7 High**, **12 Medium** and **9 Low*
 * **Impact:** Buttons dead and home screen frozen during sync; wrong wall-clock for any user outside IST (affects fixed-schedule climate mode and displayed times).
 * **Fix applied:** Added `wifi_request_ntp_sync()` / `wifi_get_ntp_result()` to `task_wifi_manager`. The actual `configTime()` + `getLocalTime()` + `rtc.adjust()` now run exclusively inside `task_wifi_manager` on Core 0. The UI task posts the request, shows "Syncing...", then polls `wifi_get_ntp_result()` in 200 ms steps (up to 6 s total) — buttons remain responsive between polls and the UI task is never blocked for more than 200 ms at a time. The hardcoded `19800` is replaced by `NTP_UTC_OFFSET_SEC` and `NTP_SERVER` constants in `config.h`.
 
-### BUG-017 — Clock changes (manual set / NTP) are not reconciled with stored epochs
+### BUG-017 — Clock changes (manual set / NTP) are not reconciled with stored epochs ✅ FIXED
 * **Severity:** Medium
 * **Location:** `rtc.adjust()` call sites [task_ui.cpp:1737-1744, 1810](egg_incubator_v2/task_ui.cpp#L1737-L1810); consumers as in BUG-005
 * **Root cause:** After the RTC is set backwards, `lastTurnEpoch`, `cycleStartEpoch`, `rampStepStartEpoch` and `startEpoch` may lie in the future; unsigned `now - then` underflows.
 * **Impact:** Immediate spurious turner run, cyclic/ramp phase corruption, incubation day jumping (e.g. correcting a fast clock by 10 min mid-hatch triggers a turn).
-* **Recommended fix:** After any `rtc.adjust()`, clamp each stored epoch to `min(stored, newNow)`; gate all elapsed-time math with a `then <= now` check.
+* **Fix applied:** Added `clampEpochsToNow(uint32_t newNow)` in `globals.cpp` (declared in `globals.h`). It clamps `lastTurnEpoch`, `cycleStartEpoch`, and `rampStepStartEpoch` to `min(stored, newNow)` under `settingsMutex`, then persists the clamped values to NVS. `startEpoch` is intentionally left untouched — `calcIncubationDay()` already handles `nowEpoch < startEpoch`. Both `rtc.adjust()` call sites (manual set in `task_ui.cpp`; NTP in `task_wifi_manager.cpp`) now call `clampEpochsToNow()` immediately after.
 
 ### BUG-018 — Settings loaded from NVS are not range-validated
 * **Severity:** Medium

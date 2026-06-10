@@ -1,6 +1,7 @@
 #include "globals.h"
 #include "config.h"
 #include <Arduino.h>
+#include <Preferences.h>
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SHARED STATE
@@ -88,4 +89,34 @@ void allRelaysOff(void) {
     setFanSpeed(0);
     setRelay(RELAY_PUMP,       false);
     setRelay(RELAY_TURNER,     false);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// clampEpochsToNow — called after rtc.adjust() to prevent underflow when the
+// clock is set backwards.  Clamps lastTurnEpoch, cycleStartEpoch, and
+// rampStepStartEpoch to min(stored, newNow); startEpoch is intentionally left
+// untouched (calcIncubationDay already handles nowEpoch < startEpoch).
+// ─────────────────────────────────────────────────────────────────────────────
+void clampEpochsToNow(uint32_t newNow) {
+    if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        if (gSettings.lastTurnEpoch      > newNow) gSettings.lastTurnEpoch      = newNow;
+        if (gSettings.cycleStartEpoch    > newNow) gSettings.cycleStartEpoch    = newNow;
+        if (gSettings.rampStepStartEpoch > newNow) gSettings.rampStepStartEpoch = newNow;
+        xSemaphoreGive(settingsMutex);
+    }
+    // Persist the clamped values so they survive a reboot
+    Preferences p;
+    p.begin("incubator", false);
+    uint32_t lt = 0, cs = 0, rs = 0;
+    if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+        lt = gSettings.lastTurnEpoch;
+        cs = gSettings.cycleStartEpoch;
+        rs = gSettings.rampStepStartEpoch;
+        xSemaphoreGive(settingsMutex);
+    }
+    p.putULong("lastTurn",   lt);
+    p.putULong("cycleStart", cs);
+    p.putULong("rampStart",  rs);
+    p.end();
+    Serial.printf("[RTC] Epochs clamped to %lu after clock adjust\n", (unsigned long)newNow);
 }
