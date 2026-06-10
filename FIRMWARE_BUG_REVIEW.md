@@ -18,7 +18,7 @@ However, the review found **2 Critical**, **7 High**, **12 Medium** and **9 Low*
 
 1. ~~**The task watchdog protects nothing** — it is initialized but no task is subscribed and idle-task monitoring is masked off. A hung control task leaves the heater frozen in its last state with no recovery.~~ **✅ Fixed (BUG-001)**
 2. ~~**Fan output polarity is self-contradictory** for the declared active-LOW relay board — `setFanSpeed(0)` drives the pin LOW, which is `RELAY_ON` on that hardware; `allRelaysOff()` may therefore *energize* the fan channel.~~ **✅ Fixed (BUG-002)**
-3. **Humidity actuation never checks `hum_valid`** and operates on a fabricated 50 % default — a dead DHT22 can run the humidifier/pump logic on frozen data for the rest of the hatch.
+3. ~~**Humidity actuation never checks `hum_valid`** and operates on a fabricated 50 % default — a dead DHT22 can run the humidifier/pump logic on frozen data for the rest of the hatch.~~ **✅ Fixed (BUG-003)**
 4. **RTC epoch validity (`rtcEpochValid`) is computed but never enforced**, so all epoch-based logic (turner, cyclic phase, ramp, milestones) silently misbehaves after RTC battery loss (unsigned underflow).
 5. **GPIO12 (pump relay) is a strapping pin** — a relay board pull-up on it can prevent the ESP32 from booting at all.
 
@@ -61,12 +61,15 @@ However, the review found **2 Critical**, **7 High**, **12 Medium** and **9 Low*
 
 ## 3. High Findings
 
-### BUG-003 — Humidifier/pump logic acts on invalid and fabricated humidity data
-* **Severity:** High
+### BUG-003 — Humidifier/pump logic acts on invalid and fabricated humidity data ✅ FIXED
+* **Severity:** High → **Fixed** (2026-06-10)
 * **Location:** [task_sensors.cpp:81,103,123-127](egg_incubator_v2/task_sensors.cpp#L81-L127); consumers: [task_control.cpp:131-144](egg_incubator_v2/task_control.cpp#L131-L144), [task_climate_control.cpp:154-165](egg_incubator_v2/task_climate_control.cpp#L154-L165)
 * **Root cause:** Three compounding issues: (1) `lastValidHum` is initialized to a fabricated `50.0f` and is written into `gSensorData.humidity_dht` even when the read failed (“stale-hold”), (2) both control tasks read `humidity_dht` but **never check `hum_valid`**, and (3) there is no stale-age limit — the held value is served forever.
 * **Impact:** If the DHT22 dies (common failure mode in 60-75 %RH condensing incubator air), the humidifier hysteresis keeps switching on a frozen value indefinitely. Example: last valid reading 56 %, setpoint 70 % at lockdown → humidifier latched ON continuously for days → saturated chamber, drowned/late-drowned embryos, water spillage near mains wiring. Conversely a frozen high reading suppresses humidification entirely. The boot-time fabricated 50 % can also switch the humidifier before a single real reading exists. Note the pump task *does* check `hum_valid` ([task_incubator.cpp:234](egg_incubator_v2/task_incubator.cpp#L234)) — the inconsistency shows the gap is unintentional.
-* **Recommended fix:** Check `hum_valid` in both control tasks and force humidifier OFF when invalid (mirror the temperature gate). Track a `lastValidMs` timestamp; treat data older than e.g. 60 s as invalid even if `valid` was last set true. Never seed `humidity_dht` with a made-up constant — keep `hum_valid=false` until the first genuine reading.
+* **Fix applied:**
+  1. `task_sensors.cpp` — `lastValidHum` seed removed (`0.0f`, never written to shared state until a real read succeeds). Added `everHadValid` flag: on bad reads, `humidity_dht` is only updated with the stale value if a genuine reading has been obtained at least once; otherwise `hum_valid` is set `false` and `humidity_dht` is left untouched. On a good read, `hum_valid=true` is written immediately inside the valid branch.
+  2. `task_control.cpp` — reads `hum_valid` from the sensor mutex block; humidifier section wrapped in `if (!humValid) { setRelay(RELAY_HUMIDIFIER, false); } else { … }`.
+  3. `task_climate_control.cpp` — same gate applied to its humidifier section.
 
 ### BUG-004 — Pump relay on GPIO12 (strapping pin); turner on GPIO15 (strapping pin)
 * **Severity:** High

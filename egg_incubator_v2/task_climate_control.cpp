@@ -49,10 +49,12 @@ void task_climate_control(void* pvParameters) {
         float currentHum  = 0.0f;
         bool  tempValid   = false;
 
+        bool  humValid    = false;
         if (xSemaphoreTake(sensorMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
             currentTemp = gSensorData.temp_ds18b20;
             currentHum  = gSensorData.humidity_dht;
             tempValid   = gSensorData.temp_valid;
+            humValid    = gSensorData.hum_valid;
             xSemaphoreGive(sensorMutex);
         }
 
@@ -161,16 +163,20 @@ void task_climate_control(void* pvParameters) {
         }
 
         // ── 5. Humidifier control ────────────────────────────────────────────
-        bool humOn = false;
-        if (xSemaphoreTake(controlMutex, pdMS_TO_TICKS(20)) == pdTRUE) {
-            humOn = gRelayState.humidifierOn;
-            xSemaphoreGive(controlMutex);
-        }
-
-        if (!humOn && currentHum <= (humSP - humHyst)) {
-            setRelay(RELAY_HUMIDIFIER, true);
-        } else if (humOn && currentHum >= (humSP + humHyst)) {
+        if (!humValid) {
             setRelay(RELAY_HUMIDIFIER, false);
+        } else {
+            bool humOn = false;
+            if (xSemaphoreTake(controlMutex, pdMS_TO_TICKS(20)) == pdTRUE) {
+                humOn = gRelayState.humidifierOn;
+                xSemaphoreGive(controlMutex);
+            }
+
+            if (!humOn && currentHum <= (humSP - humHyst)) {
+                setRelay(RELAY_HUMIDIFIER, true);
+            } else if (humOn && currentHum >= (humSP + humHyst)) {
+                setRelay(RELAY_HUMIDIFIER, false);
+            }
         }
 
         vTaskDelay(pdMS_TO_TICKS(500));

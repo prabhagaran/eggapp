@@ -85,7 +85,8 @@ void task_sensor(void* pvParameters) {
 
     esp_task_wdt_add(NULL);   // subscribe to TWDT (max cycle ≈ 3 500 ms, under 10 s)
 
-    float lastValidHum = 50.0f;  // safe default until first valid reading
+    float lastValidHum = 0.0f;
+    bool  everHadValid = false;   // stays false until first genuine read
     int consecutiveBad = 0;
     static unsigned long lastHumErrorMs = 0;
 
@@ -103,16 +104,20 @@ void task_sensor(void* pvParameters) {
         else          Serial.printf("[DHT RAW] %.2f %%\n", h);
 #endif
 
-        bool valid = false;
-
         if (!isnan(h) && h >= 0.0f && h <= 100.0f) {
             float reportedHum = h + HUM_CALIB_OFFSET;
             if (reportedHum < 0.0f)   reportedHum = 0.0f;
             if (reportedHum > 100.0f) reportedHum = 100.0f;
             lastValidHum   = reportedHum;
-            valid          = true;
+            everHadValid   = true;
             consecutiveBad = 0;
             Serial.printf("[DHT] Humidity: %.1f %%\n", reportedHum);
+
+            if (xSemaphoreTake(sensorMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+                gSensorData.humidity_dht = lastValidHum;
+                gSensorData.hum_valid    = true;
+                xSemaphoreGive(sensorMutex);
+            }
         } else {
             ++consecutiveBad;
             Serial.println("[DHT] Bad reading — holding last value");
@@ -127,12 +132,17 @@ void task_sensor(void* pvParameters) {
                 pushError("SENSOR_ERROR", "DHT persistent failures");
                 lastHumErrorMs = millis();
             }
-        }
 
-        if (xSemaphoreTake(sensorMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-            gSensorData.humidity_dht = lastValidHum;
-            gSensorData.hum_valid    = valid;
-            xSemaphoreGive(sensorMutex);
+            if (xSemaphoreTake(sensorMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+                // Only hold a stale value if we ever had a real reading.
+                // Before the first valid read, keep hum_valid=false so
+                // consumers do not act on an uninitialised value.
+                if (everHadValid) {
+                    gSensorData.humidity_dht = lastValidHum;
+                }
+                gSensorData.hum_valid = false;
+                xSemaphoreGive(sensorMutex);
+            }
         }
     }
 }
