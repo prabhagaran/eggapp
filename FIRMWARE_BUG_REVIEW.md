@@ -187,12 +187,12 @@ However, the review found **2 Critical**, **7 High**, **12 Medium** and **9 Low*
 * **Impact:** Immediate spurious turner run, cyclic/ramp phase corruption, incubation day jumping (e.g. correcting a fast clock by 10 min mid-hatch triggers a turn).
 * **Fix applied:** Added `clampEpochsToNow(uint32_t newNow)` in `globals.cpp` (declared in `globals.h`). It clamps `lastTurnEpoch`, `cycleStartEpoch`, and `rampStepStartEpoch` to `min(stored, newNow)` under `settingsMutex`, then persists the clamped values to NVS. `startEpoch` is intentionally left untouched — `calcIncubationDay()` already handles `nowEpoch < startEpoch`. Both `rtc.adjust()` call sites (manual set in `task_ui.cpp`; NTP in `task_wifi_manager.cpp`) now call `clampEpochsToNow()` immediately after.
 
-### BUG-018 — Settings loaded from NVS are not range-validated
+### BUG-018 — Settings loaded from NVS are not range-validated ✅ FIXED
 * **Severity:** Medium
 * **Location:** [egg_incubator_v2.ino:35-88](egg_incubator_v2/egg_incubator_v2.ino#L35-L88) (`loadSettings`)
 * **Root cause:** Every value is trusted as stored. Enums are cast unchecked (`(EggType)prefs.getUInt(...)`), floats are not clamped to the documented editing limits, `totalDays`/`lockdownDay`/`turnerIntervalMin` = 0 or inconsistent (`lockdownDay > totalDays`) are accepted.
 * **Impact:** A corrupted or partially-written NVS (power loss during the ~38-key `saveSettings()` sequence, which is not atomic) yields out-of-range setpoints or division/modulo edge cases (`totalCycleSec == 0` is guarded, but e.g. `turnerIntervalMin = 0` → turner runs every 10 s poll; hysteresis 0 → relay chatter).
-* **Recommended fix:** Clamp every loaded value to its legal range (the limits already exist in `config.h`); validate enum values; treat invalid combinations by falling back to defaults and pushing an error.
+* **Fix applied:** Added a validation pass inside the `settingsMutex` block in `loadSettings()`. Enums are bounds-checked against their max values; floats are clamped using the existing `config.h` limits (`TEMP_SETPOINT_MIN/MAX`, `HUM_HYST_MIN/MAX`, etc.); `turnerIntervalMin` and `turnerDurationSec` are clamped to their UI-enforced min/max; `totalDays`/`lockdownDay` inconsistency is corrected; cyclic periods are guarded against zero; ramp index is bounds-checked. Any out-of-range value triggers `pushError("NVS_CORRUPT", …)` and a serial warning.
 
 ### BUG-019 — `switchProfile()` proceeds even when it failed to record the new profile
 * **Severity:** Medium
