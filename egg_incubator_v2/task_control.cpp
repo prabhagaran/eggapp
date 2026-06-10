@@ -18,16 +18,23 @@
 // ─────────────────────────────────────────────────────────────────────────────
 void task_temperature_control(void* pvParameters) {
 
+    esp_task_wdt_add(NULL);   // subscribe to TWDT
+
     static unsigned long lastSensorErrorMs = 0;
 
     for (;;) {
+
+        esp_task_wdt_reset();  // pet the watchdog at the top of every cycle
 
         // ── Safe self-suspend point (profile switch via task notification) ────
         // Called at loop top: no mutex is held here.
         { uint32_t cmd = 0;
           if (xTaskNotifyWait(0, 0xFFFFFFFFUL, &cmd, 0) == pdTRUE && cmd == TASK_CMD_SUSPEND) {
               xEventGroupSetBits(suspendAckGroup, TASK_SUSPEND_BIT_TEMP_CTRL);
+              esp_task_wdt_delete(NULL);  // unsubscribe: a suspended task cannot reset
               vTaskSuspend(NULL);
+              // ── resumed here by switchProfile() ──────────────────────────
+              esp_task_wdt_add(NULL);    // re-subscribe now that we are running again
           }
         }
 

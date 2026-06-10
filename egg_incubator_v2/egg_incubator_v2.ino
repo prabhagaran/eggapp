@@ -391,14 +391,33 @@ void setup() {
 
     Serial.println("[SETUP] All tasks started");
 
-    // ── Task watchdog: 5 s timeout; panics on expire ─────────────────────────
-    // esp_task_wdt_init() API changed in IDF v5 (esp32 core ≥ 3.x) — needs config struct
+    // ── Task watchdog ────────────────────────────────────────────────────────
+    // Timeout must exceed the longest subscribed-task sleep with margin.
+    // Subscribed tasks: TempCtrl/ClimCtrl (500 ms loop), DHT (2 500 + 1 000 ms
+    // max = 3 500 ms), DS18B20 (800 + 1 000 ms = 1 800 ms). 10 s gives ≈ 2.8×
+    // margin over the DHT worst case. Long-sleep tasks (turner, pump, cloud)
+    // are intentionally NOT subscribed.
+    //
+    // On Arduino-ESP32 core ≥ 3.x (IDF v5) the TWDT is already initialised by
+    // the framework; esp_task_wdt_init() returns ESP_ERR_INVALID_STATE in that
+    // case — use esp_task_wdt_reconfigure() instead.
     const esp_task_wdt_config_t wdt_cfg = {
-        .timeout_ms    = 5000,
-        .idle_core_mask = 0,
+        .timeout_ms    = 10000,   // 10 s
+        .idle_core_mask = 0,      // do not watch idle tasks
         .trigger_panic  = true
     };
-    esp_task_wdt_init(&wdt_cfg);
+    {
+        esp_err_t wdt_err = esp_task_wdt_init(&wdt_cfg);
+        if (wdt_err == ESP_ERR_INVALID_STATE) {
+            // Already initialised by the Arduino framework — just reconfigure.
+            wdt_err = esp_task_wdt_reconfigure(&wdt_cfg);
+        }
+        if (wdt_err != ESP_OK) {
+            Serial.printf("[WDT] Init/reconfigure failed: %s\n", esp_err_to_name(wdt_err));
+        } else {
+            Serial.println("[WDT] Initialised (10 s, panic on expire)");
+        }
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
