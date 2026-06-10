@@ -150,6 +150,16 @@ static void readSettings(float& tempSP, float& tempHyst,
     }
 }
 
+// Returns the number of days in a given month (1-12) for a given year.
+static uint8_t daysInMonth(int m, int y) {
+    if (m == 2) {
+        bool leap = (y % 4 == 0 && (y % 100 != 0 || y % 400 == 0));
+        return leap ? 29 : 28;
+    }
+    static const uint8_t dom[13] = {0,31,28,31,30,31,30,31,31,30,31,30,31};
+    return dom[m];
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // TASK: UI STATE MACHINE
 // ─────────────────────────────────────────────────────────────────────────────
@@ -741,21 +751,22 @@ void task_ui(void* pvParameters) {
             } else { // IM_EDIT
                 // UP/DOWN modify field
                 if (evt == UI_EVT_UP) {
-                    if (editField == 0) { editDay++;   if (editDay   > 31) editDay   = 1;  }
-                    else if (editField == 1) { editMonth++; if (editMonth > 12) editMonth = 1;  }
-                    else if (editField == 2) { editYear++;  if (editYear  > 2099) editYear = 2024; }
+                    if (editField == 0) { editDay++;   if (editDay   > (int)daysInMonth(editMonth, editYear)) editDay = 1; }
+                    else if (editField == 1) { editMonth++; if (editMonth > 12) editMonth = 1; if (editDay > (int)daysInMonth(editMonth, editYear)) editDay = daysInMonth(editMonth, editYear); }
+                    else if (editField == 2) { editYear++;  if (editYear  > 2099) editYear = 2024; if (editDay > (int)daysInMonth(editMonth, editYear)) editDay = daysInMonth(editMonth, editYear); }
                     oled_show_incubation_day_set(0, editDay, editMonth, editYear, true, editField);
                 } else if (evt == UI_EVT_DOWN) {
-                    if (editField == 0) { editDay--;   if (editDay   < 1)  editDay   = 31; }
-                    else if (editField == 1) { editMonth--; if (editMonth < 1)  editMonth = 12; }
-                    else if (editField == 2) { editYear--;  if (editYear  < 2020) editYear = 2099; }
+                    if (editField == 0) { editDay--;   if (editDay   < 1) editDay = daysInMonth(editMonth, editYear); }
+                    else if (editField == 1) { editMonth--; if (editMonth < 1) editMonth = 12; if (editDay > (int)daysInMonth(editMonth, editYear)) editDay = daysInMonth(editMonth, editYear); }
+                    else if (editField == 2) { editYear--;  if (editYear  < 2020) editYear = 2099; if (editDay > (int)daysInMonth(editMonth, editYear)) editDay = daysInMonth(editMonth, editYear); }
                     oled_show_incubation_day_set(0, editDay, editMonth, editYear, true, editField);
                 } else if (evt == UI_EVT_OK) {
                     editField++;
                     if (editField < 3) {
                         oled_show_incubation_day_set(0, editDay, editMonth, editYear, true, editField);
                     } else {
-                        // Final OK: save startEpoch and reset lastTurnEpoch
+                        // Final OK: clamp day then save startEpoch and reset lastTurnEpoch
+                        if (editDay > (int)daysInMonth(editMonth, editYear)) editDay = daysInMonth(editMonth, editYear);
                         DateTime startDate(editYear, editMonth, editDay, 0, 0, 0);
                         uint32_t newStart = startDate.unixtime();
 
@@ -1820,18 +1831,18 @@ void task_ui(void* pvParameters) {
                         case 0: tH  = (tH  + 1) % 24;                        break;
                         case 1: tM  = (tM  + 1) % 60;                        break;
                         case 2: tS  = (tS  + 1) % 60;                        break;
-                        case 3: tD  = (tD  % 31) + 1;                        break;  // 1-31
-                        case 4: tMo = (tMo % 12) + 1;                        break;  // 1-12
-                        case 5: tY  = min(2099, tY + 1);                     break;
+                        case 3: tD  = (tD % daysInMonth(tMo, tY)) + 1;       break;
+                        case 4: tMo = (tMo % 12) + 1; if (tD > daysInMonth(tMo, tY)) tD = daysInMonth(tMo, tY); break;
+                        case 5: tY  = min(2099, tY + 1); if (tD > daysInMonth(tMo, tY)) tD = daysInMonth(tMo, tY); break;
                     }
                 } else if (evt == UI_EVT_DOWN) {
                     switch (tEditField) {
                         case 0: tH  = (tH  - 1 + 24) % 24;                   break;
                         case 1: tM  = (tM  - 1 + 60) % 60;                   break;
                         case 2: tS  = (tS  - 1 + 60) % 60;                   break;
-                        case 3: tD  = ((tD  - 2 + 31) % 31) + 1;             break;
-                        case 4: tMo = ((tMo - 2 + 12) % 12) + 1;             break;
-                        case 5: tY  = max(2000, tY - 1);                     break;
+                        case 3: tD  = (tD <= 1) ? daysInMonth(tMo, tY) : tD - 1; break;
+                        case 4: tMo = (tMo <= 1) ? 12 : tMo - 1; if (tD > daysInMonth(tMo, tY)) tD = daysInMonth(tMo, tY); break;
+                        case 5: tY  = max(2000, tY - 1); if (tD > daysInMonth(tMo, tY)) tD = daysInMonth(tMo, tY); break;
                     }
                 } else if (evt == UI_EVT_OK) {
                     // advance to next field
@@ -1842,7 +1853,8 @@ void task_ui(void* pvParameters) {
             } else {
                 // field == 6: SAVE? prompt
                 if (evt == UI_EVT_OK) {
-                    // Write to DS1307 RTC
+                    // Write to DS1307 RTC (clamp day defensively before adjust)
+                    if (tD > daysInMonth(tMo, tY)) tD = daysInMonth(tMo, tY);
                     rtc.adjust(DateTime(tY, tMo, tD, tH, tM, tS));
                     Serial.printf("[RTC] Manually set to %04d-%02d-%02d %02d:%02d:%02d\n",
                                   tY, tMo, tD, tH, tM, tS);
