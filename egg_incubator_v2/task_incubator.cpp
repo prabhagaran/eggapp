@@ -52,6 +52,12 @@ void task_turner(void* pvParameters) {
             xSemaphoreGive(rtcMutex);
         }
 
+        // Epoch must be sane before any subtraction; DS1307 reset returns year 2000.
+        if (!rtcEpochValid) {
+            vTaskDelay(pdMS_TO_TICKS(10000));
+            continue;
+        }
+
         // Bootstrap: if never turned before, record now and wait full interval
         if (lastTurn == 0) {
             if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
@@ -301,8 +307,8 @@ void task_milestone(void* pvParameters) {
             xSemaphoreGive(rtcMutex);
         }
 
-        // Check once per minute (not every iteration)
-        if (nowEpoch == 0 || (nowEpoch - lastCheckEpoch) < 60) {
+        // Check once per minute (not every iteration); skip entirely if epoch is unreliable.
+        if (nowEpoch == 0 || !rtcEpochValid || (nowEpoch - lastCheckEpoch) < 60) {
             vTaskDelay(pdMS_TO_TICKS(30000));
             continue;
         }

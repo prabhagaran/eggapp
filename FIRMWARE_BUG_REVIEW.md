@@ -19,7 +19,7 @@ However, the review found **2 Critical**, **7 High**, **12 Medium** and **9 Low*
 1. ~~**The task watchdog protects nothing** — it is initialized but no task is subscribed and idle-task monitoring is masked off. A hung control task leaves the heater frozen in its last state with no recovery.~~ **✅ Fixed (BUG-001)**
 2. ~~**Fan output polarity is self-contradictory** for the declared active-LOW relay board — `setFanSpeed(0)` drives the pin LOW, which is `RELAY_ON` on that hardware; `allRelaysOff()` may therefore *energize* the fan channel.~~ **✅ Fixed (BUG-002)**
 3. ~~**Humidity actuation never checks `hum_valid`** and operates on a fabricated 50 % default — a dead DHT22 can run the humidifier/pump logic on frozen data for the rest of the hatch.~~ **✅ Fixed (BUG-003)**
-4. **RTC epoch validity (`rtcEpochValid`) is computed but never enforced**, so all epoch-based logic (turner, cyclic phase, ramp, milestones) silently misbehaves after RTC battery loss (unsigned underflow).
+4. ~~**RTC epoch validity (`rtcEpochValid`) is computed but never enforced**, so all epoch-based logic (turner, cyclic phase, ramp, milestones) silently misbehaves after RTC battery loss (unsigned underflow).~~ **✅ Fixed (BUG-005)**
 5. **GPIO12 (pump relay) is a strapping pin** — a relay board pull-up on it can prevent the ESP32 from booting at all.
 
 ### Severity Summary
@@ -78,12 +78,18 @@ However, the review found **2 Critical**, **7 High**, **12 Medium** and **9 Low*
 * **Impact:** Device may fail to boot at all once the relay board is connected, or boot intermittently depending on relay board input circuit — a “works on bench, dead in field” failure. After any watchdog/brownout reset mid-incubation, a non-booting controller means no heat at all.
 * **Recommended fix:** Move the pump relay to a safe GPIO (e.g. 16, 17, 19, 23). If the PCB is already committed, burn the flash-voltage eFuse (`espefuse.py set_flash_voltage 3.3V`) to make GPIO12 strapping irrelevant, and verify GPIO15 boot behavior with the actual relay board attached.
 
-### BUG-005 — `rtcEpochValid` is computed but never enforced; epoch math underflows after RTC failure
-* **Severity:** High
+### BUG-005 — `rtcEpochValid` is computed but never enforced; epoch math underflows after RTC failure ✅ FIXED
+* **Severity:** High → **Fixed** (2026-06-10)
 * **Location:** Flag set in [task_rtc.cpp:24-32](egg_incubator_v2/task_rtc.cpp#L24-L32); never read anywhere. Consumers at risk: [task_incubator.cpp:72](egg_incubator_v2/task_incubator.cpp#L72) (turner), [climate_logic.cpp:57](egg_incubator_v2/climate_logic.cpp#L57) (cyclic), [climate_logic.cpp:103](egg_incubator_v2/climate_logic.cpp#L103) (ramp), [incubator_logic.cpp:101](egg_incubator_v2/incubator_logic.cpp#L101) (milestones)
 * **Root cause:** When the DS1307 loses battery backup it resets to year 2000 (epoch ≈ 9.47×10⁸). `task_rtc` correctly detects this and sets `rtcEpochValid = false` — but no control logic checks the flag. All elapsed-time computations use unsigned arithmetic: `(nowEpoch - lastTurn)` with `lastTurn` from 2026 and `nowEpoch` from 2000 underflows to ≈ 4.2×10⁹ s.
 * **Impact:** Turner fires immediately and then corrupts `lastTurnEpoch` (persisted to NVS) with a year-2000 value; cyclic heat/cool phase and ramp-step advancement jump arbitrarily; incubation day / milestone calculations go wrong. The same hazard occurs transiently whenever the user sets the clock backwards (manual edit or NTP).
-* **Recommended fix:** Gate every epoch-dependent action on `rtcEpochValid` (skip the cycle and keep outputs in their safe state, exactly like the temperature-invalid gate). After any RTC adjust (manual/NTP), re-baseline stored epochs (`lastTurnEpoch`, `cycleStartEpoch`, `rampStepStartEpoch`) if they are in the future relative to the new time.
+* **Fix applied:** `rtcEpochValid` is now checked at every epoch-dependent entry point before any subtraction is attempted:
+  - `task_turner` (`task_incubator.cpp`): after reading `nowEpoch`, `if (!rtcEpochValid)` skips the entire turn decision and delays 10 s — no underflow, no spurious turn, no NVS corruption.
+  - `task_milestone` (`task_incubator.cpp`): guard extended to `nowEpoch == 0 || !rtcEpochValid` — milestone and lockdown logic is skipped entirely until the epoch is sane.
+  - `calcIncubationDay` (`incubator_logic.cpp`): returns `0` (not started) when epoch is invalid.
+  - `checkMilestone` (`incubator_logic.cpp`): returns `false` when epoch is invalid.
+  - `cyclicInHeatPhase` (`climate_logic.cpp`): returns `true` (heat phase) when epoch is invalid — the temperature setpoint still bounds the heater, avoiding runaway.
+  - `getRampTargetTemp` (`climate_logic.cpp`): returns the current `tempSetpoint` when epoch is invalid — ramp step index is frozen, no premature advancement.
 
 ### BUG-006 — Lockdown state is never reset: a second batch gets no turning and no lockdown
 * **Severity:** High
