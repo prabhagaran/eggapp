@@ -17,9 +17,10 @@ SemaphoreHandle_t sensorMutex   = nullptr;
 SemaphoreHandle_t rtcMutex      = nullptr;
 SemaphoreHandle_t controlMutex  = nullptr;
 SemaphoreHandle_t settingsMutex = nullptr;
-QueueHandle_t     uiEventQueue  = nullptr;
-QueueHandle_t     errorQueue    = nullptr;
-QueueHandle_t     telemetryQueue = nullptr;
+QueueHandle_t      uiEventQueue   = nullptr;
+QueueHandle_t      errorQueue     = nullptr;
+QueueHandle_t      telemetryQueue = nullptr;
+EventGroupHandle_t suspendAckGroup = nullptr;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FAULT STATE — written/read under faultMux critical section
@@ -58,15 +59,14 @@ void pushError(const char* type, const char* message) {
 // setRelay — single point of relay control; mirrors state into gRelayState
 // ─────────────────────────────────────────────────────────────────────────────
 void setRelay(uint8_t pin, bool on) {
-    digitalWrite(pin, on ? RELAY_ON : RELAY_OFF);
-
     if (xSemaphoreTake(controlMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+        digitalWrite(pin, on ? RELAY_ON : RELAY_OFF);
         switch (pin) {
-            case RELAY_HEATER:     gRelayState.heaterOn    = on; break;
-            case RELAY_COOLER:     gRelayState.coolerOn    = on; break;
-            case RELAY_HUMIDIFIER: gRelayState.humidifierOn= on; break;
-            case RELAY_PUMP:       gRelayState.pumpOn      = on; break;
-            case RELAY_TURNER:     gRelayState.turnerOn    = on; break;
+            case RELAY_HEATER:     gRelayState.heaterOn     = on; break;
+            case RELAY_COOLER:     gRelayState.coolerOn     = on; break;
+            case RELAY_HUMIDIFIER: gRelayState.humidifierOn = on; break;
+            case RELAY_PUMP:       gRelayState.pumpOn       = on; break;
+            case RELAY_TURNER:     gRelayState.turnerOn     = on; break;
         }
         xSemaphoreGive(controlMutex);
     }

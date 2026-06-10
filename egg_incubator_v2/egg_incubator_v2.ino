@@ -164,17 +164,20 @@ void factoryReset(void) {
 // switchProfile — safe profile switch using task-notification based suspend
 //
 // Each suspendable task checks for TASK_CMD_SUSPEND at the TOP of its loop
-// (outside any mutex/critical-section), then calls vTaskSuspend(NULL) itself.
-// This eliminates the M-6 deadlock risk caused by direct vTaskSuspend() while
-// a task might be mid-critical-section.
+// (outside any mutex/critical-section), sets its ack bit in suspendAckGroup,
+// then calls vTaskSuspend(NULL) itself.
 //
 // Flow:
 //   1. allRelaysOff() — safe hardware state immediately
 //   2. Persist new profile to gSettings
-//   3. Notify only the tasks that need to be suspended (not all tasks)
-//   4. vTaskDelay(200 ms) — window for tasks to reach their safe suspend point
-//   5. Resume the tasks that belong to the new profile, after clearing any
-//      stale TASK_CMD_SUSPEND notification so they don't re-suspend instantly
+//   3. For each outgoing task that is currently running (not already suspended
+//      e.g. turner suspended by lockdown): send TASK_CMD_SUSPEND and add its
+//      bit to the wait mask. Already-suspended tasks are skipped.
+//   4. xEventGroupWaitBits() — block until every notified task has acked
+//      (i.e. set its bit just before vTaskSuspend). Timeout after
+//      TASK_SUSPEND_TIMEOUT_MS (35 s > longest task sleep of 30 s).
+//   5. Resume the tasks that belong to the new profile, clearing any stale
+//      TASK_CMD_SUSPEND notification so they don't re-suspend instantly.
 // ─────────────────────────────────────────────────────────────────────────────
 void switchProfile(ProfileType newProfile) {
     allRelaysOff();
@@ -186,12 +189,23 @@ void switchProfile(ProfileType newProfile) {
     }
 
     if (newProfile == PROFILE_EGG_INCUBATOR) {
-        // Request climate control task to self-suspend at its next safe point
-        if (hTaskClimateControl != nullptr)
+        // Only notify the climate task if it is actually running
+        EventBits_t waitBits = 0;
+        xEventGroupClearBits(suspendAckGroup, TASK_SUSPEND_BITS_CLIMATE);
+        if (hTaskClimateControl != nullptr &&
+            eTaskGetState(hTaskClimateControl) != eSuspended) {
             xTaskNotify(hTaskClimateControl, TASK_CMD_SUSPEND, eSetValueWithOverwrite);
+            waitBits |= TASK_SUSPEND_BIT_CLIM_CTRL;
+        }
 
-        // Give the task time to reach the top-of-loop safe suspend check
-        vTaskDelay(pdMS_TO_TICKS(200));
+        if (waitBits) {
+            EventBits_t got = xEventGroupWaitBits(
+                suspendAckGroup, waitBits,
+                pdTRUE, pdTRUE,
+                pdMS_TO_TICKS(TASK_SUSPEND_TIMEOUT_MS));
+            if ((got & waitBits) != waitBits)
+                Serial.println("[SYSTEM] WARNING: climate task did not ack suspend in time");
+        }
 
         // Resume incubator tasks — clear any stale TASK_CMD_SUSPEND notification
         // before resuming so they do not immediately re-suspend themselves
@@ -207,15 +221,44 @@ void switchProfile(ProfileType newProfile) {
         Serial.println("[PROFILE] Switched to Egg Incubator");
 
     } else {
-        // Request incubator tasks to self-suspend at their next safe points
-        if (hTaskTempControl != nullptr) xTaskNotify(hTaskTempControl,  TASK_CMD_SUSPEND, eSetValueWithOverwrite);
-        if (hTaskTurner      != nullptr) xTaskNotify(hTaskTurner,       TASK_CMD_SUSPEND, eSetValueWithOverwrite);
-        if (hTaskFan         != nullptr) xTaskNotify(hTaskFan,          TASK_CMD_SUSPEND, eSetValueWithOverwrite);
-        if (hTaskPump        != nullptr) xTaskNotify(hTaskPump,         TASK_CMD_SUSPEND, eSetValueWithOverwrite);
-        if (hTaskMilestone   != nullptr) xTaskNotify(hTaskMilestone,    TASK_CMD_SUSPEND, eSetValueWithOverwrite);
+        // Build wait mask — skip tasks already suspended (e.g. turner at lockdown)
+        EventBits_t waitBits = 0;
+        xEventGroupClearBits(suspendAckGroup, TASK_SUSPEND_BITS_INCUBATOR);
 
-        // Give tasks time to reach their top-of-loop safe suspend checks
-        vTaskDelay(pdMS_TO_TICKS(200));
+        if (hTaskTempControl != nullptr &&
+            eTaskGetState(hTaskTempControl) != eSuspended) {
+            xTaskNotify(hTaskTempControl, TASK_CMD_SUSPEND, eSetValueWithOverwrite);
+            waitBits |= TASK_SUSPEND_BIT_TEMP_CTRL;
+        }
+        if (hTaskTurner != nullptr &&
+            eTaskGetState(hTaskTurner) != eSuspended) {
+            xTaskNotify(hTaskTurner, TASK_CMD_SUSPEND, eSetValueWithOverwrite);
+            waitBits |= TASK_SUSPEND_BIT_TURNER;
+        }
+        if (hTaskFan != nullptr &&
+            eTaskGetState(hTaskFan) != eSuspended) {
+            xTaskNotify(hTaskFan, TASK_CMD_SUSPEND, eSetValueWithOverwrite);
+            waitBits |= TASK_SUSPEND_BIT_FAN;
+        }
+        if (hTaskPump != nullptr &&
+            eTaskGetState(hTaskPump) != eSuspended) {
+            xTaskNotify(hTaskPump, TASK_CMD_SUSPEND, eSetValueWithOverwrite);
+            waitBits |= TASK_SUSPEND_BIT_PUMP;
+        }
+        if (hTaskMilestone != nullptr &&
+            eTaskGetState(hTaskMilestone) != eSuspended) {
+            xTaskNotify(hTaskMilestone, TASK_CMD_SUSPEND, eSetValueWithOverwrite);
+            waitBits |= TASK_SUSPEND_BIT_MILESTONE;
+        }
+
+        if (waitBits) {
+            EventBits_t got = xEventGroupWaitBits(
+                suspendAckGroup, waitBits,
+                pdTRUE, pdTRUE,
+                pdMS_TO_TICKS(TASK_SUSPEND_TIMEOUT_MS));
+            if ((got & waitBits) != waitBits)
+                Serial.println("[SYSTEM] WARNING: not all incubator tasks acked suspend in time");
+        }
 
         // Resume climate task — clear any stale notification first
         if (hTaskClimateControl != nullptr) {
@@ -270,7 +313,8 @@ void setup() {
     milestoneMutex = xSemaphoreCreateMutex();
     uiEventQueue  = xQueueCreate(UI_EVENT_QUEUE_SIZE,  sizeof(UiEvent));
     errorQueue    = xQueueCreate(ERROR_QUEUE_SIZE, sizeof(ErrorMsg_t));
-    telemetryQueue = xQueueCreate(TELEMETRY_QUEUE_SIZE, sizeof(TelemetryMsg_t));
+    telemetryQueue  = xQueueCreate(TELEMETRY_QUEUE_SIZE, sizeof(TelemetryMsg_t));
+    suspendAckGroup = xEventGroupCreate();
 
     // ── Load settings from NVS ───────────────────────────────────────────────
     loadSettings();
