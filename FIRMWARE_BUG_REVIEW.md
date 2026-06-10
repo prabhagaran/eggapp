@@ -151,11 +151,12 @@ However, the review found **2 Critical**, **7 High**, **12 Medium** and **9 Low*
 * **Impact:** The user-visible function does the opposite of its label — instead of an immediate turn, it postpones the next turn by up to 12 h. Misleading during setup/testing and for manual extra turns.
 * **Fix applied:** In the “Turn Now” OK handler (`task_ui.cpp`), reads `nowEpoch` from `rtcMutex` and `intervalSec` from `settingsMutex`, then sets `lastTurnEpoch = nowEp - intervalSec`. The turner's next 10-s poll sees elapsed ≥ interval and fires immediately. The `0` bootstrap path is no longer triggered.
 
-### BUG-013 — Date editor accepts impossible dates (e.g. 31 Feb); no day/month cross-validation
+### BUG-013 — Date editor accepts impossible dates (e.g. 31 Feb); no day/month cross-validation ✅ FIXED
 * **Severity:** Medium
 * **Location:** Incubation start editor [task_ui.cpp:739-756](egg_incubator_v2/task_ui.cpp#L739-L756); RTC manual edit [task_ui.cpp:1787-1810](egg_incubator_v2/task_ui.cpp#L1787-L1810)
 * **Root cause:** Day rolls 1-31 regardless of month/year. `DateTime(2026, 2, 31, …)` is undefined in RTClib (no validation) and `unixtime()` returns a wrong epoch; `rtc.adjust()` writes the invalid date into the DS1307, which may then increment nonsensically.
 * **Impact:** Wrong `startEpoch` → wrong incubation day, milestones and hatch date; corrupted RTC calendar after manual set.
+* **Fix applied:** Added `static uint8_t daysInMonth(int m, int y)` helper (leap-year aware) in `task_ui.cpp`. Both date editors now use it: day wraps at `daysInMonth(month, year)` instead of hardcoded 31; when month or year changes, day is clamped down if it exceeds the new month's limit. An additional defensive clamp is applied immediately before `DateTime` construction / `rtc.adjust()` on final save.
 * **Recommended fix:** Clamp day to days-in-month(month, year) whenever day/month/year changes, and validate before calling `unixtime()` / `rtc.adjust()`.
 
 ### BUG-014 — WiFiManager object shared by two tasks without synchronization; `autoConnect()` blocks the UI task
