@@ -754,18 +754,41 @@ void task_ui(void* pvParameters) {
                         // Final OK: save startEpoch and reset lastTurnEpoch
                         DateTime startDate(editYear, editMonth, editDay, 0, 0, 0);
                         uint32_t newStart = startDate.unixtime();
+
+                        // Restore humidity to egg-type default (lockdown may have raised it).
+                        float defaultHum = DEFAULT_HUM_SETPOINT;
+                        EggType curEggType = EGG_CHICKEN;
                         if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
-                            gSettings.startEpoch = newStart;
+                            curEggType = gSettings.eggType;
+                            xSemaphoreGive(settingsMutex);
+                        }
+                        switch (curEggType) {
+                            case EGG_DUCK:  defaultHum = DUCK_DEFAULT_HUM;   break;
+                            case EGG_QUAIL: defaultHum = QUAIL_DEFAULT_HUM;  break;
+                            default:        defaultHum = CHICKEN_DEFAULT_HUM; break;
+                        }
+
+                        if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+                            gSettings.startEpoch    = newStart;
                             gSettings.lastTurnEpoch = 0;
+                            gSettings.humSetpoint   = defaultHum;
                             xSemaphoreGive(settingsMutex);
                         }
 
-                        // Persist only the startEpoch and lastTurn keys to NVS
+                        // Resume the turner in case it was suspended for lockdown.
+                        // vTaskResume is a no-op if the task is not suspended.
+                        if (hTaskTurner != nullptr) {
+                            vTaskResume(hTaskTurner);
+                            Serial.println("[BATCH] Turner resumed for new batch");
+                        }
+
+                        // Persist only the startEpoch, lastTurn and setHum keys to NVS
                         {
                             Preferences prefs;
                             prefs.begin("incubator", false);
                             prefs.putULong("startEpoch", newStart);
                             prefs.putULong("lastTurn", 0);
+                            prefs.putFloat("setHum", defaultHum);
                             prefs.end();
                         }
 
