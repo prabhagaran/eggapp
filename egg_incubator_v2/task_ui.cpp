@@ -910,8 +910,17 @@ void task_ui(void* pvParameters) {
                 }
                 if (evt == UI_EVT_OK) {
                     if (editTurnNow) {
+                        // Set lastTurnEpoch one full interval in the past so the turner
+                        // fires on its next 10-s poll, rather than treating 0 as bootstrap.
+                        uint32_t nowEp  = 0;
+                        uint32_t intSec = 0;
+                        if (xSemaphoreTake(rtcMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+                            nowEp = gRtcTime.epoch;
+                            xSemaphoreGive(rtcMutex);
+                        }
                         if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
-                            gSettings.lastTurnEpoch = 0;
+                            intSec = (uint32_t)gSettings.turnerIntervalMin * 60UL;
+                            gSettings.lastTurnEpoch = (nowEp > intSec) ? (nowEp - intSec) : 0;
                             xSemaphoreGive(settingsMutex);
                         }
                         saveSettings();

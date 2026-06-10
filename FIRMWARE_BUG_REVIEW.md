@@ -144,12 +144,12 @@ However, the review found **2 Critical**, **7 High**, **12 Medium** and **9 Low*
 * **Impact:** Power outage spanning day 18 (or the user browsing in climate profile, where `task_milestone` is suspended) → humidity is never raised for hatch. Turner stopping is independently safe (`turnerActive()` uses `day < lockdownDay`), but the humidity action is one-shot.
 * **Fix applied:** In `checkMilestone()` (`incubator_logic.cpp`), changed `day == (int)lockdownDay` to `day >= (int)lockdownDay && day < (int)totalDays`. The function now returns `"LOCKDOWN"` for all post-lockdown days until hatch day, so `task_milestone` can apply the action even if the device boots days late. The existing `lockdownApplied` flag in `task_milestone` prevents double-application.
 
-### BUG-012 — “Turn Now” does not turn now
+### BUG-012 — “Turn Now” does not turn now ✅ FIXED
 * **Severity:** Medium
 * **Location:** [task_ui.cpp:884-891](egg_incubator_v2/task_ui.cpp#L884-L891); turner bootstrap [task_incubator.cpp:56-70](egg_incubator_v2/task_incubator.cpp#L56-L70)
 * **Root cause:** The UI implements “Turn Now” by setting `lastTurnEpoch = 0`. But the turner task treats `lastTurn == 0` as *bootstrap*: it records the current epoch and waits a **full interval** before the first turn.
 * **Impact:** The user-visible function does the opposite of its label — instead of an immediate turn, it postpones the next turn by up to 12 h. Misleading during setup/testing and for manual extra turns.
-* **Recommended fix:** Use a dedicated “turn requested” flag/notification to the turner task, or set `lastTurnEpoch = nowEpoch - intervalSec` so the next 10-s poll triggers a turn.
+* **Fix applied:** In the “Turn Now” OK handler (`task_ui.cpp`), reads `nowEpoch` from `rtcMutex` and `intervalSec` from `settingsMutex`, then sets `lastTurnEpoch = nowEp - intervalSec`. The turner's next 10-s poll sees elapsed ≥ interval and fires immediately. The `0` bootstrap path is no longer triggered.
 
 ### BUG-013 — Date editor accepts impossible dates (e.g. 31 Feb); no day/month cross-validation
 * **Severity:** Medium
