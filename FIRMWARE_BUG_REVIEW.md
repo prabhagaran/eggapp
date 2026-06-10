@@ -173,12 +173,12 @@ However, the review found **2 Critical**, **7 High**, **12 Medium** and **9 Low*
 * **Impact:** Overlapping reconnect attempts can repeatedly abort each other’s association, lengthening outages and adding log noise; harder to reason about Wi-Fi state.
 * **Fix applied:** Removed `WiFi.reconnect()` from `task_cloud`. The cloud task now only observes `WiFi.status()` and waits 5 s before retrying its own work — all reconnect policy is centralized in `task_wifi_manager`.
 
-### BUG-016 — NTP sync blocks the UI for up to ~7 s; timezone hardcoded to UTC+5:30
+### BUG-016 — NTP sync blocks the UI for up to ~7 s; timezone hardcoded to UTC+5:30 ✅ FIXED
 * **Severity:** Medium
 * **Location:** [task_ui.cpp:1728-1761](egg_incubator_v2/task_ui.cpp#L1728-L1761)
 * **Root cause:** `getLocalTime(&timeinfo, 5000)` plus a 2-s result screen run inline in the UI event handler; `configTime(19800, 0, …)` hardcodes IST with no DST/config option.
 * **Impact:** Buttons dead and home screen frozen during sync; wrong wall-clock for any user outside IST (affects fixed-schedule climate mode and displayed times).
-* **Recommended fix:** Run the sync in the wifi/cloud task and report back via a flag; make the UTC offset a setting.
+* **Fix applied:** Added `wifi_request_ntp_sync()` / `wifi_get_ntp_result()` to `task_wifi_manager`. The actual `configTime()` + `getLocalTime()` + `rtc.adjust()` now run exclusively inside `task_wifi_manager` on Core 0. The UI task posts the request, shows "Syncing...", then polls `wifi_get_ntp_result()` in 200 ms steps (up to 6 s total) — buttons remain responsive between polls and the UI task is never blocked for more than 200 ms at a time. The hardcoded `19800` is replaced by `NTP_UTC_OFFSET_SEC` and `NTP_SERVER` constants in `config.h`.
 
 ### BUG-017 — Clock changes (manual set / NTP) are not reconciled with stored epochs
 * **Severity:** Medium

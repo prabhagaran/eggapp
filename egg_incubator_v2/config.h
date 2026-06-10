@@ -173,6 +173,8 @@
 #define SENSOR_ERROR_THROTTLE_MS       60000UL   // min gap between same error pushes
 #define HTTP_ERROR_THROTTLE_MS        300000UL   // 5 minutes
 #define WIFI_PORTAL_TIMEOUT_SEC           180    // 3-minute WiFi config portal
+#define NTP_SERVER                "pool.ntp.org"
+#define NTP_UTC_OFFSET_SEC        19800L          // UTC+5:30 (IST) — change to match your timezone
 
 #define ERROR_QUEUE_SIZE               20
 #define UI_EVENT_QUEUE_SIZE            10
