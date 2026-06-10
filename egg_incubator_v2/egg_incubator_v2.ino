@@ -248,10 +248,13 @@ void switchProfile(ProfileType newProfile) {
     allRelaysOff();
     Serial.println("[SYSTEM] Profile switch requested — notifying tasks");
 
-    if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-        gSettings.activeProfile = newProfile;
-        xSemaphoreGive(settingsMutex);
+    if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+        Serial.println("[SYSTEM] ERROR: switchProfile — settingsMutex timeout; switch aborted");
+        pushError("FAULT", "switchProfile: mutex timeout — profile NOT switched");
+        return;
     }
+    gSettings.activeProfile = newProfile;
+    xSemaphoreGive(settingsMutex);
 
     if (newProfile == PROFILE_EGG_INCUBATOR) {
         // Only notify the climate task if it is actually running
