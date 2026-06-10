@@ -70,6 +70,29 @@
 #define TASK_CMD_SUSPEND      0xA5A5UL
 
 // ─────────────────────────────────────────────────────────────────────────────
+// TASK SUSPEND ACKNOWLEDGEMENT BITS  (EventGroup — F-01 fix)
+//
+// Each suspendable task sets its bit in suspendAckGroup just before calling
+// vTaskSuspend(NULL). switchProfile() waits on the required bits instead of a
+// fixed delay, eliminating the race where the newly-resumed profile tasks could
+// overlap with outgoing tasks that have not yet self-suspended.
+// ─────────────────────────────────────────────────────────────────────────────
+#define TASK_SUSPEND_BIT_TEMP_CTRL   (1UL << 0)
+#define TASK_SUSPEND_BIT_CLIM_CTRL   (1UL << 1)
+#define TASK_SUSPEND_BIT_TURNER      (1UL << 2)
+#define TASK_SUSPEND_BIT_FAN         (1UL << 3)
+#define TASK_SUSPEND_BIT_PUMP        (1UL << 4)
+#define TASK_SUSPEND_BIT_MILESTONE   (1UL << 5)
+// Combined masks — one per switch direction
+#define TASK_SUSPEND_BITS_INCUBATOR \
+    (TASK_SUSPEND_BIT_TEMP_CTRL | TASK_SUSPEND_BIT_TURNER | \
+     TASK_SUSPEND_BIT_FAN       | TASK_SUSPEND_BIT_PUMP   | \
+     TASK_SUSPEND_BIT_MILESTONE)
+#define TASK_SUSPEND_BITS_CLIMATE    (TASK_SUSPEND_BIT_CLIM_CTRL)
+// Must exceed the longest task sleep period (task_pump checks every 30 s)
+#define TASK_SUSPEND_TIMEOUT_MS      35000UL
+
+// ─────────────────────────────────────────────────────────────────────────────
 // DEFAULT SETPOINTS
 // ─────────────────────────────────────────────────────────────────────────────
 #define DEFAULT_TEMP_SETPOINT     37.5f

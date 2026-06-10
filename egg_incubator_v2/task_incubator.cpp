@@ -22,8 +22,11 @@ void task_turner(void* pvParameters) {
 
         // ── Safe self-suspend point (profile switch via task notification) ────
         { uint32_t cmd = 0;
-          if (xTaskNotifyWait(0, 0xFFFFFFFFUL, &cmd, 0) == pdTRUE && cmd == TASK_CMD_SUSPEND)
-              vTaskSuspend(NULL); }
+          if (xTaskNotifyWait(0, 0xFFFFFFFFUL, &cmd, 0) == pdTRUE && cmd == TASK_CMD_SUSPEND) {
+              xEventGroupSetBits(suspendAckGroup, TASK_SUSPEND_BIT_TURNER);
+              vTaskSuspend(NULL);
+          }
+        }
 
         if (!turnerActive()) {
             // Past lockdown — keep relay off and wait
@@ -127,8 +130,11 @@ void task_fan(void* pvParameters) {
     for (;;) {
         // ── Safe self-suspend point (profile switch via task notification) ────
         { uint32_t cmd = 0;
-          if (xTaskNotifyWait(0, 0xFFFFFFFFUL, &cmd, 0) == pdTRUE && cmd == TASK_CMD_SUSPEND)
-              vTaskSuspend(NULL); }
+          if (xTaskNotifyWait(0, 0xFFFFFFFFUL, &cmd, 0) == pdTRUE && cmd == TASK_CMD_SUSPEND) {
+              xEventGroupSetBits(suspendAckGroup, TASK_SUSPEND_BIT_FAN);
+              vTaskSuspend(NULL);
+          }
+        }
 
         uint8_t speed = 0;
         ProfileType profile = PROFILE_EGG_INCUBATOR;
@@ -210,8 +216,11 @@ void task_pump(void* pvParameters) {
     for (;;) {
         // ── Safe self-suspend point (profile switch via task notification) ────
         { uint32_t cmd = 0;
-          if (xTaskNotifyWait(0, 0xFFFFFFFFUL, &cmd, 0) == pdTRUE && cmd == TASK_CMD_SUSPEND)
-              vTaskSuspend(NULL); }
+          if (xTaskNotifyWait(0, 0xFFFFFFFFUL, &cmd, 0) == pdTRUE && cmd == TASK_CMD_SUSPEND) {
+              xEventGroupSetBits(suspendAckGroup, TASK_SUSPEND_BIT_PUMP);
+              vTaskSuspend(NULL);
+          }
+        }
 
         float currentHum = 0.0f;
         bool  humValid   = false;
@@ -278,8 +287,11 @@ void task_milestone(void* pvParameters) {
     for (;;) {
         // ── Safe self-suspend point (profile switch via task notification) ────
         { uint32_t cmd = 0;
-          if (xTaskNotifyWait(0, 0xFFFFFFFFUL, &cmd, 0) == pdTRUE && cmd == TASK_CMD_SUSPEND)
-              vTaskSuspend(NULL); }
+          if (xTaskNotifyWait(0, 0xFFFFFFFFUL, &cmd, 0) == pdTRUE && cmd == TASK_CMD_SUSPEND) {
+              xEventGroupSetBits(suspendAckGroup, TASK_SUSPEND_BIT_MILESTONE);
+              vTaskSuspend(NULL);
+          }
+        }
 
         uint32_t nowEpoch = 0;
         if (xSemaphoreTake(rtcMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
@@ -323,15 +335,17 @@ void task_milestone(void* pvParameters) {
                     Serial.println("[MILESTONE] Turner suspended for lockdown");
                 }
 
+                float humToSave = 0.0f;
                 if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
                     gSettings.humSetpoint = gSettings.lockdownHumidity;
+                    humToSave = gSettings.humSetpoint;  // snapshot before release
                     xSemaphoreGive(settingsMutex);
                 }
                 // Persist only the humidity setpoint to NVS so lockdown survives power cycles
                 {
                     Preferences prefs;
                     prefs.begin("incubator", false);
-                    prefs.putFloat("setHum", gSettings.humSetpoint);
+                    prefs.putFloat("setHum", humToSave);
                     prefs.end();
                 }
                 Serial.println("[MILESTONE] Humidity raised for lockdown");

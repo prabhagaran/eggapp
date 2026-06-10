@@ -5,6 +5,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include <freertos/queue.h>
+#include <freertos/event_groups.h>
 #include "RTClib.h"
 #include "config.h"
 #include <atomic>
@@ -255,7 +256,8 @@ extern TaskHandle_t hTaskPump;
 extern TaskHandle_t hTaskMilestone;
 extern TaskHandle_t hTaskTempControl;
 extern TaskHandle_t hTaskClimateControl;
-extern SemaphoreHandle_t milestoneMutex;  // guards gMilestoneLabel; created in setup()
+extern SemaphoreHandle_t  milestoneMutex;   // guards gMilestoneLabel; created in setup()
+extern EventGroupHandle_t suspendAckGroup;  // task suspend ack bits — F-01 fix
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPER: push an error onto errorQueue (safe from any task)

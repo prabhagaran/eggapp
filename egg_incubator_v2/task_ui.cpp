@@ -215,9 +215,13 @@ void task_ui(void* pvParameters) {
                         xSemaphoreGive(settingsMutex);
                     }
                     if (climMode == CLIMATE_FIXED_SCHEDULE) {
-                        snprintf(phase, sizeof(phase), rs.heaterOn ? "HEAT" : "COOL");
+                        if      (rs.heaterOn) snprintf(phase, sizeof(phase), "HEAT");
+                        else if (rs.coolerOn) snprintf(phase, sizeof(phase), "COOL");
+                        else                  snprintf(phase, sizeof(phase), "IDLE");
                     } else if (climMode == CLIMATE_CYCLIC) {
-                        snprintf(phase, sizeof(phase), rs.heaterOn ? "HEAT" : "COOL");
+                        if      (rs.heaterOn) snprintf(phase, sizeof(phase), "HEAT");
+                        else if (rs.coolerOn) snprintf(phase, sizeof(phase), "COOL");
+                        else                  snprintf(phase, sizeof(phase), "IDLE");
                     } else {
                         uint8_t si = 0;
                         if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(20)) == pdTRUE) {
