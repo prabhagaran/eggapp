@@ -23,3 +23,9 @@ void wifi_request_connect(void);
 
 // Called from UI when user navigates Settings → WiFi → Disconnect
 void wifi_request_disconnect(void);
+
+// Post an NTP sync request; wifi task executes it and updates the RTC.
+void wifi_request_ntp_sync(void);
+
+// Poll result: 0=pending, 1=success, 2=timeout, 3=no WiFi
+int wifi_get_ntp_result(void);

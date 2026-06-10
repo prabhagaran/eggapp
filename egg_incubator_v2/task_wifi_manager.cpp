@@ -5,6 +5,10 @@
 #include <WiFiManager.h>
 #include <Arduino.h>
 #include <atomic>
+#include <time.h>
+#include "RTClib.h"
+
+extern RTC_DS1307 rtc;  // defined in egg_incubator_v2.ino
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Module-private state — only task_wifi_manager touches wm directly.
@@ -15,7 +19,11 @@ static WiFiManager wm;
 static constexpr int WIFI_REQ_NONE       = 0;
 static constexpr int WIFI_REQ_CONNECT    = 1;
 static constexpr int WIFI_REQ_DISCONNECT = 2;
+static constexpr int WIFI_REQ_NTP        = 3;
 static std::atomic<int> wifiReqPending{WIFI_REQ_NONE};
+
+// NTP result: 0=idle/pending, 1=success, 2=timeout, 3=no WiFi
+static std::atomic<int> ntpSyncResult{0};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // wifi_request_connect / wifi_request_disconnect
@@ -29,6 +37,16 @@ void wifi_request_connect(void) {
 
 void wifi_request_disconnect(void) {
     wifiReqPending.store(WIFI_REQ_DISCONNECT, std::memory_order_release);
+}
+
+void wifi_request_ntp_sync(void) {
+    ntpSyncResult.store(0, std::memory_order_release);  // clear previous result
+    wifiReqPending.store(WIFI_REQ_NTP, std::memory_order_release);
+}
+
+// Returns 0=pending, 1=success, 2=timeout, 3=no WiFi
+int wifi_get_ntp_result(void) {
+    return ntpSyncResult.load(std::memory_order_acquire);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -84,6 +102,26 @@ void task_wifi_manager(void* pvParameters) {
                 wifiUserEnabled.store(true, std::memory_order_release);
                 wifiPortalActive.store(true, std::memory_order_release);
                 Serial.println("[WIFI] Portal open: join 'INCUBATOR_SETUP' to configure");
+            }
+        } else if (req == WIFI_REQ_NTP) {
+            if (WiFi.status() != WL_CONNECTED) {
+                ntpSyncResult.store(3, std::memory_order_release);
+                Serial.println("[NTP] WiFi not connected");
+            } else {
+                configTime(NTP_UTC_OFFSET_SEC, 0, NTP_SERVER);
+                struct tm timeinfo;
+                if (getLocalTime(&timeinfo, 5000)) {
+                    rtc.adjust(DateTime(
+                        timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
+                        timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec));
+                    Serial.printf("[NTP] RTC updated: %04d-%02d-%02d %02d:%02d:%02d\n",
+                        timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
+                        timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+                    ntpSyncResult.store(1, std::memory_order_release);
+                } else {
+                    Serial.println("[NTP] getLocalTime timed out");
+                    ntpSyncResult.store(2, std::memory_order_release);
+                }
             }
         } else if (req == WIFI_REQ_DISCONNECT) {
             wifiUserEnabled.store(false, std::memory_order_release);

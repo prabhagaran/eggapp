@@ -1773,35 +1773,18 @@ void task_ui(void* pvParameters) {
                     oled_show_time_edit(tEditField, tH, tM, tS, tD, tMo, tY);
 
                 } else if (timeDateMenuIdx == 1) {
-                    // WIFI SYNC: attempt NTP and stay in sync-result screen
+                    // WIFI SYNC: post request to wifi task (non-blocking); poll for result.
+                    wifi_request_ntp_sync();
                     oled_show_time_wifi_sync(0);  // "Syncing Time..."
-                    int syncResult = 2;
-                    if (WiFi.status() == WL_CONNECTED) {
-                        configTime(19800, 0, "pool.ntp.org");
-                        struct tm timeinfo;
-                        // getLocalTime is RTOS-aware (uses sntp internal semaphore)
-                        if (getLocalTime(&timeinfo, 5000)) {
-                            rtc.adjust(DateTime(
-                                timeinfo.tm_year + 1900,
-                                timeinfo.tm_mon  + 1,
-                                timeinfo.tm_mday,
-                                timeinfo.tm_hour,
-                                timeinfo.tm_min,
-                                timeinfo.tm_sec
-                            ));
-                            Serial.printf("[NTP] RTC updated: %04d-%02d-%02d %02d:%02d:%02d\n",
-                                timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
-                                timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
-                            syncResult = 1;  // success
-                        } else {
-                            Serial.println("[NTP] getLocalTime timed out");
-                        }
-                    } else {
-                        Serial.println("[NTP] WiFi not connected");
+                    // Poll up to ~6 s in 200 ms steps so UI task is not blocked.
+                    int syncResult = 0;
+                    for (int i = 0; i < 30 && syncResult == 0; i++) {
+                        vTaskDelay(pdMS_TO_TICKS(200));
+                        syncResult = wifi_get_ntp_result();
                     }
+                    if (syncResult == 0) syncResult = 2;  // treat still-pending as timeout
                     oled_show_time_wifi_sync(syncResult);
-                    // Display result for ~2 seconds using RTOS-aware delay
-                    vTaskDelay(pdMS_TO_TICKS(2000));
+                    vTaskDelay(pdMS_TO_TICKS(1500));
                     uiState = UI_SYSTEM_MENU;
                     lastMenuIdx = -1;
                     oled_show_system_menu(sysMenuIdx, sysMenuTop);
