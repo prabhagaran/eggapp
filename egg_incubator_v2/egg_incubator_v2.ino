@@ -82,6 +82,14 @@ void loadSettings(void) {
         xSemaphoreGive(settingsMutex);
     }
 
+    // Restore over-temperature fault latch — survives power loss / WDT reboot
+    if (prefs.getBool("otFault", false)) {
+        portENTER_CRITICAL(&faultMux);
+        overTempFault = true;
+        portEXIT_CRITICAL(&faultMux);
+        Serial.println("[NVS] Over-temp fault latch restored — hold OK 3 s to clear");
+    }
+
     prefs.end();
     Serial.println("[NVS] Settings loaded");
     Serial.printf("[NVS] startEpoch loaded = %lu\n", (unsigned long)gSettings.startEpoch);

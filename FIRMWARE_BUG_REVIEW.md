@@ -130,12 +130,12 @@ However, the review found **2 Critical**, **7 High**, **12 Medium** and **9 Low*
 
 ## 4. Medium Findings
 
-### BUG-010 — Over-temperature fault latch is not persisted across reboot
+### BUG-010 — Over-temperature fault latch is not persisted across reboot ✅ FIXED
 * **Severity:** Medium
 * **Location:** [globals.cpp:28](egg_incubator_v2/globals.cpp#L28), [task_control.cpp:74-86](egg_incubator_v2/task_control.cpp#L74-L86)
 * **Root cause:** `overTempFault` lives only in RAM. A power blip (or the panic-reboot the WDT would cause once BUG-001 is fixed) clears the latch.
 * **Impact:** A genuine over-temp event followed by a brownout silently re-enables the heater with no operator acknowledgment — defeats the purpose of a *latched* fault.
-* **Recommended fix:** Persist the fault flag (and cause) to NVS when latched; on boot, restore the latched state and require the same 3-s OK hold to clear. Clear the NVS flag only on manual reset.
+* **Fix applied:** NVS key `"otFault"` (namespace `"incubator"`) now tracks the latch. On detection in `task_control.cpp` and `task_climate_control.cpp`, `putBool("otFault", true)` is written immediately after setting `overTempFault`. `loadSettings()` in `egg_incubator_v2.ino` reads the key on boot and restores `overTempFault` under `faultMux`. On the 3-s OK hold clear in `task_buttons.cpp`, `putBool("otFault", false)` clears the NVS flag. Each write uses a short-lived local `Preferences` instance to avoid cross-task sharing of the global `prefs` object.
 
 ### BUG-011 — Lockdown is missed entirely if the device is off (or in the other profile) on the lockdown day
 * **Severity:** Medium
