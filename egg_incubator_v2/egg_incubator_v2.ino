@@ -35,6 +35,8 @@ Preferences prefs;
 void loadSettings(void) {
     prefs.begin("incubator", true);  // read-only
 
+    bool nvsBad = false;
+
     if (xSemaphoreTake(settingsMutex, portMAX_DELAY) == pdTRUE) {
 
         gSettings.activeProfile       = (ProfileType)prefs.getUInt("profile",   PROFILE_EGG_INCUBATOR);
@@ -79,7 +81,62 @@ void loadSettings(void) {
             gSettings.rampSteps[i].targetTemp  = prefs.getFloat(kt, DEFAULT_TEMP_SETPOINT);
         }
 
+        // ── Range-validate every loaded value; fall back to defaults on bad data ──
+        #define CLAMP(v, lo, hi, def) do { if ((v) < (lo) || (v) > (hi)) { (v) = (def); nvsBad = true; } } while(0)
+        #define CLAMPUI(v, lo, hi, def) do { if ((v) < (uint32_t)(lo) || (v) > (uint32_t)(hi)) { (v) = (def); nvsBad = true; } } while(0)
+
+        // Enums — anything outside known values → default
+        if (gSettings.activeProfile > PROFILE_CLIMATE_CHAMBER)
+            { gSettings.activeProfile = PROFILE_EGG_INCUBATOR; nvsBad = true; }
+        if (gSettings.controlMode > MODE_MANUAL)
+            { gSettings.controlMode = MODE_AUTO; nvsBad = true; }
+        if (gSettings.eggType >= EGG_TYPE_COUNT)
+            { gSettings.eggType = EGG_CHICKEN; nvsBad = true; }
+        if (gSettings.climateMode > CLIMATE_RAMP)
+            { gSettings.climateMode = CLIMATE_FIXED_SCHEDULE; nvsBad = true; }
+
+        // Floats
+        CLAMP(gSettings.tempSetpoint,     TEMP_SETPOINT_MIN, TEMP_SETPOINT_MAX, DEFAULT_TEMP_SETPOINT);
+        CLAMP(gSettings.tempHysteresis,   TEMP_HYST_MIN,     TEMP_HYST_MAX,     DEFAULT_TEMP_HYSTERESIS);
+        CLAMP(gSettings.humSetpoint,      HUM_SETPOINT_MIN,  HUM_SETPOINT_MAX,  DEFAULT_HUM_SETPOINT);
+        CLAMP(gSettings.humHysteresis,    HUM_HYST_MIN,      HUM_HYST_MAX,      DEFAULT_HUM_HYSTERESIS);
+        CLAMP(gSettings.lockdownHumidity, HUM_SETPOINT_MIN,  HUM_SETPOINT_MAX,  DEFAULT_LOCKDOWN_HUM);
+
+        // Turner — minimum 1 to avoid divide-by-zero / runaway
+        CLAMPUI(gSettings.turnerIntervalMin,  TURNER_MIN_INTERVAL_MIN,  TURNER_MAX_INTERVAL_MIN,  DEFAULT_TURNER_INTERVAL_MIN);
+        CLAMPUI(gSettings.turnerDurationSec,  TURNER_MIN_DURATION_SEC,  TURNER_MAX_DURATION_SEC,  DEFAULT_TURNER_DURATION_SEC);
+
+        // Fan / pump
+        if (gSettings.fanSpeedPercent  > 100) { gSettings.fanSpeedPercent  = DEFAULT_FAN_SPEED_PERCENT;  nvsBad = true; }
+        if (gSettings.pumpDurationSec  == 0)  { gSettings.pumpDurationSec  = DEFAULT_PUMP_DURATION_SEC;  nvsBad = true; }
+
+        // Incubation days — must be non-zero and consistent
+        if (gSettings.totalDays == 0)   { gSettings.totalDays = CHICKEN_TOTAL_DAYS; nvsBad = true; }
+        if (gSettings.lockdownDay == 0 || gSettings.lockdownDay >= gSettings.totalDays)
+            { gSettings.lockdownDay = gSettings.totalDays > 3 ? gSettings.totalDays - 3 : 1; nvsBad = true; }
+
+        // Schedule hours
+        if (gSettings.schedStartHour > 23) { gSettings.schedStartHour = DEFAULT_SCHED_START_HOUR; nvsBad = true; }
+        if (gSettings.schedEndHour   > 23) { gSettings.schedEndHour   = DEFAULT_SCHED_END_HOUR;   nvsBad = true; }
+
+        // Cyclic periods — 0 would cause divide-by-zero in cyclicInHeatPhase()
+        if (gSettings.heatPeriodMin == 0) { gSettings.heatPeriodMin = DEFAULT_CLIMATE_HEAT_PERIOD_MIN; nvsBad = true; }
+        if (gSettings.coolPeriodMin == 0) { gSettings.coolPeriodMin = DEFAULT_CLIMATE_COOL_PERIOD_MIN; nvsBad = true; }
+
+        // Ramp step index bounds
+        if (gSettings.rampCount > CLIMATE_MAX_RAMP_STEPS) { gSettings.rampCount = 0; nvsBad = true; }
+        if (gSettings.rampStepIdx >= gSettings.rampCount && gSettings.rampCount > 0)
+            { gSettings.rampStepIdx = 0; nvsBad = true; }
+
+        #undef CLAMP
+        #undef CLAMPUI
+
         xSemaphoreGive(settingsMutex);
+    }
+
+    if (nvsBad) {
+        pushError("NVS_CORRUPT", "Settings out of range — defaults applied");
+        Serial.println("[NVS] Warning: one or more settings were out of range and reset to defaults");
     }
 
     // Restore over-temperature fault latch — survives power loss / WDT reboot
