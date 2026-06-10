@@ -44,8 +44,10 @@ enum ClimateModeType : uint8_t {
 typedef struct {
     float  temp_ds18b20;   // °C  — -999.0 means sensor fault
     float  humidity_dht;   // %RH — last valid value retained on NaN
+    float  temp_dht;       // °C  — DHT22 temperature channel for plausibility cross-check
     bool   temp_valid;
     bool   hum_valid;
+    bool   dht_temp_valid; // true when temp_dht is a fresh, in-range reading
 } SensorData_t;
 
 // ─────────────────────────────────────────────────────────────────────────────

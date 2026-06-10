@@ -98,6 +98,7 @@ void task_sensor(void* pvParameters) {
         vTaskDelay(pdMS_TO_TICKS(2500));
 
         float h = dht.readHumidity();
+        float dhtT = dht.readTemperature();
 
 #if DHT_DEBUG_RAW
         if (isnan(h)) Serial.println("[DHT RAW] NaN");
@@ -116,6 +117,12 @@ void task_sensor(void* pvParameters) {
             if (xSemaphoreTake(sensorMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
                 gSensorData.humidity_dht = lastValidHum;
                 gSensorData.hum_valid    = true;
+                if (!isnan(dhtT) && dhtT > SENSOR_INVALID_LOW && dhtT < SENSOR_INVALID_HIGH) {
+                    gSensorData.temp_dht      = dhtT;
+                    gSensorData.dht_temp_valid = true;
+                } else {
+                    gSensorData.dht_temp_valid = false;
+                }
                 xSemaphoreGive(sensorMutex);
             }
         } else {
@@ -140,7 +147,8 @@ void task_sensor(void* pvParameters) {
                 if (everHadValid) {
                     gSensorData.humidity_dht = lastValidHum;
                 }
-                gSensorData.hum_valid = false;
+                gSensorData.hum_valid      = false;
+                gSensorData.dht_temp_valid = false;
                 xSemaphoreGive(sensorMutex);
             }
         }
