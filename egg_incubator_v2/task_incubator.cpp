@@ -181,7 +181,7 @@ void setFanSpeed(uint8_t percent) {
             .channel = (ledc_channel_t)channel,
             .intr_type = LEDC_INTR_DISABLE,
             .timer_sel = (ledc_timer_t)timer,
-            .duty = 0,
+            .duty = 255,  // active-LOW: start HIGH = relay OFF until task_fan applies speed
             .hpoint = 0
         };
         ledc_channel_config(&chcfg);
@@ -190,7 +190,9 @@ void setFanSpeed(uint8_t percent) {
     }
 
     if (percent > 100) percent = 100;
-    uint32_t duty = (uint32_t)((uint32_t)percent * 255U / 100U);
+    // Active-LOW relay: duty=0 (GPIO LOW) = relay ON = fan running.
+    // Invert so that percent=100 drives the relay fully ON and percent=0 turns it OFF.
+    uint32_t duty = ((uint32_t)(100U - percent) * 255U) / 100U;
     ledc_set_duty(LEDC_HIGH_SPEED_MODE, (ledc_channel_t)channel, duty);
     ledc_update_duty(LEDC_HIGH_SPEED_MODE, (ledc_channel_t)channel);
 

@@ -16,8 +16,8 @@ The firmware is well above hobby average: relay writes are centralized, shared s
 
 However, the review found **2 Critical**, **7 High**, **12 Medium** and **9 Low** issues. The most important themes:
 
-1. **The task watchdog protects nothing** — it is initialized but no task is subscribed and idle-task monitoring is masked off. A hung control task leaves the heater frozen in its last state with no recovery.
-2. **Fan output polarity is self-contradictory** for the declared active-LOW relay board — `setFanSpeed(0)` drives the pin LOW, which is `RELAY_ON` on that hardware; `allRelaysOff()` may therefore *energize* the fan channel.
+1. ~~**The task watchdog protects nothing** — it is initialized but no task is subscribed and idle-task monitoring is masked off. A hung control task leaves the heater frozen in its last state with no recovery.~~ **✅ Fixed (BUG-001)**
+2. ~~**Fan output polarity is self-contradictory** for the declared active-LOW relay board — `setFanSpeed(0)` drives the pin LOW, which is `RELAY_ON` on that hardware; `allRelaysOff()` may therefore *energize* the fan channel.~~ **✅ Fixed (BUG-002)**
 3. **Humidity actuation never checks `hum_valid`** and operates on a fabricated 50 % default — a dead DHT22 can run the humidifier/pump logic on frozen data for the rest of the hatch.
 4. **RTC epoch validity (`rtcEpochValid`) is computed but never enforced**, so all epoch-based logic (turner, cyclic phase, ramp, milestones) silently misbehaves after RTC battery loss (unsigned underflow).
 5. **GPIO12 (pump relay) is a strapping pin** — a relay board pull-up on it can prevent the ESP32 from booting at all.
@@ -35,25 +35,27 @@ However, the review found **2 Critical**, **7 High**, **12 Medium** and **9 Low*
 
 ## 2. Critical Findings
 
-### BUG-001 — Task watchdog is initialized but monitors nothing
-* **Severity:** Critical
+### BUG-001 — Task watchdog is initialized but monitors nothing ✅ FIXED
+* **Severity:** Critical → **Fixed** (2026-06-10)
 * **Location:** [egg_incubator_v2.ino:394-401](egg_incubator_v2/egg_incubator_v2.ino#L394-L401) (`setup()`); CHANGELOG confirms `esp_task_wdt_add(NULL)` / `esp_task_wdt_reset()` were removed from all tasks.
 * **Root cause:** `esp_task_wdt_init(&wdt_cfg)` is called with `idle_core_mask = 0` (no idle tasks watched) and **no task ever calls `esp_task_wdt_add()`**. The TWDT therefore has zero subscribed tasks. Additionally, on Arduino-ESP32 core 3.x the TWDT is already initialized by the framework, so `esp_task_wdt_init()` returns `ESP_ERR_INVALID_STATE` (return value is not checked); `esp_task_wdt_reconfigure()` is the correct call.
 * **Impact:** The single most important fail-safe in a heater-controlling device is absent. If `task_temperature_control` deadlocks, hard-faults into a blocked state, or stalls on a wedged I²C/OneWire bus while the heater relay is ON, the heater stays ON indefinitely. Eggs cook; in the climate-chamber profile (80 °C limit) this is a fire-adjacent hazard. The code *looks* protected ("panics on expire" comment) but is not — worse than having no WDT, because it creates false confidence.
-* **Recommended fix:**
-  1. Use `esp_task_wdt_reconfigure()` (core 3.x) and check the return code.
-  2. Subscribe the safety-relevant tasks (`task_temperature_control`, `task_climate_control`, `task_sensor`, `task_ds18b20`) with `esp_task_wdt_add(NULL)` and call `esp_task_wdt_reset()` once per loop iteration.
-  3. For tasks with long legitimate sleeps (pump 30 s, turner 10 s), either pick a WDT timeout above the longest sleep, sleep in sub-second slices with periodic resets, or leave them unsubscribed and protect only the control loop.
-  4. Independently, consider an external hardware safety (bimetal thermal cutoff in series with the heater) — software watchdogs alone are not an adequate safety layer for a heating appliance.
+* **Fix applied:**
+  1. `setup()` now calls `esp_task_wdt_reconfigure()` when `esp_task_wdt_init()` returns `ESP_ERR_INVALID_STATE`, with return-value checking.
+  2. Four safety-critical tasks are subscribed: `task_temperature_control` and `task_climate_control` are subscribed from `setup()` via `esp_task_wdt_add(handle)` **after** the profile-based `vTaskSuspend` calls (so the inactive control task is never subscribed while frozen); `task_ds18b20` and `task_sensor` (DHT) self-subscribe in their preambles since they are never suspended.
+  3. Each subscribed task calls `esp_task_wdt_reset()` at the top of every loop iteration. On profile switch, the outgoing control task calls `esp_task_wdt_delete(NULL)` before `vTaskSuspend(NULL)` and `esp_task_wdt_add(NULL)` immediately after (resume path).
+  4. WDT timeout is 10 s — covers the DHT22 worst-case cycle (≈3.5 s) with 2.8× margin. Turner (up to 130 s), pump (30 s), milestone, cloud, Wi-Fi and UI tasks are intentionally not subscribed.
 
-### BUG-002 — Fan PWM polarity contradicts the active-LOW relay convention; “fan off” can energize the output
-* **Severity:** Critical
+### BUG-002 — Fan PWM polarity contradicts the active-LOW relay convention; “fan off” can energize the output ✅ FIXED
+* **Severity:** Critical → **Fixed** (2026-06-10)
 * **Location:** [task_incubator.cpp:161-202](egg_incubator_v2/task_incubator.cpp#L161-L202) (`setFanSpeed`), [globals.cpp:78-86](egg_incubator_v2/globals.cpp#L78-L86) (`allRelaysOff`), [config.h:37-43](egg_incubator_v2/config.h#L37-L43)
-* **Root cause:** `RELAY_FAN` (GPIO13) is declared in the “RELAY OUTPUT PINS / Active-LOW relay board” block (`RELAY_ON = LOW`). But `setFanSpeed()` drives it with **non-inverted** LEDC PWM: `percent = 0 → duty 0 → pin constantly LOW`, and `percent = 100 → duty 255 → pin constantly HIGH`. Under active-LOW semantics that is exactly inverted: `setFanSpeed(0)` (used by `allRelaysOff()`, sensor-fault and over-temp paths) holds the pin LOW = **relay energized**, while 100 % speed de-energizes it. Meanwhile `setup()` writes `digitalWrite(RELAY_FAN, RELAY_OFF /*HIGH*/)`, which under the PWM convention would mean “full speed”. The two conventions cannot both be right.
+* **Root cause:** `RELAY_FAN` (GPIO13) is declared in the “RELAY OUTPUT PINS / Active-LOW relay board” block (`RELAY_ON = LOW`). But `setFanSpeed()` drove it with **non-inverted** LEDC PWM: `percent = 0 → duty 0 → pin constantly LOW`, and `percent = 100 → duty 255 → pin constantly HIGH`. Under active-LOW semantics that is exactly inverted: `setFanSpeed(0)` (used by `allRelaysOff()`, sensor-fault and over-temp paths) held the pin LOW = **relay energized**, while 100 % speed de-energized it. Meanwhile `setup()` wrote `digitalWrite(RELAY_FAN, RELAY_OFF /*HIGH*/)`, which under the PWM convention meant “full speed”. The two conventions cannot both be right.
 * **Impact:** Depending on the real hardware:
   * Fan on the relay board → every “safe shutdown” (`allRelaysOff()`, over-temp latch, factory reset) turns the fan channel ON, and 25 kHz PWM applied to a relay/optocoupler input produces undefined relay behavior (chatter, partial drive, coil heating). Mechanical relays cannot be PWM-speed-controlled at all.
   * Fan on a MOSFET/driver (active-HIGH) → the config comment and the boot-time `digitalWrite(RELAY_OFF)` are wrong, and intermediate duty values behave correctly only by accident.
-* **Recommended fix:** Decide the actual fan drive hardware and make the code consistent: if it is a MOSFET/PWM driver, move `RELAY_FAN` out of the active-LOW relay block, document active-HIGH, and initialize the pin LOW at boot; if it is a relay, remove PWM entirely and switch it via `setRelay()` like every other channel. If inversion is needed, use LEDC’s `flags.output_invert` or `255 - duty`.
+* **Fix applied:**
+  1. Duty formula inverted in `setFanSpeed()`: `duty = (100 - percent) * 255 / 100`. `percent=100` now drives `duty=0` → GPIO LOW → active-LOW relay ON → fan runs. `percent=0` drives `duty=255` → GPIO HIGH → relay OFF → fan stopped. `allRelaysOff()` calling `setFanSpeed(0)` now correctly de-energizes the relay.
+  2. `ledc_channel_config` initial duty changed from `0` to `255` so the relay starts in the safe OFF state at LEDC init, before `task_fan` applies the configured speed.
 
 ---
 
