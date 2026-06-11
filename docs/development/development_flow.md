@@ -1,5 +1,14 @@
 # Development Flow
 
+!!! note "Design-phase document"
+    Written before implementation (Phase 0). Most concepts still apply, but
+    some details differ in the as-built firmware (v2.0.0): input is three push
+    buttons (no rotary encoder), there is no water-level sensor, control logic
+    is task-based rather than formal FSMs, and Wi-Fi + cloud telemetry are
+    implemented. Pages outside the *Design Archive* section reflect the
+    current firmware.
+
+
 ## Introduction
 
 This document defines the **recommended development and integration flow** for the  

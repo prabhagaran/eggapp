@@ -1,5 +1,11 @@
 # Future Expansion
 
+!!! note "See the live roadmap"
+    This design-phase wishlist is superseded by **FEATURE_ROADMAP.md** in the
+    repository root (2026-06-11), which lists 30+ candidate features with
+    effort ratings and integration notes for the as-built firmware.
+
+
 ## Introduction
 
 This document outlines potential **future expansion paths** for the  

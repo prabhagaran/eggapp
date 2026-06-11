@@ -1,5 +1,13 @@
 # System Supervisor FSM
 
+!!! warning "Design archive — superseded by the as-built firmware"
+    This page was written during the design phase, before implementation. The
+    shipped firmware (v2.0.0, `egg_incubator_v2/`) implements control as
+    procedural task loops rather than these formal FSM modules, and has no
+    water-level hardware. Kept unchanged for design history — see
+    *Software → RTOS Architecture* for the as-built design.
+
+
 Purpose
 - Coordinate global operating modes and enforce system-wide safety.
 

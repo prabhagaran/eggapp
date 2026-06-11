@@ -1,164 +1,57 @@
 # Roadmap
 
-## Introduction
+!!! info "Updated 2026-06-11 to reflect actual progress"
+    The detailed, prioritized feature list lives in **`FEATURE_ROADMAP.md`** at
+    the repository root. This page tracks the phase history.
 
-This document outlines the **development roadmap** for the  
-**Reusable Environmental Control Platform**.
+## Phase history
 
-The roadmap defines how the platform evolves from a **Thermostat MVP** into a **fully featured, multi-product environmental control system**.
+### Phase 0 — Documentation & architecture ✔ (completed)
 
-Each phase builds on a stable foundation and avoids architectural rewrites.
+Vision, philosophy, pinout, FSM design, UI style. The original design docs are
+preserved under *Design Archive*; implementation deviated where noted (buttons
+instead of encoder, task-based control instead of formal FSM modules, no
+water-level hardware).
 
----
+### Phase 1 — Thermostat MVP ✔ (absorbed)
 
-## Roadmap Principles
+The MVP was absorbed into the incubator build rather than shipped standalone:
+FreeRTOS task structure, sensor validation, relay control, hysteresis logic,
+OLED UI.
 
-The roadmap follows these guiding principles:
+### Phase 2 — Egg incubator ✔ (FW 2.0.0)
 
-- Validate before expanding
-- Add features incrementally
-- Maintain backward compatibility
-- Avoid premature optimization
-- Preserve core architecture
+Egg-type presets, incubation-day tracking (DS1307 RTC), automatic turner,
+milestones + lockdown, misting pump, PWM fan.
 
-No phase should compromise system stability.
+### Phase 3 — Climate chamber profile ✔
 
----
+Second runtime profile with cooler support, fixed-schedule / cyclic / ramp
+modes, and live profile switching (suspend/resume handshake).
 
-## Phase 0 – Documentation & Architecture (Completed)
+### Phase 4 — Connectivity ✔
 
-Status: ✔ Completed
+User-gated Wi-Fi (WiFiManager), NTP sync, HTTPS telemetry + error reporting to
+Google Apps Script with offline retry.
 
-Goals:
-- Define system vision and philosophy
-- Finalize hardware pinout
-- Design software architecture
-- Define FSMs and profiles
-- Establish UI style
+### Phase 5 — Hardening ✔ (2026-06)
 
-Outcome:
-- Architecture frozen
-- Documentation finalized
-- Ready for implementation
+Full static review + fix cycle: **38 findings (BUG-001 … BUG-038) fixed**, from
+watchdog coverage and relay-polarity safety to UI single-press fixes — see
+`FIRMWARE_BUG_REVIEW.md`. One hardware item remains open (GPIO12/15 strapping
+pins, BUG-004).
 
----
+## Next (Phase 6 candidates)
 
-## Phase 1 – Thermostat MVP
+In suggested order — full details, effort ratings, and integration notes in
+`FEATURE_ROADMAP.md`:
 
-Status: 🔄 In Progress
-
-Goals:
-- Implement FreeRTOS task structure
-- Implement Sensor and Actuator HAL
-- Implement Temperature Control FSM
-- Implement Alarm system
-- Implement Nokia-style UI
-- Validate safety behavior
-
-Outcome:
-- Fully functional thermostat
-- Stable base for expansion
-
----
-
-## Phase 2 – Incubator Profile
-
-Status: ⏳ Planned
-
-Goals:
-- Enable humidity sensing and control
-- Enable water level monitoring
-- Implement rotation motor control
-- Add incubator-specific UI menus
-- Tune control parameters
-
-Outcome:
-- Fully functional incubator profile
-- No core logic changes
-
----
-
-## Phase 3 – Cooler Profile
-
-Status: ⏳ Planned
-
-Goals:
-- Enable cooling-only control
-- Integrate pump-based cooling
-- Implement water safety logic
-- Optimize UI for cooler operation
-
-Outcome:
-- Cooler profile enabled
-- Same firmware, new behavior
-
----
-
-## Phase 4 – Advanced Features
-
-Status: ⏳ Planned
-
-Potential features:
-- Timer-based automation
-- Data logging to SD card
-- Configuration persistence (EEPROM / Flash)
-- Profile scheduling
-
-Outcome:
-- Improved usability and automation
-
----
-
-## Phase 5 – Connectivity & Cloud Integration
-
-Status: ⏳ Optional
-
-Potential features:
-- Wi-Fi configuration
-- MQTT or REST API
-- Remote monitoring
-- OTA firmware updates
-
-Outcome:
-- Connected environmental control platform
-
----
-
-## Phase 6 – Productization
-
-Status: ⏳ Optional
-
-Goals:
-- PCB optimization
-- Enclosure design
-- Certification considerations
-- Manufacturing readiness
-
-Outcome:
-- Commercial-grade product
-
----
-
-## Continuous Improvement
-
-Across all phases:
-- Bugs are fixed without breaking architecture
-- Documentation is kept in sync
-- Refactoring is allowed only if it improves clarity
-- Safety remains the top priority
-
----
-
-## Summary
-
-This roadmap provides:
-- A clear path from MVP to full platform
-- Controlled and safe expansion
-- Long-term sustainability
-- Alignment with original vision
-
-The roadmap ensures the platform grows **by design, not by accident**.
-
----
-
-➡️ Next: **Appendix → Glossary**
+1. **Quick wins:** button auto-repeat, inactivity timeout + display dim,
+   candling reminders, diagnostics screen, timezone setting
+2. **Cheap hardware safety:** buzzer alarm, water-level switch, status LED,
+   strapping-pin re-pin
+3. **Core upgrades:** more egg presets + custom profile, staged setpoint
+   schedules, MQTT / Home Assistant, Telegram alerts
+4. **v3.0 milestone:** flash repartition (`min_spiffs` — already configured in
+   `sketch.yaml`) → **OTA updates**, local web dashboard, LittleFS logging,
+   PID + SSR heater drive

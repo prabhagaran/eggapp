@@ -1,234 +1,64 @@
 # Profiles
 
-## Introduction
-
-This document describes the **Profile Configuration System** used in the  
-**Reusable Environmental Control Platform**.
-
-Profiles are the key mechanism that allow **one firmware** to behave as **multiple products** without changing control logic or hardware abstraction layers.
-
----
-
-## What Is a Profile?
-
-A **profile** is a configuration that defines:
-- What sensors are used
-- What actuators are enabled
-- What control FSMs are active
-- Default setpoints and limits
-- Timers and alarms
-
-Profiles contain **data only**, not logic.
-
-> Changing the profile changes system behavior  
-> without rewriting or recompiling core logic.
-
----
-
-## Why Profiles Are Used
-
-Without profiles:
-- Each product requires separate firmware
-- Logic gets duplicated
-- Maintenance becomes difficult
-- Bug fixes must be repeated
-
-With profiles:
-- One codebase supports many products
-- Behavior is data-driven
-- Testing effort is reduced
-- Long-term maintenance is simplified
-
----
-
-## Profile Responsibilities
-
-A profile is responsible for defining:
-
-- Enabled sensors (temperature, humidity, water level)
-- Enabled actuators (heater, fan, pump, etc.)
-- Control limits and hysteresis values
-- Default operating setpoints
-- Timer behavior
-- Alarm severity mapping
-
-A profile is **not responsible** for:
-- Control algorithms
-- Hardware access
-- UI rendering logic
-
----
-
-## Profile Capability Definition
-
-Profiles declare their capabilities explicitly.
-
-Example capability flags:
-- Use temperature control
-- Use humidity control
-- Use water level monitoring
-- Enable specific actuators
-- Enable timers
-
-These flags are used by:
-- Control FSMs (to enable/disable logic)
-- UI (to show or hide menu items)
-- Sensor task (to ignore unused sensors)
-
----
-
-## Supported Profiles
-
-The platform currently supports the following profiles:
-
-### Thermostat Profile
-Designed for basic temperature control.
-
-Characteristics:
-- Temperature control only
-- Heating and cooling support
-- No humidity or water level control
-- Simple UI menu
-
-Use cases:
-- Room thermostat
-- Heater controller
-- Temperature chamber
-
----
-
-### Incubator Profile
-Designed for egg incubation and similar environments.
-
-Characteristics:
-- Temperature control
-- Humidity control
-- Water level monitoring
-- Rotation motor control
-- Timers and alarms enabled
-
-Use cases:
-- Egg incubator
-- Controlled biological environments
-
----
-
-### Cooler Profile
-Designed for evaporative or water-assisted cooling systems.
-
-Characteristics:
-- Temperature control (cooling only)
-- Water level monitoring
-- Fan and pump control
-- No humidity regulation
-
-Use cases:
-- Air cooler
-- Evaporative cooling systems
-
----
-
-## Profile-to-FSM Mapping
-
-Profiles determine which FSMs are active.
-
-| Profile | Temp FSM | Hum FSM | Water FSM | Timer FSM |
-|------|---------|--------|----------|-----------|
-| Thermostat | ✔ | ✖ | ✖ | ✖ |
-| Incubator | ✔ | ✔ | ✔ | ✔ |
-| Cooler | ✔ | ✖ | ✔ | ✖ |
-
-FSM implementations remain unchanged across profiles.
-
----
-
-## Profile-to-Actuator Mapping
-
-Profiles also define which actuators are valid.
-
-| Profile | Heater | Cooler | Humidifier | Pump | Rotation |
-|------|-------|--------|------------|------|----------|
-| Thermostat | ✔ | ✔ | ✖ | ✖ | ✖ |
-| Incubator | ✔ | ✔ | ✔ | ✔ | ✔ |
-| Cooler | ✖ | ✔ | ✖ | ✔ | ✖ |
-
-Commands for disabled actuators are ignored.
-
----
-
-## Default Setpoints and Limits
-
-Each profile defines:
-- Default temperature setpoint
-- Minimum and maximum allowed values
-- Hysteresis bands
-- Default humidity (if applicable)
-- Timer intervals (if applicable)
-
-These defaults are loaded at startup or when switching profiles.
-
----
-
-## Profile Selection
-
-Profiles can be selected:
-- At startup (default)
-- Via the UI menu
-- Via serial command (development)
-
-Profile switching:
-- Safely disables all actuators
-- Reloads configuration values
-- Reinitializes FSM states
-
----
-
-## UI Integration
-
-The UI adapts dynamically based on the active profile:
-- Menu items appear only if relevant
-- Values are editable only if enabled
-- Status screens show only active parameters
-
-This ensures a clean and user-friendly interface.
-
----
-
-## Safety Considerations
-
-Profiles cannot override safety rules.
-
-Regardless of profile:
-- Sensor failures force safe states
-- Alarms override user actions
-- Actuators are disabled during FAULT states
-
-Safety logic always has higher priority than profile behavior.
-
----
-
-## Extending Profiles
-
-To add a new product:
-1. Define a new profile configuration
-2. Specify enabled sensors and actuators
-3. Set limits and defaults
-4. Update UI menu mapping if needed
-
-No FSM or HAL changes are required.
-
----
-
-## Summary
-
-The profile system:
-- Enables true firmware reuse
-- Keeps logic clean and centralized
-- Simplifies product variation
-- Supports long-term scalability
-
-Profiles are the foundation that transform this platform into a **multi-product system**.
-
----
-
-➡️ Next: **User Interface → UI Overview**
+!!! info "As-built — describes FW 2.0.0"
+    The design phase envisioned four data-driven profiles (thermostat, incubator,
+    cooler, test chamber). The shipped firmware implements **two**, selected at
+    runtime from the System menu and persisted to NVS.
+
+## The two profiles
+
+| | `PROFILE_EGG_INCUBATOR` | `PROFILE_CLIMATE_CHAMBER` |
+|---|---|---|
+| Control task | `TempCtrl` (task_control.cpp) | `ClimCtrl` (task_climate_control.cpp) |
+| Active helper tasks | Turner, Fan, Pump, Milestone | — |
+| Actuators | heater, humidifier, fan, turner, pump | heater, cooler, humidifier |
+| Safety limit | 39.5 °C over-temp latch | 80 °C over-temp latch |
+| Modes | Auto / Manual | Fixed Schedule / Cyclic / Ramp |
+| Home screen | incubation day, hatch countdown, milestones | phase (HEAT/COOL/IDLE/RAMP n) |
+| Menus shown | egg type, incubation day, turner, fan, pump | climate mode, schedule/cyclic/ramp |
+
+Both profiles share the sensor, RTC, button, UI, cloud, and Wi-Fi tasks, the
+settings store, and the alarm/fault machinery.
+
+## How switching works (`switchProfile()`)
+
+1. The new profile is recorded in `gSettings` under `settingsMutex`
+   (early-return if the mutex can't be taken — the switch never proceeds
+   half-recorded, BUG-019).
+2. All relays are forced OFF.
+3. Outgoing-profile tasks receive `TASK_CMD_SUSPEND` via `xTaskNotify`. They
+   wake immediately from any blocking point (`xTaskNotifyWait` replaced all
+   long delays — BUG-008), drive their actuator OFF if mid-run, ack via the
+   `suspendAckGroup` event group, and self-suspend.
+4. After the acks (3 s safety-net timeout; real ack time is milliseconds),
+   incoming-profile tasks are resumed and the control task re-subscribes to the
+   task watchdog.
+5. The selection is persisted to NVS, so the device boots back into the same
+   profile.
+
+## Egg-type presets (incubator profile)
+
+| Preset | Total days | Lockdown day | Candle day | Temp | Humidity |
+|--------|-----------|--------------|------------|------|----------|
+| Chicken | 21 | 18 | 7 | 37.5 °C | 60 % |
+| Duck | 28 | 25 | 10 | 37.5 °C | 75 % |
+| Quail | 17 | 14 | 7 | 37.5 °C | 60 % |
+
+Selecting a preset applies its defaults (`applyEggTypeDefaults()`); every value
+remains individually editable afterwards. At **lockdown** the milestone task
+suspends the turner and raises humidity to 70 %; starting a new batch resets
+both automatically (BUG-006).
+
+## Climate modes (climate-chamber profile)
+
+- **Fixed schedule** — heat between a start and end hour (RTC-based)
+- **Cyclic** — alternate heat/cool periods (30–1440 min each)
+- **Ramp** — up to 8 pre-configured temperature steps with per-step duration;
+  the UI shows the step table and active step (view-only)
+
+## What a profile does *not* change
+
+Control algorithms, hardware access paths, the safety latch mechanism, and the
+UI framework are common code. A profile only determines **which task set runs**
+and **which menus/screens are shown** — consistent with the original
+"profiles are data, not logic" philosophy.

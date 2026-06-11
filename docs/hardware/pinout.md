@@ -1,122 +1,70 @@
 # Pinout
 
-## Introduction
+!!! info "As-built — verified against `egg_incubator_v2/config.h` (FW 2.0.0)"
+    This page reflects the wiring of the shipped firmware. The original
+    design-phase pinout (rotary encoder, water-level sensor, 8-relay bank)
+    was superseded during implementation.
 
-This document defines the **final and locked GPIO pin assignment** for the  
-**Reusable Environmental Control Platform**.
+## Inputs — Buttons (active-LOW, internal pull-ups)
 
-The pinout is designed to:
-- Avoid ESP32 boot and flash conflicts
-- Support FreeRTOS operation
-- Allow future expansion
-- Remain common across all profiles
+| Button | GPIO |
+|--------|------|
+| UP     | GPIO 32 |
+| DOWN   | GPIO 33 |
+| OK     | GPIO 25 |
 
-Once finalized, this pinout should not be changed without strong justification.
+Debounced in software (50 ms, ezButton) by the button task.
 
----
+## I²C bus (shared)
 
-## ESP32 Pin Usage Strategy
+| Signal | GPIO | Devices |
+|--------|------|---------|
+| SDA | GPIO 21 | SSD1306 OLED (0x3C) + DS1307 RTC |
+| SCL | GPIO 22 | |
 
-The following ESP32 pin rules are applied:
-
-- GPIO 6–11 → **Not used** (internal flash)
-- Boot strapping pins avoided where possible
-- Input-only pins used for sensors where applicable
-- Interrupt-capable pins reserved for encoder inputs
-- I²C pins fixed for OLED and future expansion
-
----
-
-## Sensor Pin Assignment
+## Sensors
 
 | Sensor | GPIO | Notes |
-|------|------|------|
-| DS18B20 (Temperature) | GPIO 4 | 1-Wire, 4.7 kΩ pull-up to 3.3 V |
-| DHT22 (Humidity) | GPIO 16 | Digital input |
-| Water Level Sensor | GPIO 34 | Input-only, ideal for level sensing |
+|--------|------|-------|
+| DHT22 (humidity + cross-check temp) | GPIO 4 | single-wire digital |
+| DS18B20 (primary temperature) | GPIO 18 | 1-Wire, 4.7 kΩ pull-up to 3.3 V |
 
----
+## Relay outputs (active-LOW relay board: `RELAY_ON = LOW`)
 
-## User Interface Pin Assignment
+| Function | GPIO | Notes |
+|----------|------|-------|
+| Heater | GPIO 26 | |
+| Cooler | GPIO 27 | climate-chamber profile only |
+| Humidifier | GPIO 14 | |
+| Fan | GPIO 13 | **LEDC PWM**, inverted duty (100 % speed = pin LOW) |
+| Pump | GPIO 12 | ⚠ strapping pin — see warning below |
+| Turner | GPIO 15 | ⚠ strapping pin — see warning below |
 
-### OLED Display (I²C)
+!!! warning "Known issue — strapping pins (BUG-004, open)"
+    **GPIO 12 (MTDI)** selects flash voltage at reset: a relay-board pull-up on it
+    can set VDD_SDIO to 1.8 V and prevent the ESP32 from booting at all.
+    **GPIO 15 (MTDO)** is also a strapping pin. Recommended: move these channels
+    to safe GPIOs (16, 17, 19, 23) on the next board revision, or burn the
+    flash-voltage eFuse (`espefuse.py set_flash_voltage 3.3V`). Verify boot
+    behavior with the actual relay board attached.
 
-| Signal | GPIO |
-|------|------|
-| SDA | GPIO 21 |
-| SCL | GPIO 22 |
+## Safety-relevant electrical notes
 
----
+- All relay pins are driven to `RELAY_OFF` (HIGH) **first thing in `setup()`**,
+  before any peripheral init.
+- The fan LEDC channel initializes at duty 255 (= relay OFF for the inverted
+  active-LOW convention).
+- All ESP32 GPIOs are 3.3 V logic; relay coils must be driven via the opto-isolated
+  board, never directly.
+- GPIO 6–11 are unavailable (internal flash).
 
-### Rotary Encoder
+## Differences from the design-phase pinout
 
-| Signal | GPIO | Notes |
-|------|------|------|
-| Encoder CLK (A) | GPIO 18 | Interrupt-capable |
-| Encoder DT (B) | GPIO 19 | Interrupt-capable |
-| Encoder SW | GPIO 23 | Push-button input |
-
----
-
-## Actuator (Relay) Pin Assignment
-
-The system supports **up to 8 relay outputs**.
-
-| Relay | Function | GPIO |
-|------|--------|------|
-| Relay 1 | Heater | GPIO 25 |
-| Relay 2 | Cooling Fan | GPIO 26 |
-| Relay 3 | Humidifier | GPIO 27 |
-| Relay 4 | Water Pump | GPIO 14 |
-| Relay 5 | Rotation Motor | GPIO 12 |
-| Relay 6 | Spare | GPIO 13 |
-| Relay 7 | Spare | GPIO 32 |
-| Relay 8 | Spare | GPIO 33 |
-
-All relays are driven via a **ULN2803 or opto-isolated relay board**.
-
----
-
-## Reserved / Unused Pins
-
-| GPIO | Status |
-|----|------|
-| GPIO 0 | Avoided (boot mode) |
-| GPIO 2 | Avoided (boot strapping) |
-| GPIO 5 | Reserved |
-| GPIO 15 | Avoided (boot strapping) |
-| GPIO 6–11 | Not available (flash) |
-
----
-
-## Electrical Notes
-
-- All ESP32 GPIOs operate at **3.3 V logic**
-- Do **not** connect relay coils directly to ESP32 pins
-- Use proper isolation for AC loads
-- Ensure common ground where required by driver circuits
-
----
-
-## Expandability
-
-The chosen pinout allows:
-- Additional sensors via I²C
-- Additional actuators via spare relays
-- Future communication modules (Wi-Fi, UART, SPI)
-
----
-
-## Summary
-
-This pinout:
-- Is safe and boot-reliable
-- Supports all required features
-- Allows future expansion
-- Is common across all profiles
-
-This document serves as the **single source of truth** for hardware connections.
-
----
-
-➡️ Next: **Hardware → Sensors**
+| Item | Design | As-built |
+|------|--------|----------|
+| Input device | Rotary encoder (18/19/23) | 3 buttons (32/33/25) |
+| DS18B20 | GPIO 4 | GPIO 18 |
+| DHT22 | GPIO 16 | GPIO 4 |
+| Water level sensor | GPIO 34 | not fitted |
+| Relays | 8 channels (25/26/27/14/12/13/32/33) | 6 channels (26/27/14/13/12/15) |
+| RTC | — | DS1307 on I²C |

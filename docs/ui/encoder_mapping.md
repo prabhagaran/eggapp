@@ -1,5 +1,12 @@
 # Encoder Mapping
 
+!!! warning "Design archive — superseded by the as-built firmware"
+    This page was written during the design phase. The shipped firmware
+    (v2.0.0) uses an SSD1306 128x64 OLED with **three push buttons**
+    (UP / DOWN / OK) — there is no rotary encoder. See *User Interface →
+    UI Overview* and *Button Mapping* for the as-built behavior.
+
+
 ## Introduction
 
 This document defines how the **rotary encoder** is used as the primary input device for the  

@@ -1,120 +1,80 @@
 # Reusable Environmental Control Platform
 
-Welcome to the documentation of the **Reusable Environmental Control Platform**,  
-a long-term, profile-driven embedded system built using **ESP32 + FreeRTOS (Arduino IDE)**.
-
-This project is designed as a **platform**, not a single-use product.
-
----
-
-## 🚀 What Is This Project?
-
-This platform is a **modular environmental controller** capable of managing:
-
-- 🌡️ Temperature (heating & cooling)
-- 💧 Humidity
-- 🚰 Water level
-- ⏱️ Timers & scheduled actions
-- 🚨 Alarms & safety handling
-
-Using **profiles**, the same firmware can function as:
-
-- Thermostat  
-- Egg Incubator  
-- Air Cooler  
-- Environmental Test Chamber  
-
-> **Build once. Reuse forever.**
+Documentation for an **ESP32 + FreeRTOS** environmental controller that runs as an
+**egg incubator** or a **climate chamber** from a single firmware, switchable at
+runtime. Firmware **v2.0.0** is implemented, field-tested, and hardened through a
+38-finding bug-review cycle.
 
 ---
 
-## 🧠 Design Philosophy
+## 🚀 What the device does today
 
-This project is built with **long-term thinking** and follows a **system-first approach**:
+- 🌡️ **Temperature control** — DS18B20 primary sensor, hysteresis control of a heater
+  relay (cooler relay in climate-chamber profile), with an over-temperature safety latch
+- 💧 **Humidity control** — DHT22 sensor driving a humidifier relay and a timed
+  misting pump with cooldown
+- 🥚 **Incubation management** — egg-type presets (chicken / duck / quail), incubation-day
+  tracking from a battery-backed DS1307 RTC, automatic egg turner, candling and
+  **lockdown** milestones (turner stop + humidity raise)
+- 🌀 **Fan** — PWM speed control (LEDC)
+- 🖥️ **Local UI** — SSD1306 128×64 OLED, three push buttons (UP / DOWN / OK),
+  full menu system for every setting
+- ☁️ **Wi-Fi + cloud** — user-gated Wi-Fi, NTP time sync, telemetry + error reporting
+  every 60 s to a Google Apps Script endpoint over HTTPS, with offline retry queue
+- 🔒 **Safety** — task watchdog on the control tasks, latched + NVS-persisted
+  over-temp fault, sensor-validity gates, heater-stuck and sensor-plausibility alarms
 
-- ✅ FreeRTOS-based task architecture  
-- ✅ Finite State Machines (FSM) for control logic  
-- ✅ Hardware Abstraction Layer (HAL) for sensors & actuators  
-- ✅ Profile-driven behavior (no logic rewrite)  
-- ✅ Nokia-style OLED UI for reliability and simplicity  
+## 🔁 Two profiles, one firmware
 
-The goal is **clarity, safety, and reusability**, not quick hacks.
+| | Egg Incubator | Climate Chamber |
+|---|---|---|
+| Setpoint range | 25–50 °C (37.5 °C default) | same, 80 °C safety limit |
+| Actuators | heater, humidifier, fan, turner, pump | heater, cooler, humidifier |
+| Modes | auto / manual | fixed schedule / cyclic / multi-step ramp |
+| Extras | egg-type presets, milestones, lockdown | per-step ramp table (up to 8 steps) |
 
----
-
-## 🏗️ High-Level Architecture
-
-Sensors → Sensor HAL → Control FSM → Actuator HAL → Outputs
-↑
-Profiles
-↑
-UI FSM ← Encoder + OLED
-
-- **Sensors** are isolated from logic  
-- **Control logic** is hardware-independent  
-- **UI** never touches actuators directly  
-- **Profiles** decide behavior  
-
----
-
-## 🧩 Key Features
-
-- ESP32 with built-in FreeRTOS
-- DS18B20 temperature sensing
-- DHT22 humidity sensing
-- Relay-based actuator control
-- Rotary encoder input
-- OLED text-based (Nokia-style) UI
-- Alarm & logging system
-- Expandable for Wi-Fi & cloud (future)
+Profile switching suspends/resumes the relevant FreeRTOS tasks at runtime with an
+event-group handshake — no reboot, no reflash.
 
 ---
 
-## 📂 How to Use This Documentation
+## 📂 Documentation map
 
-Each section of this documentation explains **one layer of the system**:
+| Section | Contents | Status |
+|---|---|---|
+| **Overview** | Vision, philosophy, architecture | Design-phase, concepts still valid |
+| **Hardware** | Pinout (as-built ✅), sensors, actuators | Pinout current; rest design-phase |
+| **Software** | RTOS architecture (as-built ✅), code walkthrough (✅), profiles (✅) | Current |
+| **User Interface** | UI overview + button mapping | Current (as-built) |
+| **Safety & Logging** | Faults, alarms, telemetry | Current (as-built) |
+| **Development** | Flow, MVP, roadmap | Roadmap current |
+| **Design Archive** | Original FSM / encoder / Nokia-UI design docs | Historical, superseded |
 
-- **Overview** → Vision, philosophy, architecture  
-- **Hardware** → Pinout, sensors, relays, electrical design  
-- **Software** → RTOS, FSMs, profiles  
-- **User Interface** → OLED screens & encoder behavior  
-- **Safety & Logging** → Alarms, logs, fault handling  
-- **Development** → MVP, integration flow, roadmap  
+Pages carrying a *"Design-phase document"* or *"Design archive"* banner predate the
+firmware; everything else describes the shipped code in `egg_incubator_v2/`.
 
-Read **top-down** if you are new, or jump to specific sections if you are implementing.
+### Companion documents (repository root)
 
----
-
-## 🎯 Current Status
-
-- ✔ System architecture finalized  
-- ✔ Hardware pinout locked  
-- ✔ UI style finalized  
-- ✔ Profiles defined  
-- ✔ Documentation-first approach adopted  
-
-Next step after documentation:
-➡️ **Arduino firmware implementation**
+- **`FIRMWARE_BUG_REVIEW.md`** — full static-review report, 38 findings
+  (BUG-001 … BUG-038), fix status for each
+- **`FEATURE_ROADMAP.md`** — 30+ candidate features with effort ratings and
+  integration notes
 
 ---
 
-## 👨‍💻 Intended Audience
+## 🎯 Current status (2026-06-11)
 
-This project is intended for:
-- Embedded engineers
-- Hardware developers
-- Makers building reliable systems
-- Anyone learning **RTOS-based system design**
-
----
-
-## 📌 Final Note
-
-> This is not just an incubator.  
-> This is not just a thermostat.  
-
-This is a **Reusable Environmental Control Platform**.
+- ✔ Firmware v2.0.0 implemented — both profiles operational
+- ✔ Wi-Fi, NTP, and cloud telemetry live
+- ✔ Bug-review cycle complete: BUG-001 … BUG-038 fixed (one hardware item open:
+  GPIO12/15 strapping-pin re-pin, BUG-004)
+- ✔ UI hardened: single-press menu entry, non-blocking NTP, guarded factory reset
+- ➡️ Next: flash repartition (`min_spiffs`) → OTA updates, MQTT/Home Assistant —
+  see `FEATURE_ROADMAP.md`
 
 ---
 
-➡️ Proceed to **Overview → Vision & Purpose** to understand the long-term goals of this system.
+## 👨‍💻 Intended audience
+
+Embedded engineers, hardware developers, makers building reliable systems, and
+anyone learning **RTOS-based system design** on the ESP32.

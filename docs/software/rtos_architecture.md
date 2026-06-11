@@ -1,195 +1,83 @@
 # RTOS Architecture
 
-## Introduction
+!!! info "As-built — verified against `egg_incubator_v2.ino` (FW 2.0.0)"
+    This page describes the shipped task layout. The original design-phase
+    architecture (6 generic tasks + FSM modules) is preserved in the
+    *Design Archive* section.
 
-This document describes how **FreeRTOS** is used in the  
-**Reusable Environmental Control Platform** to achieve deterministic, modular, and scalable software execution.
+## Task table (as created in `setup()`)
 
-FreeRTOS is used as a **structuring tool**, not merely as a scheduler.
+| Task | File | Core | Priority | Stack | Cadence / role |
+|------|------|------|----------|-------|----------------|
+| `RTC` | task_rtc.cpp | 1 | 2 | 3072 | reads DS1307 ~1 s, publishes `gRtcTime` |
+| `Buttons` | task_buttons.cpp | 1 | 3 | 2048 | 10 ms poll, 50 ms debounce → `uiEventQueue` |
+| `UI` | task_ui.cpp | 1 | 2 | 6144 | event-driven (50 ms queue wait) + idle refresh |
+| `DHT` | task_sensors.cpp | 1 | 3 | 3072 | DHT22 humidity + cross-check temperature |
+| `DS18B20` | task_sensors.cpp | 1 | 3 | 4096 | primary temperature, POR/validity checks |
+| `TempCtrl` | task_control.cpp | 1 | **4** | 4096 | incubator heater/humidifier control (~500 ms) |
+| `ClimCtrl` | task_climate_control.cpp | 1 | **4** | 4096 | climate heater/cooler/humidifier control |
+| `Turner` | task_incubator.cpp | 1 | 2 | 2048 | 10 s poll of epoch-based turn schedule |
+| `Fan` | task_incubator.cpp | 1 | 2 | 2048 | applies PWM fan speed |
+| `Pump` | task_incubator.cpp | 1 | 2 | 2048 | humidity-deficit misting with 5 min cooldown |
+| `Milestone` | task_incubator.cpp | 1 | 1 | 2048 | incubation-day milestones, lockdown |
+| `Cloud` | task_cloud.cpp | **0** | 1 | 12288 | telemetry 60 s, heartbeat 5 min, HTTPS |
+| `WifiMgr` | task_wifi_manager.cpp | **0** | 1 | 8192 | Wi-Fi lifecycle, NTP sync (all radio work) |
 
----
+Control tasks have the **highest priority (4)**; all network work is pinned to
+**Core 0** so it can never starve control on Core 1. The Arduino `loop()` is empty.
 
-## Why FreeRTOS?
+## Inter-task communication
 
-FreeRTOS is chosen to address common embedded system challenges:
-- Blocking code and timing conflicts
-- Monolithic `loop()` logic
-- Tight coupling between subsystems
-- Poor scalability as features grow
+### Queues (fixed-size structs, no heap)
 
-Using FreeRTOS allows the system to:
-- Run independent tasks concurrently
-- Maintain predictable timing behavior
-- Isolate failures and delays
-- Scale without redesign
+| Queue | Depth | Payload | Producer → Consumer |
+|-------|-------|---------|---------------------|
+| `uiEventQueue` | 10 | `UiEvent` | Buttons → UI |
+| `errorQueue` | 20 | `ErrorMsg_t` | any (`pushError`) → Cloud |
+| `telemetryQueue` | 16 | `TelemetryMsg_t` | Cloud retry/backoff buffer |
 
----
+### Mutexes (domain-per-mutex)
 
-## RTOS Design Principles
+| Mutex | Protects |
+|-------|----------|
+| `sensorMutex` | `gSensorData` (temps, humidity, validity flags) |
+| `rtcMutex` | `gRtcTime` (DateTime + epoch) |
+| `settingsMutex` | `gSettings` (setpoints, profile, schedules) |
+| `controlMutex` | `gRelayState` mirror |
+| `milestoneMutex` | milestone banner label |
 
-The following principles guide the RTOS architecture:
+`overTempFault` is shared with ISRs/critical paths via a **spinlock**
+(`portENTER_CRITICAL(&faultMux)`), not a mutex. Wi-Fi request flags use
+`std::atomic`.
 
-1. **One responsibility per task**
-2. **No blocking delays across tasks**
-3. **Explicit communication via queues and events**
-4. **No direct cross-task access to hardware**
-5. **Control logic centralized in FSMs**
+All takes use **bounded timeouts** (30–100 ms). Since BUG-007, the safety-critical
+GPIO write in `setRelay()` happens *before* the mutex — a contended mutex can no
+longer drop a relay command, only delay the state-mirror update.
 
-These rules ensure clarity and maintainability.
+### Profile switching (suspend/resume handshake)
 
----
+1. `switchProfile()` records the new profile in `gSettings` (early-returns if the
+   mutex can't be taken — BUG-019).
+2. Sends `TASK_CMD_SUSPEND` via `xTaskNotify` to each outgoing-profile task.
+3. Tasks block in `xTaskNotifyWait` instead of `vTaskDelay`, so they wake
+   immediately even mid-actuation, drive their relay OFF, set their bit in the
+   `suspendAckGroup` event group, then `vTaskSuspend(NULL)`.
+4. `switchProfile()` waits on the ack bits (3 s safety net — tasks actually ack in
+   milliseconds since BUG-008), then resumes the new profile's tasks.
 
-## Task Overview
+### Task watchdog (TWDT, 10 s — BUG-001)
 
-The platform uses the following FreeRTOS tasks:
+Subscribed: `TempCtrl`, `ClimCtrl`, `DS18B20`, `DHT`. Each calls
+`esp_task_wdt_reset()` at the top of its loop; control tasks deregister before
+self-suspending on profile switch and re-add on resume. A hung control task now
+panics and reboots rather than leaving the heater frozen ON. Long-running tasks
+(turner ≤ 130 s, pump, cloud, UI) are deliberately not subscribed.
 
-| Task | Responsibility |
-|----|----|
-| Sensor Task | Read and validate sensor data |
-| Control Task | Execute system and control FSMs |
-| Actuator Task | Apply commands to hardware |
-| UI Task | Handle OLED display and encoder input |
-| Timer Task | Handle scheduled actions |
-| Logger Task | Log system data and events |
+## Startup sequence (as-built)
 
-Each task runs independently with a defined priority.
-
----
-
-## Task Priority Strategy
-
-Task priorities are assigned based on system criticality:
-
-| Task | Priority | Rationale |
-|----|----|-----------|
-| Control Task | High | Core decision-making |
-| Sensor Task | Medium | Data acquisition |
-| Actuator Task | Medium | Output execution |
-| UI Task | Low | Human interaction |
-| Timer Task | Low | Scheduled operations |
-| Logger Task | Low | Non-critical logging |
-
-This ensures safety-critical logic always executes on time.
-
----
-
-## Task Timing Behavior
-
-Typical task execution intervals:
-
-| Task | Interval |
-|----|---------|
-| Sensor Task | 1–2 seconds |
-| Control Task | 200–500 ms |
-| UI Task | 100–200 ms |
-| Timer Task | 1 second |
-| Logger Task | 30–60 seconds |
-
-Intervals are configurable and profile-dependent.
-
----
-
-## Inter-Task Communication
-
-FreeRTOS primitives are used as follows:
-
-### Queues
-Used for:
-- Sensor data transfer
-- UI commands
-- Actuator commands
-
-Queues provide:
-- Thread safety
-- Clear data ownership
-- Decoupled task interaction
-
----
-
-### Event Groups
-Used for:
-- Alarm signaling
-- Fault conditions
-- System-wide notifications
-
-Event groups enable fast, broadcast-style communication.
-
----
-
-### Shared System Status
-
-A shared system status structure is:
-- Written only by the Control Task
-- Read-only for UI and Logger tasks
-- Protected using a mutex
-
-This avoids race conditions while providing real-time visibility.
-
----
-
-## Core Pinning (ESP32 Specific)
-
-ESP32 has two cores:
-- Core 0: System and background tasks
-- Core 1: Application tasks
-
-Recommended pinning:
-- Control Task → Core 1
-- Sensor Task → Core 1
-- Actuator Task → Core 0
-- UI Task → Core 0
-
-This separation improves responsiveness and stability.
-
----
-
-## Fault Isolation
-
-The RTOS architecture allows:
-- A blocked or delayed task to be isolated
-- Faults to be escalated via events
-- Safe shutdown regardless of task state
-
-Control logic never depends on UI or logging tasks.
-
----
-
-## RTOS Startup Sequence
-
-1. Hardware initialization
-2. HAL initialization
-3. Queue and event creation
-4. Task creation
-5. System enters INIT state
-6. Normal operation begins
-
-This sequence ensures consistent startup behavior.
-
----
-
-## RTOS and Arduino Loop
-
-The Arduino `loop()` function is intentionally left empty.
-
-FreeRTOS tasks fully control system execution.
-
-This prevents:
-- Hidden execution paths
-- Timing conflicts
-- Accidental blocking
-
----
-
-## Summary
-
-The RTOS architecture:
-- Structures system execution cleanly
-- Enables deterministic behavior
-- Supports long-term scalability
-- Aligns with safety and reliability goals
-
-FreeRTOS is a foundational component that enables the platform’s modular design.
-
----
-
-➡️ Next: **Software → FSM Design**
+1. Relay pins driven OFF (before anything else)
+2. I²C, sensors, RTC (RTC failure no longer halts boot — BUG-009), OLED
+3. NVS settings load with range validation (BUG-018)
+4. Queues, mutexes, event group creation
+5. Task creation (table above)
+6. Profile-based suspension of inactive tasks, then TWDT subscription

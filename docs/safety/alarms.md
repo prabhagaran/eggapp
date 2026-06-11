@@ -1,178 +1,64 @@
-# Alarms
+# Alarms & Faults
 
-## Introduction
+!!! info "As-built — describes FW 2.0.0"
+    The design-phase alarm FSM (INFO/WARNING/CRITICAL levels, water-level
+    alarms) is in the *Design Archive*. This page documents the implemented
+    fault and alarm behavior.
 
-This document describes the **alarm system** used in the  
-**Reusable Environmental Control Platform**.
+## The over-temperature latch (the critical fault)
 
-Alarms are a critical part of the system and are designed to:
-- Protect hardware and users
-- Prevent unsafe operation
-- Clearly notify abnormal conditions
-- Require explicit user acknowledgment
+The one condition that takes over the whole system:
 
-Alarms always have **higher priority** than normal operation.
+| | Incubator | Climate chamber |
+|---|---|---|
+| Trip threshold | **39.5 °C** | **80 °C** |
 
----
+When tripped:
 
-## Alarm Philosophy
+1. `overTempFault` is set under a spinlock and **persisted to NVS**
+   (`otFault`) — a power blip cannot silently clear the latch (BUG-010).
+2. All relays are forced OFF every control cycle while latched.
+3. The UI unconditionally shows the **fault screen** (banner, live temperature,
+   "Hold OK 3s to Reset") and discards normal input.
+4. Recovery is **manual only**: hold OK for 3 s. The button task clears the
+   latch and the NVS flag, forces relays off again, and logs `FAULT_RESET`.
 
-The alarm system follows these core principles:
+## Sensor-validity gates
 
-1. **Safety first**
-2. **Deterministic behavior**
-3. **Clear visibility to the user**
-4. **Explicit acknowledgment**
-5. **Safe recovery only after fault removal**
+- **DS18B20 invalid** (disconnected, power-on-reset 85 °C signature, out of
+  −10…100 °C) → heater is forced OFF; control acts only on valid data.
+- **DHT22 invalid** → humidifier and pump are forced OFF (BUG-003). Stale
+  values are never fabricated at boot; a held value is only served after at
+  least one genuine reading.
+- During an RTC failure (`rtcEpochValid == false`) all epoch-based logic
+  (turner, cyclic phase, ramp, milestones) is suspended rather than allowed to
+  underflow (BUG-005); temperature control continues normally.
 
-An alarm is not just a message—it is a **system state**.
+## Plausibility & runtime alarms (warnings, non-latching)
 
----
+| Alarm | Condition | Action |
+|-------|-----------|--------|
+| `SENSOR_WARN` | \|T_DS18B20 − T_DHT22\| > 5 °C for 5 min | throttled error pushed to cloud |
+| `HEATER_WARN` | heater ON > 30 min without ≥ 0.5 °C rise | throttled error (stuck relay / failed heater / open door) |
+| `NVS_CORRUPT` | out-of-range value found at settings load | value clamped, error pushed (BUG-018) |
+| `CLOCK_UNSET` | RTC fell back to compile time | error pushed once (BUG-028) |
 
-## Alarm Levels
+## Watchdog
 
-Each alarm is assigned a severity level.
+The ESP32 task watchdog (10 s) supervises both control tasks and both sensor
+tasks (BUG-001). A hung control task panics and reboots the device — and because
+the over-temp latch is NVS-persisted, a latched fault survives that reboot.
 
-| Level | Description |
-|----|----|
-| INFO | Informational event, no action required |
-| WARNING | Abnormal condition, system may continue with restrictions |
-| CRITICAL | Unsafe condition, system enters safe state |
+## Error reporting path
 
-Severity levels may be interpreted differently depending on the active profile.
+`pushError(source, message)` → `errorQueue` (depth 20, per-source throttling)
+→ drained by the cloud task to the HTTPS endpoint. If the queue overflows, a
+dropped-error counter is reported once connectivity returns (BUG-024). Errors
+are also always mirrored to the serial log.
 
----
+## Known gaps (tracked in `FEATURE_ROADMAP.md`)
 
-## Alarm Types
-
-The platform supports the following alarm categories:
-
-### Temperature Alarms
-- Temperature sensor failure
-- Temperature too high
-- Temperature too low
-
-### Humidity Alarms
-- Humidity sensor failure
-- Humidity too high
-- Humidity too low
-
-### Water Level Alarms
-- Water level low
-- Water level sensor failure
-
-### System Alarms
-- General system fault
-- Configuration error
-
----
-
-## Alarm Finite State Machine (Alarm FSM)
-
-The alarm system is implemented using a dedicated FSM.
-
-### Alarm FSM States
-- `ALARM_CLEAR` – No active alarm
-- `ALARM_ACTIVE` – Alarm present and unacknowledged
-- `ALARM_ACKED` – Alarm acknowledged, condition still present
-
----
-
-### Alarm FSM Behavior
-
-| Condition | Action |
-|--------|--------|
-| Fault detected | Enter `ALARM_ACTIVE` |
-| User acknowledges | Enter `ALARM_ACKED` |
-| Fault condition cleared | Return to `ALARM_CLEAR` |
-
----
-
-## Alarm Flow
-
-![alt text](image.png)
-
-
-This ensures unsafe conditions are never ignored.
-
----
-
-## Interaction With Control Logic
-
-When an alarm is active:
-- Normal control FSMs are suspended or restricted
-- Actuators are driven to a safe OFF state (for CRITICAL alarms)
-- User input is limited to alarm acknowledgment
-
-Alarm logic overrides profile and UI behavior.
-
----
-
-## Profile-Based Alarm Severity
-
-Alarm severity may vary by profile.
-
-Example:
-- High temperature in **Incubator** → CRITICAL
-- High temperature in **Thermostat** → WARNING
-
-Profiles define how alarms are interpreted, not how they are detected.
-
----
-
-## UI Behavior During Alarms
-
-- UI switches to a dedicated alarm screen
-- Alarm message is clearly displayed
-- Normal navigation is disabled
-- Short press acknowledges the alarm
-
-The user cannot bypass an active alarm.
-
----
-
-## Alarm Logging
-
-Each alarm event is logged with:
-- Alarm type
-- Severity
-- Timestamp
-- System state
-
-This provides traceability and aids debugging.
-
----
-
-## Recovery Rules
-
-The system only recovers from an alarm when:
-1. The user has acknowledged the alarm
-2. The fault condition is no longer present
-
-Automatic recovery without acknowledgment is not allowed for critical alarms.
-
----
-
-## Safety Guarantees
-
-The alarm system guarantees that:
-- Unsafe actuator states are prevented
-- Faults are visible to the user
-- Recovery is controlled and explicit
-- System behavior remains deterministic
-
----
-
-## Summary
-
-The alarm system:
-- Protects hardware and users
-- Enforces safe system behavior
-- Integrates tightly with FSMs and UI
-- Supports profile-based severity handling
-
-It is a fundamental component of the platform’s safety architecture.
-
----
-
-➡️ Next: **Safety & Logging → Logging**
+- No local audible alarm yet (buzzer — roadmap 1.1)
+- Non-fault errors are not shown on the OLED, only serial/cloud
+- Single temperature sensor remains a SPOF; the DHT22 cross-check warns but
+  cannot take over (roadmap 1.2)

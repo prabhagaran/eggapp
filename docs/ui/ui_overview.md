@@ -1,168 +1,92 @@
 # UI Overview
 
-## Introduction
+!!! info "As-built — describes `task_ui.cpp` / `oled_ui.cpp` (FW 2.0.0)"
+    The original Nokia-style / rotary-encoder design is preserved in the
+    *Design Archive* section. The shipped UI uses an SSD1306 128×64 OLED and
+    three push buttons.
 
-This document describes the **User Interface (UI) architecture** of the  
-**Reusable Environmental Control Platform**.
+## Hardware
 
-The UI is designed to be:
-- Simple
-- Reliable
-- Deterministic
-- Profile-aware
-- Suitable for long-term use
+- **SSD1306 128×64 OLED** on I²C (0x3C), Adafruit_SSD1306 driver
+- **Three buttons**: UP (GPIO 32), DOWN (GPIO 33), OK (GPIO 25) — see *Button Mapping*
 
-The UI follows a **classic Nokia-style design philosophy**, prioritizing clarity and robustness over visual complexity.
+## Architecture
 
----
+The UI is a single FreeRTOS task (`task_ui`, Core 1, priority 2) running an
+**event-driven state machine**:
 
-## UI Design Goals
+- The button task posts `UI_EVT_UP / DOWN / OK` events to `uiEventQueue` (depth 10).
+- `task_ui` blocks on the queue with a 50 ms timeout. On timeout it runs
+  time-driven work (home-screen refresh, live sensor refresh on edit screens,
+  non-blocking NTP progress); on an event it dispatches to the current
+  `UiState` handler.
+- All displayed data is read as **snapshots under their domain mutexes** —
+  the UI never touches sensors or actuators directly; settings changes go
+  through `gSettings` + `saveSettings()` like any other writer.
 
-The primary goals of the UI design are:
+### Redraw policy
 
-- Provide clear visibility of system status
-- Allow safe configuration of system parameters
-- Never interfere with control logic
-- Remain responsive under all conditions
-- Work consistently across all profiles
+Screens redraw only when something changed (`lastMenuIdx` dirty-check), plus:
 
-The UI is not responsible for making control decisions.
+- Home screen: every 3 s (sensor values) and on minute change (clock)
+- Temperature / humidity edit screens: live current-value refresh every 1 s
+- OLED init failure does not halt the system — the UI task idles and all
+  control tasks keep running (BUG-009)
 
----
+## Screen map
 
-## UI Hardware Components
+```text
+HOME (incubator or climate variant)
+└─ OK → MAIN MENU
+   ├─ Egg Incubator   (10 items, scrolling window of 4)
+   │   ├─ Control Mode → Auto / Manual (manual: heater toggle)
+   │   ├─ Set Temperature   (live reading + setpoint, 0.1 °C steps)
+   │   ├─ Set Humidity      (1 % steps)
+   │   ├─ Hysteresis        (temp / humidity)
+   │   ├─ Egg Type          (chicken / duck / quail / custom presets)
+   │   ├─ Incubation Day    (start-date editor, D/M/Y fields)
+   │   ├─ Turner            (interval, duration, Turn Now)
+   │   ├─ Fan               (PWM speed %)
+   │   ├─ Pump Duration     (5–120 s)
+   │   └─ Back
+   ├─ Climate Chamber  (6 items)
+   │   ├─ Control Mode / Set Temp / Set Hum / Hysteresis
+   │   ├─ Climate Mode → Fixed Schedule / Cyclic / Ramp (view)
+   │   └─ Back
+   ├─ System           (6 items)
+   │   ├─ Switch Profile (Egg Incubator ⇄ Climate Chamber)
+   │   ├─ WiFi (connect / disconnect)
+   │   ├─ Time & Date (manual RTC edit, WiFi/NTP sync)
+   │   ├─ Device Info (ID, FW, IP, uptime)
+   │   ├─ Factory Reset (No/Yes confirm, defaults to No)
+   │   └─ Back
+   └─ Back → HOME
+```
 
-The UI subsystem consists of:
-- **OLED Display** (I²C)
-- **Rotary Encoder with Push Button**
+## Home screens
 
-These components provide a minimal yet powerful interaction model suitable for embedded systems.
+**Incubator:** mode (AUTO/MAN), clock, incubation day + date, T current/setpoint,
+H current/setpoint, hatch countdown or milestone banner, relay states
+(heater/fan/humidifier/turner), `!W` indicator when Wi-Fi is down.
 
----
+**Climate:** mode, clock, T/H current/setpoint, phase (HEAT/COOL/IDLE or RAMP n),
+heater/cooler/humidifier states, Wi-Fi indicator.
 
-## UI Architecture Overview
+## Fault override
 
-![alt text](image.png)
+When the over-temperature latch is set, the UI unconditionally shows the
+**fault screen** (alarm banner, live temperature, "Hold OK 3s to Reset") and
+discards queued button events. The reset gesture is handled by the button task,
+not the UI.
 
+## Behavioral details (post bug-fix series)
 
-System status flows in the opposite direction:
-
-![alt text](image-1.png)
-
-
-The UI never accesses sensors or actuators directly.
-
----
-
-## UI Finite State Machine (UI FSM)
-
-The UI behavior is controlled using a dedicated FSM.
-
-### UI FSM States
-- `UI_BOOT` – Startup screen
-- `UI_HOME` – Status display
-- `UI_MENU_LIST` – Menu navigation
-- `UI_VALUE_EDIT` – Parameter editing
-- `UI_ALARM` – Alarm display and acknowledgment
-
-Each state has a clear purpose and defined transitions.
-
----
-
-## Status Display (Home Screen)
-
-The home screen provides real-time visibility of:
-- Temperature
-- Humidity (if enabled)
-- Water level (if enabled)
-- System mode (AUTO / MANUAL)
-- Active profile
-- System state (IDLE / HEATING / COOLING / FAULT)
-
-The home screen is **read-only**.
-
----
-
-## Menu-Based Navigation
-
-All configuration is performed using a **menu-driven interface**.
-
-Menu characteristics:
-- Vertical list layout
-- Single active selection
-- Profile-dependent menu items
-- Consistent navigation rules
-
-The menu structure adapts automatically based on the active profile.
-
----
-
-## Parameter Editing
-
-When editing a value:
-- Only one parameter is edited at a time
-- Changes are previewed before confirmation
-- Limits are enforced by the control logic
-- Canceling an edit restores the previous value
-
-This prevents accidental or unsafe configuration changes.
-
----
-
-## Alarm UI Behavior
-
-When an alarm is active:
-- The UI enters a dedicated alarm screen
-- Normal navigation is blocked
-- Alarm message is displayed clearly
-- User acknowledgment is required
-
-Alarms always override normal UI behavior.
-
----
-
-## Profile Awareness
-
-The UI dynamically adapts based on the active profile:
-- Displays only relevant parameters
-- Shows only applicable menu items
-- Hides unused sensors and actuators
-
-This keeps the UI clean and context-aware.
-
----
-
-## UI Safety Rules
-
-The following safety rules are enforced:
-- UI cannot directly control actuators
-- UI input is ignored during critical faults
-- Unsafe values cannot be committed
-- All changes go through control validation
-
----
-
-## Performance Considerations
-
-- OLED refresh rate is limited to avoid flicker
-- Encoder input is debounced
-- UI task runs at lower priority than control logic
-- No blocking delays are used in UI code
-
-This ensures a responsive and stable system.
-
----
-
-## Summary
-
-The UI subsystem:
-- Provides reliable local interaction
-- Is fully decoupled from control logic
-- Adapts automatically to different profiles
-- Prioritizes safety and clarity
-
-The Nokia-style UI ensures consistent and predictable behavior across all use cases.
-
----
-
-➡️ Next: **User Interface → Nokia Style UI**
+- Every menu entry takes effect on the **first** press — the swallowed-first-event
+  patterns were removed (BUG-031, BUG-038)
+- OK events are rate-limited to one per 300 ms to absorb contact bounce
+- NTP sync runs **non-blocking**: buttons stay live during sync, and presses made
+  while syncing are discarded instead of replaying afterwards (BUG-033)
+- Factory reset requires highlighting **Yes** explicitly; a stray OK lands on
+  **No** (BUG-034)
+- Climate schedule/cyclic editors edit local buffers and commit on the final OK,
+  so the control task never sees half-edited values (BUG-035)
