@@ -23,6 +23,26 @@ Transport: HTTPS GET to a **Google Apps Script** endpoint, token-authenticated,
 root CA pinned via `secrets.h` (gitignored; `secrets.h.example` is the
 template — cloud features disable cleanly when absent).
 
+### Sheet column layout (as written by the Apps Script endpoint)
+
+| Column | Meaning | Notes |
+|--------|---------|-------|
+| `Timestamp` | server-side receive time | sheet timezone |
+| `DeviceID`, `FW` | e.g. `INCUBATOR_01`, `2.0.0` | |
+| `Profile` | `EGG` / `CLIMATE` | |
+| `Temp`, `Hum` | current DS18B20 °C, DHT22 %RH | **`Hum = 0` means an invalid DHT read** — exclude from averages |
+| `SetTemp`, `SetHum` | active setpoints | reflects lockdown raise etc. |
+| `Mode` | `AUTO` / `MANUAL` | |
+| `Heater` … `Turner` | relay states, 1/0 | sampled once per minute — short actuations (pump 10 s, turner 30 s) **undercount** if used to count events |
+| `Day`, `DaysLeft` | incubation day tracking | `0` = not started |
+| `HatchEpoch` | predicted hatch date (unix) | |
+| `Phase` | climate-chamber phase | empty in EGG profile (expected) |
+
+A ready-made dashboard builder lives at **`tools/sheets_dashboard.gs`** in the
+repository — paste it into the sheet's Apps Script editor and run
+*Incubator → Build / refresh dashboard* for hourly temperature/humidity/duty
+charts with invalid reads filtered out.
+
 ### Reliability behavior
 
 - **Retry queue:** failed sends are buffered in `telemetryQueue` (16 messages)

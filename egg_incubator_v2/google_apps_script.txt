@@ -21,7 +21,7 @@
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 const TOKEN    = 'a1b2c3d4e5f60718293a4b5c6d7e8f90'; // must match CLOUD_TOKEN in config.h / secrets.h
-const SHEET_ID = 'REPLACE_WITH_SHEET_ID';             // Google Sheet ID from the URL
+const SHEET_ID = '1p3ud1bIm_ypz806wJOYs797Bpn0PZ_ON2fb6KQXr9OE';             // Google Sheet ID from the URL
 
 // ─── Sheet header definitions ─────────────────────────────────────────────────
 const TELEMETRY_HEADERS = [
