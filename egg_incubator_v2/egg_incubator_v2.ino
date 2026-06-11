@@ -355,6 +355,9 @@ void setup() {
     pinMode(RELAY_PUMP,       OUTPUT); digitalWrite(RELAY_PUMP,       RELAY_OFF);
     pinMode(RELAY_TURNER,     OUTPUT); digitalWrite(RELAY_TURNER,     RELAY_OFF);
 
+    // ── Fan PWM — init LEDC once, before any task can call setFanSpeed() ─────
+    initFanPwm();
+
     // ── Button pins ──────────────────────────────────────────────────────────
     pinMode(BTN_UP,   INPUT_PULLUP);
     pinMode(BTN_DOWN, INPUT_PULLUP);
@@ -368,12 +371,14 @@ void setup() {
     // without wall-clock time. Epoch-dependent logic (turner, milestones, cyclic
     // phase) is already gated on rtcEpochValid, so it stays dormant until the
     // clock is set via the UI or NTP.
+    bool clockSetFromCompileTime = false;
     if (!rtc.begin()) {
         Serial.println("[SETUP] RTC not found — continuing without RTC");
         rtcEpochValid = false;
     } else if (!rtc.isrunning()) {
         Serial.println("[SETUP] RTC not running — setting to compile time");
         rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+        clockSetFromCompileTime = true;
     }
 
     // ── RTOS primitives ──────────────────────────────────────────────────────
@@ -386,6 +391,12 @@ void setup() {
     errorQueue    = xQueueCreate(ERROR_QUEUE_SIZE, sizeof(ErrorMsg_t));
     telemetryQueue  = xQueueCreate(TELEMETRY_QUEUE_SIZE, sizeof(TelemetryMsg_t));
     suspendAckGroup = xEventGroupCreate();
+
+    // Compile time passes the epoch sanity gate but is NOT the real time —
+    // warn the operator so they verify/set the clock (BUG-028).
+    if (clockSetFromCompileTime) {
+        pushError("CLOCK_UNSET", "RTC set from compile time — verify clock");
+    }
 
     // ── Load settings from NVS ───────────────────────────────────────────────
     loadSettings();

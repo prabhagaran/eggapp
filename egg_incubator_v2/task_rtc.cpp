@@ -12,16 +12,17 @@ extern RTC_DS1307 rtc;  // defined in main .ino
 // ─────────────────────────────────────────────────────────────────────────────
 void task_rtc(void* pvParameters) {
     for (;;) {
-        DateTime now = rtc.now();
+        DateTime now   = rtc.now();
+        uint32_t epoch = now.unixtime();  // local copy — used outside the mutex
 
         if (xSemaphoreTake(rtcMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
             gRtcTime.now   = now;
-            gRtcTime.epoch = now.unixtime();
+            gRtcTime.epoch = epoch;
             xSemaphoreGive(rtcMutex);
 
             // Epoch sanity: DS1307 power-loss returns 2000-01-01 (epoch ~946684800)
             static unsigned long lastEpochErrMs = 0;
-            if (gRtcTime.epoch < 1700000000UL) {
+            if (epoch < 1700000000UL) {
                 rtcEpochValid = false;
                 if (millis() - lastEpochErrMs > 30000UL) {
                     lastEpochErrMs = millis();
@@ -35,7 +36,7 @@ void task_rtc(void* pvParameters) {
         static bool rtc_first = true;
         if (rtc_first) {
             rtc_first = false;
-            Serial.printf("[RTC] nowEpoch = %lu\n", (unsigned long)gRtcTime.epoch);
+            Serial.printf("[RTC] nowEpoch = %lu\n", (unsigned long)epoch);
         }
 
         vTaskDelay(pdMS_TO_TICKS(1000));

@@ -137,8 +137,7 @@ enum UiEvent : uint8_t {
     UI_EVT_NONE,
     UI_EVT_UP,
     UI_EVT_DOWN,
-    UI_EVT_OK,
-    UI_EVT_LONGOK
+    UI_EVT_OK
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -151,7 +150,6 @@ enum UiState : uint8_t {
     UI_MAIN_MENU,
     UI_CONTROLLER_MODE_MENU,
 
-    UI_SET_ENV_MENU,
     UI_ENV_TEMPERATURE,
     UI_ENV_HUMIDITY,
     UI_ENV_HYSTERESIS_MENU,
@@ -173,7 +171,6 @@ enum UiState : uint8_t {
     UI_CLIMATE_CYCLIC,
     UI_CLIMATE_RAMP,
 
-    UI_SETTINGS_MENU,
     UI_WIFI_MENU,
     UI_MODE_MENU,
     UI_MANUAL_CONTROL_MENU,
@@ -210,16 +207,6 @@ enum EnvMenuItem : uint8_t {
     ENV_COUNT
 };
 
-enum SettingsMenuItem : uint8_t {
-    SET_TIME_DATE = 0,
-    SET_WIFI,
-    SET_MODE,
-    SET_DEVICE_INFO,
-    SET_FACTORY_RESET,
-    SET_BACK,
-    SET_COUNT
-};
-
 // ─────────────────────────────────────────────────────────────────────────────
 // EXTERN DECLARATIONS — defined in globals.cpp
 // ─────────────────────────────────────────────────────────────────────────────
@@ -251,6 +238,7 @@ extern portMUX_TYPE  faultMux;
 extern std::atomic<bool> wifiUserEnabled;   // true = user has enabled Wi-Fi
 extern std::atomic<bool> wifiPortalActive;  // true = config portal is running
 extern volatile bool rtcEpochValid;     // true = RTC epoch is sane (> Nov 2023)
+extern std::atomic<uint32_t> gErrorsDropped;  // errors lost to a full errorQueue
 
 extern TaskHandle_t hTaskTurner;
 extern TaskHandle_t hTaskFan;
@@ -277,7 +265,8 @@ inline float round1(float v) { return roundf(v * 10.0f) / 10.0f; }
 void setRelay(uint8_t pin, bool on);
 void allRelaysOff(void);
 void clampEpochsToNow(uint32_t newNow);  // call after rtc.adjust() to prevent epoch underflow
-// LEDC-based fan PWM helper (implemented in task_incubator.cpp)
+// LEDC-based fan PWM helpers (implemented in task_incubator.cpp)
+void initFanPwm(void);   // one-time LEDC init — call from setup() before tasks start
 void setFanSpeed(uint8_t percent);
 
 #endif // GLOBALS_H

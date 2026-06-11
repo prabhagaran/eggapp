@@ -19,7 +19,6 @@ static const char* uiEventName(UiEvent e) {
         case UI_EVT_UP:   return "UP";
         case UI_EVT_DOWN: return "DOWN";
         case UI_EVT_OK:   return "OK";
-        case UI_EVT_LONGOK: return "LONGOK";
         default: return "?";
     }
 }
@@ -33,8 +32,6 @@ static const char* uiStateName(UiState s) {
         case UI_SYSTEM_MENU: return "SYSTEM_MENU";
         case UI_PUMP_SETTINGS: return "PUMP_SETTINGS";
         case UI_CONTROLLER_MODE_MENU: return "CONTROLLER_MODE_MENU";
-        case UI_SET_ENV_MENU: return "SET_ENV_MENU";
-        case UI_SETTINGS_MENU: return "SETTINGS_MENU";
         case UI_ENV_TEMPERATURE: return "ENV_TEMPERATURE";
         case UI_ENV_HUMIDITY: return "ENV_HUMIDITY";
         case UI_ENV_INCUBATION_DAY: return "ENV_INCUBATION_DAY";
@@ -56,8 +53,6 @@ extern void switchProfile(ProfileType newProfile);
 static UiState  uiState          = UI_HOME;
 static int      mainMenuIdx      = 0;
 static int      controllerModeIdx= 0;
-static int      envMenuIdx       = 0;
-static int      settingsMenuIdx  = 0;
 static int      modeMenuIdx      = 0;
 static int      manualCtrlIdx    = 0;
 static int      hysteresisMenuIdx= 0;
@@ -359,107 +354,7 @@ void task_ui(void* pvParameters) {
             }
         }
 
-        // ═════════════════════════════════════════════════════════════════════
-        // SET ENVIRONMENT MENU
-        // ═════════════════════════════════════════════════════════════════════
-        else if (uiState == UI_SET_ENV_MENU) {
-            // Number of items depends on profile:
-            // Incubator: Temperature, Hysteresis, Humidity, Inc.Start Day, Egg Type, Turner, Fan, Back = 8
-            // Climate:   Temperature, Hysteresis, Humidity, Climate Profile, Back = 5
-            int itemCount = (profile == PROFILE_EGG_INCUBATOR) ? 8 : 5;
-            if      (evt == UI_EVT_UP)   envMenuIdx = (envMenuIdx - 1 + itemCount) % itemCount;
-            else if (evt == UI_EVT_DOWN) envMenuIdx = (envMenuIdx + 1) % itemCount;
-
-            if (envMenuIdx != lastMenuIdx) {
-                oled_show_set_environment(envMenuIdx, profile);
-                lastMenuIdx = envMenuIdx;
-            }
-
-            if (evt == UI_EVT_OK) {
-                float curTemp = 0.0f;
-                float curHum  = 0.0f;
-                if (xSemaphoreTake(sensorMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
-                    curTemp = gSensorData.temp_ds18b20;
-                    curHum  = gSensorData.humidity_dht;
-                    xSemaphoreGive(sensorMutex);
-                }
-
-                // Common items 0-2
-                if (envMenuIdx == 0) {
-                    uiState = UI_ENV_TEMPERATURE;
-                    lastTempUiRefreshMs = 0;
-                    oled_show_temperature(curTemp, tempSP);
-                } else if (envMenuIdx == 1) {
-                    uiState = UI_ENV_HYSTERESIS_MENU;
-                    hysteresisMenuIdx = 0; lastMenuIdx = -1;
-                    oled_show_hysteresis_menu(hysteresisMenuIdx, tempHyst, humHyst);
-                    lastMenuIdx = hysteresisMenuIdx;
-                } else if (envMenuIdx == 2) {
-                    uiState = UI_ENV_HUMIDITY;
-                    oled_show_humidity(curHum, humSP);
-                }
-
-                // Egg incubator items 3-7
-                else if (profile == PROFILE_EGG_INCUBATOR) {
-                    if (envMenuIdx == 3) {
-                    // Incubation start date
-                        uiState = UI_ENV_INCUBATION_DAY;
-                        // Force the UI state's own initialization path to run on the
-                        // next loop iteration so static edit/navigation state is reset
-                        // (prevents stale mode/editField from previous visits).
-                        editField = 0;
-                        lastMenuIdx = -1;
-                        Serial.println("[UI] Request enter INCUBATION screen (will init next loop)");
-                        continue;
-                    } else if (envMenuIdx == 4) {
-                        uiState = UI_ENV_EGG_TYPE;
-                        if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
-                            eggTypeIdx = (int)gSettings.eggType;
-                            xSemaphoreGive(settingsMutex);
-                        }
-                        oled_show_egg_type(eggTypeIdx);
-                    } else if (envMenuIdx == 5) {
-                        uiState = UI_ENV_TURNER;
-                        turnerMenuIdx = 0;
-                        uint16_t intv = DEFAULT_TURNER_INTERVAL_MIN, dur = DEFAULT_TURNER_DURATION_SEC;
-                        if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
-                            intv = gSettings.turnerIntervalMin;
-                            dur  = gSettings.turnerDurationSec;
-                            xSemaphoreGive(settingsMutex);
-                        }
-                        oled_show_turner_settings(turnerMenuIdx, intv, dur, 0, false);
-                    } else if (envMenuIdx == 6) {
-                        uiState = UI_ENV_FAN;
-                        fanMenuIdx = 0;
-                        uint8_t speed = DEFAULT_FAN_SPEED_PERCENT;
-                        if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
-                            speed = (uint8_t)gSettings.fanSpeedPercent;
-                            xSemaphoreGive(settingsMutex);
-                        }
-                        oled_show_fan_settings(fanMenuIdx, speed);
-                    } else if (envMenuIdx == 7) {
-                        // Back
-                        uiState = UI_MAIN_MENU; lastMenuIdx = -1;
-                        oled_show_menu(mainMenuIdx);
-                        lastMenuIdx = mainMenuIdx;
-                    }
-                }
-
-                // Climate chamber items 3-4
-                else {
-                    if (envMenuIdx == 3) {
-                        uiState = UI_CLIMATE_MODE_MENU;
-                        climateModeIdx = 0; lastMenuIdx = -1;
-                        oled_show_climate_mode_menu(climateModeIdx, climMode);
-                        lastMenuIdx = climateModeIdx;
-                    } else if (envMenuIdx == 4) {
-                        uiState = UI_MAIN_MENU; lastMenuIdx = -1;
-                        oled_show_menu(mainMenuIdx);
-                        lastMenuIdx = mainMenuIdx;
-                    }
-                }
-            }
-        }
+        // (BUG-025: dead UI_SET_ENV_MENU handler removed — no state ever entered it)
 
         // ═════════════════════════════════════════════════════════════════════
         // TEMPERATURE EDIT
@@ -1515,66 +1410,7 @@ void task_ui(void* pvParameters) {
             oled_show_climate_ramp(climateRampIdx, sc, rs, asi);
         }
 
-        // ═════════════════════════════════════════════════════════════════════
-        // SETTINGS MENU
-        // ═════════════════════════════════════════════════════════════════════
-        else if (uiState == UI_SETTINGS_MENU) {
-            if      (evt == UI_EVT_UP)   settingsMenuIdx = (settingsMenuIdx - 1 + SET_COUNT) % SET_COUNT;
-            else if (evt == UI_EVT_DOWN) settingsMenuIdx = (settingsMenuIdx + 1) % SET_COUNT;
-
-            if (settingsMenuIdx != lastMenuIdx) {
-                oled_show_settings_menu(settingsMenuIdx);
-                lastMenuIdx = settingsMenuIdx;
-            }
-
-            if (evt == UI_EVT_OK) {
-                switch ((SettingsMenuItem)settingsMenuIdx) {
-                    case SET_TIME_DATE: {
-                        // Initialise submenu index and open Time & Date menu
-                        timeDateMenuIdx = 0;
-                        uiState     = UI_TIME_DATE_MENU;
-                        lastMenuIdx = -1;
-                        oled_show_time_date_menu(timeDateMenuIdx);
-                        lastMenuIdx = timeDateMenuIdx;
-                        break;
-                    }
-                    case SET_WIFI:
-                        uiState     = UI_WIFI_MENU;
-                        wifiMenuIdx = 0;
-                        lastMenuIdx = -1;
-                        oled_show_wifi_menu(wifiMenuIdx, WiFi.status() == WL_CONNECTED);
-                        lastMenuIdx = wifiMenuIdx;
-                        break;
-                    case SET_MODE:
-                        uiState = UI_MODE_MENU;
-                        modeMenuIdx = (ctrlMode == MODE_AUTO) ? 0 : 1;
-                        lastMenuIdx = -1;
-                        oled_show_mode_menu(modeMenuIdx);
-                        lastMenuIdx = modeMenuIdx;
-                        break;
-                    case SET_DEVICE_INFO: {
-                        uiState = UI_DEVICE_INFO;
-                        String ip = WiFi.localIP().toString();
-                        uint32_t up = millis() / 1000;
-                        oled_show_device_info(DEVICE_ID, FW_VERSION, ip.c_str(),
-                            profile == PROFILE_EGG_INCUBATOR ? "Incubator" : "Climate",
-                            up);
-                        break;
-                    }
-                    case SET_FACTORY_RESET:
-                        uiState = UI_FACTORY_RESET_CONFIRM;
-                        oled_show_factory_reset_confirm();
-                        break;
-                    case SET_BACK:
-                        uiState = UI_MAIN_MENU; lastMenuIdx = -1;
-                        oled_show_menu(mainMenuIdx);
-                        lastMenuIdx = mainMenuIdx;
-                        break;
-                    default:
-                        break;
-                }
-            }
-        }
+        // (BUG-025: dead UI_SETTINGS_MENU handler removed — no state ever entered it)
 
         // ═════════════════════════════════════════════════════════════════════
         // WiFi MENU  (Settings → WiFi)

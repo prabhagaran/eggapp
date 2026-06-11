@@ -83,7 +83,9 @@ void task_cloud(void* pvParameters) {
             if (code > 0) http.getString();  // drain
             http.end();
 
-            if (code > 0) {
+            // Same success criterion as the first-attempt path: 2xx/3xx only.
+            // 404/500 etc. are server failures and must retry, not "succeed".
+            if (code >= 200 && code < 400) {
                 Serial.printf("[CLOUD] Retry success code=%d\n", code);
             } else {
                 // failed: schedule next attempt or drop
@@ -173,6 +175,17 @@ void task_cloud(void* pvParameters) {
             }
 
             vTaskDelay(pdMS_TO_TICKS(500));  // brief gap between error sends
+        }
+
+        // ── Report errors that were dropped while the queue was full ────────
+        {
+            uint32_t dropped = gErrorsDropped.exchange(0, std::memory_order_acq_rel);
+            if (dropped > 0) {
+                char msg[40];
+                snprintf(msg, sizeof(msg), "%lu errors dropped (queue full)", (unsigned long)dropped);
+                pushError("ERR_DROPPED", msg);
+                Serial.printf("[CLOUD] %s\n", msg);
+            }
         }
 
         // ── Snapshot all telemetry data ──────────────────────────────────────

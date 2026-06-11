@@ -24,6 +24,8 @@ void task_ds18b20(void* pvParameters) {
     esp_task_wdt_add(NULL);   // subscribe to TWDT (max cycle ≈ 1 800 ms, well under 10 s)
 
     static unsigned long lastErrorMs = 0;
+    float lastValidTemp = -999.0f;
+    bool  hadValidTemp  = false;
 
     for (;;) {
         esp_task_wdt_reset();  // pet the watchdog at the top of every cycle
@@ -34,8 +36,15 @@ void task_ds18b20(void* pvParameters) {
 
         float t = ds18b20.getTempCByIndex(0);
 
-        if (t == DEVICE_DISCONNECTED_C || t == 85.0f) {
-            // 85.0 is the DS18B20 power-on reset value — treat as invalid
+        // 85.0 is the DS18B20 power-on-reset value, but it is also a legitimate
+        // reading in the climate profile (valid range extends past 85 °C).
+        // Treat exactly 85.0 as POR only when implausible: no prior valid
+        // reading, or the last valid reading was nowhere near 85.
+        bool likelyPOR = (t == 85.0f) &&
+                         (!hadValidTemp || lastValidTemp < 80.0f || lastValidTemp > 90.0f);
+
+        if (t == DEVICE_DISCONNECTED_C || likelyPOR) {
+            // Disconnected, or 85.0 judged to be the power-on reset value
             if (xSemaphoreTake(sensorMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
                 gSensorData.temp_ds18b20 = -999.0f;
                 gSensorData.temp_valid   = false;
@@ -60,6 +69,8 @@ void task_ds18b20(void* pvParameters) {
             }
 
         } else {
+            lastValidTemp = t;
+            hadValidTemp  = true;
             if (xSemaphoreTake(sensorMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
                 gSensorData.temp_ds18b20 = t;
                 gSensorData.temp_valid   = true;

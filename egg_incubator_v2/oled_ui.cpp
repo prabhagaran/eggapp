@@ -292,7 +292,11 @@ void oled_show_fault_screen(float currentTemp) {
 
     display.setCursor(0, 37);
     display.print("Temp: ");
-    display.print(currentTemp, 1);
+    if (currentTemp < -100.0f) {
+        display.print("--.-");   // sensor invalid during the latch
+    } else {
+        display.print(currentTemp, 1);
+    }
     display.print(" C");
 
     display.setCursor(0, 50);

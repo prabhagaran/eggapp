@@ -46,20 +46,36 @@ TaskHandle_t hTaskClimateControl= nullptr;
 // ─────────────────────────────────────────────────────────────────────────────
 // pushError — safe from any task, non-blocking
 // ─────────────────────────────────────────────────────────────────────────────
+std::atomic<uint32_t> gErrorsDropped{0};  // errors lost to a full errorQueue
+
 void pushError(const char* type, const char* message) {
     ErrorMsg_t err;
     strncpy(err.type,    type,    sizeof(err.type)    - 1);
     strncpy(err.message, message, sizeof(err.message) - 1);
     err.type[sizeof(err.type) - 1]       = '\0';
     err.message[sizeof(err.message) - 1] = '\0';
-    // Non-blocking: if queue is full, the error is silently dropped
-    xQueueSend(errorQueue, &err, 0);
+    // Non-blocking: if queue is full, count the drop so it can be reported later
+    if (xQueueSend(errorQueue, &err, 0) != pdTRUE) {
+        gErrorsDropped.fetch_add(1, std::memory_order_relaxed);
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // setRelay — single point of relay control; mirrors state into gRelayState
 // ─────────────────────────────────────────────────────────────────────────────
 void setRelay(uint8_t pin, bool on) {
+    // RELAY_FAN is LEDC-attached — digitalWrite would fight the PWM peripheral
+    // and gRelayState.fanOn would go stale. Fan must go through setFanSpeed().
+    switch (pin) {
+        case RELAY_HEATER: case RELAY_COOLER: case RELAY_HUMIDIFIER:
+        case RELAY_PUMP:   case RELAY_TURNER:
+            break;
+        default:
+            pushError("FAULT", "setRelay: unsupported pin");
+            Serial.printf("[RELAY] setRelay called with unsupported pin %u — ignored\n", pin);
+            return;
+    }
+
     // GPIO write is atomic on ESP32 — always execute it regardless of mutex state.
     // The mutex only protects the gRelayState software mirror.
     digitalWrite(pin, on ? RELAY_ON : RELAY_OFF);

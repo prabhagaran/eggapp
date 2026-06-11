@@ -191,37 +191,34 @@ void task_fan(void* pvParameters) {
     }
 }
 
+// One-time LEDC init — MUST be called from setup() before any task starts.
+// Was previously a lazy init inside setFanSpeed() guarded by a non-atomic
+// static flag, racy when first called concurrently from UI/control/fan tasks.
+void initFanPwm(void) {
+    ledc_timer_config_t tcfg = {
+        .speed_mode = LEDC_HIGH_SPEED_MODE,
+        .duty_resolution = (ledc_timer_bit_t)LEDC_TIMER_8_BIT,  // 0..255
+        .timer_num = LEDC_TIMER_0,
+        .freq_hz = 25000,
+        .clk_cfg = LEDC_AUTO_CLK
+    };
+    ledc_timer_config(&tcfg);
+
+    ledc_channel_config_t chcfg = {
+        .gpio_num = RELAY_FAN,
+        .speed_mode = LEDC_HIGH_SPEED_MODE,
+        .channel = LEDC_CHANNEL_0,
+        .intr_type = LEDC_INTR_DISABLE,
+        .timer_sel = LEDC_TIMER_0,
+        .duty = 255,  // active-LOW: start HIGH = relay OFF until task_fan applies speed
+        .hpoint = 0
+    };
+    ledc_channel_config(&chcfg);
+}
+
 // LEDC-based fan PWM helper (uses ESP-IDF driver API for portability)
 void setFanSpeed(uint8_t percent) {
-    static bool initialized = false;
     const int channel = 0; // LEDC channel
-    const int timer = LEDC_TIMER_0;
-    const int freqHz = 25000;
-    const ledc_timer_bit_t resolution = (ledc_timer_bit_t)LEDC_TIMER_8_BIT; // 8-bit -> 0..255
-
-    if (!initialized) {
-        ledc_timer_config_t tcfg = {
-            .speed_mode = LEDC_HIGH_SPEED_MODE,
-            .duty_resolution = resolution,
-            .timer_num = (ledc_timer_t)timer,
-            .freq_hz = freqHz,
-            .clk_cfg = LEDC_AUTO_CLK
-        };
-        ledc_timer_config(&tcfg);
-
-        ledc_channel_config_t chcfg = {
-            .gpio_num = RELAY_FAN,
-            .speed_mode = LEDC_HIGH_SPEED_MODE,
-            .channel = (ledc_channel_t)channel,
-            .intr_type = LEDC_INTR_DISABLE,
-            .timer_sel = (ledc_timer_t)timer,
-            .duty = 255,  // active-LOW: start HIGH = relay OFF until task_fan applies speed
-            .hpoint = 0
-        };
-        ledc_channel_config(&chcfg);
-
-        initialized = true;
-    }
 
     if (percent > 100) percent = 100;
     // Active-LOW relay: duty=0 (GPIO LOW) = relay ON = fan running.
