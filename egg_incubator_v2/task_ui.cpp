@@ -155,6 +155,107 @@ static uint8_t daysInMonth(int m, int y) {
     return dom[m];
 }
 
+// Factory reset confirm selection: 0 = No (default), 1 = Yes (BUG-034)
+static int factoryResetIdx = 0;
+
+// Climate schedule / cyclic edit buffers — committed to gSettings only on
+// final OK so the control task never sees half-edited values (BUG-035)
+static uint8_t  editSchedStart = DEFAULT_SCHED_START_HOUR;
+static uint8_t  editSchedEnd   = DEFAULT_SCHED_END_HOUR;
+static uint32_t editHeatPeriod = DEFAULT_CLIMATE_HEAT_PERIOD_MIN;
+static uint32_t editCoolPeriod = DEFAULT_CLIMATE_COOL_PERIOD_MIN;
+
+// NTP sync progress tracking for the non-blocking UI_TIME_WIFI_SYNC flow (BUG-033)
+static unsigned long ntpSyncStartMs   = 0;
+static unsigned long ntpResultShownMs = 0;
+static int           ntpSyncResult    = 0;   // 0 = pending
+
+// BUG-036: a failed settingsMutex take in an editor silently discards the
+// user's button press — make the (rare) event visible for diagnosis.
+static void logSettingsMutexTimeout(void) {
+    Serial.println("[UI] settingsMutex timeout — adjustment dropped");
+}
+
+// Discard any queued button events (e.g. presses made during an NTP sync)
+static void drainUiQueue(void) {
+    UiEvent dummy;
+    while (xQueueReceive(uiEventQueue, &dummy, 0) == pdTRUE) {}
+}
+
+// Drive the NTP sync screen forward; called on idle ticks and on events while
+// in UI_TIME_WIFI_SYNC. Shows the result when available (or after a 6 s
+// timeout) and auto-returns to the System menu 1.5 s later.
+static void ntpSyncPoll(void) {
+    if (ntpSyncResult == 0) {
+        int r = wifi_get_ntp_result();
+        if (r == 0 && (millis() - ntpSyncStartMs) > 6000) r = 2;  // timeout
+        if (r != 0) {
+            ntpSyncResult = r;
+            oled_show_time_wifi_sync(r);
+            ntpResultShownMs = millis();
+        }
+    } else if (millis() - ntpResultShownMs > 1500) {
+        drainUiQueue();   // presses made during the sync must not replay
+        uiState = UI_SYSTEM_MENU;
+        oled_show_system_menu(sysMenuIdx, sysMenuTop);
+        lastMenuIdx = sysMenuIdx;
+    }
+}
+
+// Incubation start-date screen state (UI_ENV_INCUBATION_DAY)
+enum IncubMode { IM_NAV = 0, IM_EDIT };
+static IncubMode incubMode   = IM_NAV;
+static int       incubNavIdx = 0;   // 0=Start Date, 1=Back
+static int       dispDay = 1, dispMonth = 1, dispYear = 2024;
+
+// Load the saved (or current RTC) date snapshot and draw the navigation view.
+// Called directly from the Egg menu OK handler so the screen appears on the
+// first press (BUG-038 — the state used to be entered without drawing, so the
+// next press ran the init instead of acting: double-press to enter).
+static void enterIncubationScreen(void) {
+    uint32_t sEpoch = 0;
+    if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+        sEpoch = gSettings.startEpoch;
+        xSemaphoreGive(settingsMutex);
+    }
+    if (sEpoch != 0) {
+        DateTime sd((uint32_t)sEpoch);
+        dispDay = sd.day(); dispMonth = sd.month(); dispYear = sd.year();
+    } else {
+        DateTime now(2024, 1, 1);
+        if (xSemaphoreTake(rtcMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+            now = gRtcTime.now;
+            xSemaphoreGive(rtcMutex);
+        }
+        dispDay = now.day(); dispMonth = now.month(); dispYear = now.year();
+    }
+    incubMode = IM_NAV; incubNavIdx = 0; editField = 0;
+    oled_show_incubation_day_set(incubNavIdx, dispDay, dispMonth, dispYear, false, 0);
+    lastMenuIdx = incubNavIdx;
+}
+
+// Periodic redraw of the live sensor value on the temp/hum edit screens while
+// no buttons are pressed (BUG-032 — handlers below only run on events).
+static void uiIdleRefresh(void) {
+    if (uiState != UI_ENV_TEMPERATURE && uiState != UI_ENV_HUMIDITY) return;
+    if (millis() - lastTempUiRefreshMs < 1000) return;
+    lastTempUiRefreshMs = millis();
+
+    float cur = 0.0f, sp = 0.0f;
+    if (xSemaphoreTake(sensorMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
+        cur = (uiState == UI_ENV_TEMPERATURE) ? gSensorData.temp_ds18b20
+                                              : gSensorData.humidity_dht;
+        xSemaphoreGive(sensorMutex);
+    }
+    if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
+        sp = (uiState == UI_ENV_TEMPERATURE) ? gSettings.tempSetpoint
+                                             : gSettings.humSetpoint;
+        xSemaphoreGive(settingsMutex);
+    }
+    if (uiState == UI_ENV_TEMPERATURE) oled_show_temperature(cur, sp);
+    else                               oled_show_humidity(cur, sp);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // TASK: UI STATE MACHINE
 // ─────────────────────────────────────────────────────────────────────────────
@@ -249,6 +350,9 @@ void task_ui(void* pvParameters) {
         // ── EVENT PROCESSING ─────────────────────────────────────────────────
         UiEvent evt;
         if (xQueueReceive(uiEventQueue, &evt, pdMS_TO_TICKS(50)) != pdTRUE) {
+            // No event this tick — run time-driven UI work (BUG-032 / BUG-033)
+            if (uiState == UI_TIME_WIFI_SYNC) ntpSyncPoll();
+            else                              uiIdleRefresh();
             continue;
         }
 
@@ -367,7 +471,7 @@ void task_ui(void* pvParameters) {
                     if (gSettings.tempSetpoint > TEMP_SETPOINT_MAX) gSettings.tempSetpoint = TEMP_SETPOINT_MAX;
                     tempSP = gSettings.tempSetpoint;
                     xSemaphoreGive(settingsMutex);
-                }
+                } else logSettingsMutexTimeout();
                 redraw = true;
             } else if (evt == UI_EVT_DOWN) {
                 if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
@@ -375,7 +479,7 @@ void task_ui(void* pvParameters) {
                     if (gSettings.tempSetpoint < TEMP_SETPOINT_MIN) gSettings.tempSetpoint = TEMP_SETPOINT_MIN;
                     tempSP = gSettings.tempSetpoint;
                     xSemaphoreGive(settingsMutex);
-                }
+                } else logSettingsMutexTimeout();
                 redraw = true;
             }
 
@@ -423,7 +527,7 @@ void task_ui(void* pvParameters) {
                     if (gSettings.humSetpoint > HUM_SETPOINT_MAX) gSettings.humSetpoint = HUM_SETPOINT_MAX;
                     humSP = gSettings.humSetpoint;
                     xSemaphoreGive(settingsMutex);
-                }
+                } else logSettingsMutexTimeout();
                 redraw = true;
             } else if (evt == UI_EVT_DOWN) {
                 if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
@@ -431,7 +535,7 @@ void task_ui(void* pvParameters) {
                     if (gSettings.humSetpoint < HUM_SETPOINT_MIN) gSettings.humSetpoint = HUM_SETPOINT_MIN;
                     humSP = gSettings.humSetpoint;
                     xSemaphoreGive(settingsMutex);
-                }
+                } else logSettingsMutexTimeout();
                 redraw = true;
             }
 
@@ -498,14 +602,14 @@ void task_ui(void* pvParameters) {
                     if (gSettings.tempHysteresis > TEMP_HYST_MAX) gSettings.tempHysteresis = TEMP_HYST_MAX;
                     tempHyst = gSettings.tempHysteresis;
                     xSemaphoreGive(settingsMutex);
-                }
+                } else logSettingsMutexTimeout();
             } else if (evt == UI_EVT_DOWN) {
                 if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
                     gSettings.tempHysteresis = round1(gSettings.tempHysteresis - 0.1f);
                     if (gSettings.tempHysteresis < TEMP_HYST_MIN) gSettings.tempHysteresis = TEMP_HYST_MIN;
                     tempHyst = gSettings.tempHysteresis;
                     xSemaphoreGive(settingsMutex);
-                }
+                } else logSettingsMutexTimeout();
             }
             oled_show_hysteresis_menu(hysteresisMenuIdx, tempHyst, humHyst);
             if (evt == UI_EVT_OK) {
@@ -524,14 +628,14 @@ void task_ui(void* pvParameters) {
                     if (gSettings.humHysteresis > HUM_HYST_MAX) gSettings.humHysteresis = HUM_HYST_MAX;
                     humHyst = gSettings.humHysteresis;
                     xSemaphoreGive(settingsMutex);
-                }
+                } else logSettingsMutexTimeout();
             } else if (evt == UI_EVT_DOWN) {
                 if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
                     gSettings.humHysteresis -= 1.0f;
                     if (gSettings.humHysteresis < HUM_HYST_MIN) gSettings.humHysteresis = HUM_HYST_MIN;
                     humHyst = gSettings.humHysteresis;
                     xSemaphoreGive(settingsMutex);
-                }
+                } else logSettingsMutexTimeout();
             }
             oled_show_hysteresis_menu(hysteresisMenuIdx, tempHyst, humHyst);
             if (evt == UI_EVT_OK) {
@@ -568,53 +672,24 @@ void task_ui(void* pvParameters) {
         // INCUBATION START DATE (two-item menu: Start Date / Back)
         // Navigation mode vs Edit mode (separate)
         else if (uiState == UI_ENV_INCUBATION_DAY) {
-            enum IncubMode { IM_NAV = 0, IM_EDIT };
-            static IncubMode mode = IM_NAV;
-            static int navIdx = 0; // 0=Start Date, 1=Back
-            static int dispDay = 1, dispMonth = 1, dispYear = 2024;
-
-            // Initialize screen on entry
+            // Screen state lives at file scope; enterIncubationScreen() already
+            // drew the navigation view when the Egg menu OK was handled, so
+            // this is only a safety net for any other entry path (BUG-038).
             if (lastMenuIdx == -1) {
-                Serial.println("[UI] INCUBATION screen init");
-                lastOkUiMs = 0;  // clear rate-limiter on every fresh entry
-                // load snapshot from settings or RTC
-                uint32_t sEpoch = 0;
-                if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
-                    sEpoch = gSettings.startEpoch;
-                    xSemaphoreGive(settingsMutex);
-                }
-                if (sEpoch != 0) {
-                    DateTime sd((uint32_t)sEpoch);
-                    dispDay = sd.day(); dispMonth = sd.month(); dispYear = sd.year();
-                } else {
-                    DateTime now(2024,1,1);
-                    if (xSemaphoreTake(rtcMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
-                        now = gRtcTime.now;
-                        xSemaphoreGive(rtcMutex);
-                    }
-                    dispDay = now.day(); dispMonth = now.month(); dispYear = now.year();
-                }
-                // Always start in navigation mode on entry; do not preload edit values
-                mode = IM_NAV; navIdx = 0; editField = 0;
-                lastMenuIdx = navIdx;
-                oled_show_incubation_day_set(navIdx, dispDay, dispMonth, dispYear, false, 0);
-                // Do NOT continue here — fall through so the triggering event
-                // is processed immediately by the IM_NAV handler below.
-                // (Previously this `continue` caused the first button press to
-                // be silently discarded, requiring a double-press to enter.)
+                enterIncubationScreen();
             }
 
-            if (mode == IM_NAV) {
+            if (incubMode == IM_NAV) {
                 // navigate between Start Date and Back
-                if (evt == UI_EVT_UP)   navIdx = (navIdx - 1 + 2) % 2;
-                else if (evt == UI_EVT_DOWN) navIdx = (navIdx + 1) % 2;
+                if (evt == UI_EVT_UP)   incubNavIdx = (incubNavIdx - 1 + 2) % 2;
+                else if (evt == UI_EVT_DOWN) incubNavIdx = (incubNavIdx + 1) % 2;
 
                 // always redraw navigation row so a single UP/DOWN press updates immediately
-                oled_show_incubation_day_set(navIdx, dispDay, dispMonth, dispYear, false, 0);
-                lastMenuIdx = navIdx;
+                oled_show_incubation_day_set(incubNavIdx, dispDay, dispMonth, dispYear, false, 0);
+                lastMenuIdx = incubNavIdx;
 
                 if (evt == UI_EVT_OK) {
-                    if (navIdx == 0) {
+                    if (incubNavIdx == 0) {
                         // Enter edit mode: load edit values from saved or RTC
                         uint32_t sEpoch = 0;
                         if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
@@ -633,7 +708,7 @@ void task_ui(void* pvParameters) {
                             editDay = now.day(); editMonth = now.month(); editYear = now.year();
                         }
                         editField = 0;
-                        mode = IM_EDIT;
+                        incubMode = IM_EDIT;
                         oled_show_incubation_day_set(0, editDay, editMonth, editYear, true, editField);
                     } else {
                         // Back to Egg Incubator menu
@@ -714,8 +789,8 @@ void task_ui(void* pvParameters) {
                         }
 
                         // Return to navigation mode
-                        mode = IM_NAV; navIdx = 0; lastMenuIdx = navIdx;
-                        oled_show_incubation_day_set(navIdx, dispDay, dispMonth, dispYear, false, 0);
+                        incubMode = IM_NAV; incubNavIdx = 0; lastMenuIdx = incubNavIdx;
+                        oled_show_incubation_day_set(incubNavIdx, dispDay, dispMonth, dispYear, false, 0);
                     }
                 }
             }
@@ -746,7 +821,8 @@ void task_ui(void* pvParameters) {
                 editTurnNow = false;
                 oled_show_turner_settings(turnerMenuIdx, editInterval, editDuration, (int)turnerEditState, editTurnNow);
                 lastMenuIdx = turnerMenuIdx;
-                continue;
+                // No `continue` — fall through so the triggering event is
+                // processed immediately (BUG-031; same fix as incubation screen).
             }
 
             // Navigation mode
@@ -857,7 +933,8 @@ void task_ui(void* pvParameters) {
                 }
                 oled_show_fan_settings(fanMenuIdx, editSpeed);
                 lastMenuIdx = fanMenuIdx;
-                continue;
+                // No `continue` — fall through so the triggering event is
+                // processed immediately (BUG-031; same fix as incubation screen).
             }
 
             // Navigation mode
@@ -973,9 +1050,11 @@ void task_ui(void* pvParameters) {
                         break;
                     case 5:  // Incubation Day
                         uiState = UI_ENV_INCUBATION_DAY;
-                        editField = 0;
-                        lastMenuIdx = -1;
-                        continue;
+                        // Draw right away — entering without drawing made the
+                        // next press run the screen init instead of acting,
+                        // so it took a double-press to enter (BUG-038).
+                        enterIncubationScreen();
+                        break;
                     case 6:  // Turner
                         uiState = UI_ENV_TURNER;
                         turnerMenuIdx = 0; lastMenuIdx = -1;
@@ -1145,7 +1224,8 @@ void task_ui(void* pvParameters) {
                     }
                     case 4:  // Factory Reset
                         uiState = UI_FACTORY_RESET_CONFIRM;
-                        oled_show_factory_reset_confirm();
+                        factoryResetIdx = 0;  // default to No (BUG-034)
+                        oled_show_factory_reset_confirm(factoryResetIdx);
                         break;
                     case 5:  // Back
                         uiState = UI_MAIN_MENU; lastMenuIdx = -1;
@@ -1221,34 +1301,26 @@ void task_ui(void* pvParameters) {
 
             if (evt == UI_EVT_OK) {
                 if (climateModeIdx == 0) {
-                    if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
-                        gSettings.climateMode = CLIMATE_FIXED_SCHEDULE;
-                        xSemaphoreGive(settingsMutex);
-                    }
+                    // Load edit buffers only — mode and hours are committed
+                    // together on the editor's final OK (BUG-035).
                     uiState = UI_CLIMATE_SCHEDULE;
                     climateSchedIdx = 0;
-                    uint8_t sh = DEFAULT_SCHED_START_HOUR, eh = DEFAULT_SCHED_END_HOUR;
                     if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
-                        sh = gSettings.schedStartHour;
-                        eh = gSettings.schedEndHour;
+                        editSchedStart = gSettings.schedStartHour;
+                        editSchedEnd   = gSettings.schedEndHour;
                         xSemaphoreGive(settingsMutex);
                     }
-                    oled_show_climate_schedule(climateSchedIdx, sh, eh);
+                    oled_show_climate_schedule(climateSchedIdx, editSchedStart, editSchedEnd);
                 } else if (climateModeIdx == 1) {
-                    if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
-                        gSettings.climateMode = CLIMATE_CYCLIC;
-                        gSettings.cycleStartEpoch = 0;  // reset on mode change
-                        xSemaphoreGive(settingsMutex);
-                    }
+                    // Same edit-buffer pattern (BUG-035).
                     uiState = UI_CLIMATE_CYCLIC;
                     climateCyclicIdx = 0;
-                    uint32_t hp = DEFAULT_CLIMATE_HEAT_PERIOD_MIN, cp = DEFAULT_CLIMATE_COOL_PERIOD_MIN;
                     if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
-                        hp = gSettings.heatPeriodMin;
-                        cp = gSettings.coolPeriodMin;
+                        editHeatPeriod = gSettings.heatPeriodMin;
+                        editCoolPeriod = gSettings.coolPeriodMin;
                         xSemaphoreGive(settingsMutex);
                     }
-                    oled_show_climate_cyclic(climateCyclicIdx, hp, cp);
+                    oled_show_climate_cyclic(climateCyclicIdx, editHeatPeriod, editCoolPeriod);
                 } else if (climateModeIdx == 2) {
                     if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
                         gSettings.climateMode      = CLIMATE_RAMP;
@@ -1279,110 +1351,69 @@ void task_ui(void* pvParameters) {
         // CLIMATE FIXED SCHEDULE EDIT (0=start, 1=end, 2=back)
         // ═════════════════════════════════════════════════════════════════════
         else if (uiState == UI_CLIMATE_SCHEDULE) {
-            uint8_t sh = DEFAULT_SCHED_START_HOUR, eh = DEFAULT_SCHED_END_HOUR;
-            if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
-                sh = gSettings.schedStartHour;
-                eh = gSettings.schedEndHour;
-                xSemaphoreGive(settingsMutex);
-            }
-
+            // BUG-035: UP/DOWN edit local buffers; gSettings (incl. the mode
+            // switch itself) is written only on the final OK.
             if (climateSchedIdx == 0) {
-                if (evt == UI_EVT_UP) {
-                    if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
-                        gSettings.schedStartHour = (gSettings.schedStartHour + 1) % 24;
-                        sh = gSettings.schedStartHour;
-                        xSemaphoreGive(settingsMutex);
-                    }
-                } else if (evt == UI_EVT_DOWN) {
-                    if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
-                        gSettings.schedStartHour = (gSettings.schedStartHour + 23) % 24;
-                        sh = gSettings.schedStartHour;
-                        xSemaphoreGive(settingsMutex);
-                    }
-                }
+                if      (evt == UI_EVT_UP)   editSchedStart = (editSchedStart + 1) % 24;
+                else if (evt == UI_EVT_DOWN) editSchedStart = (editSchedStart + 23) % 24;
             } else if (climateSchedIdx == 1) {
-                if (evt == UI_EVT_UP) {
-                    if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
-                        gSettings.schedEndHour = (gSettings.schedEndHour + 1) % 24;
-                        eh = gSettings.schedEndHour;
-                        xSemaphoreGive(settingsMutex);
-                    }
-                } else if (evt == UI_EVT_DOWN) {
-                    if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
-                        gSettings.schedEndHour = (gSettings.schedEndHour + 23) % 24;
-                        eh = gSettings.schedEndHour;
-                        xSemaphoreGive(settingsMutex);
-                    }
-                }
+                if      (evt == UI_EVT_UP)   editSchedEnd = (editSchedEnd + 1) % 24;
+                else if (evt == UI_EVT_DOWN) editSchedEnd = (editSchedEnd + 23) % 24;
             }
 
             if (evt == UI_EVT_OK) {
                 if (climateSchedIdx < 2) {
                     climateSchedIdx++;
                 } else {
+                    if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+                        gSettings.schedStartHour = editSchedStart;
+                        gSettings.schedEndHour   = editSchedEnd;
+                        gSettings.climateMode    = CLIMATE_FIXED_SCHEDULE;
+                        xSemaphoreGive(settingsMutex);
+                    }
                     saveSettings();
                     uiState = UI_CLIMATE_MODE_MENU; lastMenuIdx = -1;
-                    oled_show_climate_mode_menu(climateModeIdx, climMode);
+                    oled_show_climate_mode_menu(climateModeIdx, CLIMATE_FIXED_SCHEDULE);
                     lastMenuIdx = climateModeIdx;
                     continue;
                 }
             }
-            oled_show_climate_schedule(climateSchedIdx, sh, eh);
+            oled_show_climate_schedule(climateSchedIdx, editSchedStart, editSchedEnd);
         }
 
         // ═════════════════════════════════════════════════════════════════════
         // CLIMATE CYCLIC EDIT (0=heat period, 1=cool period, 2=back)
         // ═════════════════════════════════════════════════════════════════════
         else if (uiState == UI_CLIMATE_CYCLIC) {
-            uint32_t hp = DEFAULT_CLIMATE_HEAT_PERIOD_MIN, cp = DEFAULT_CLIMATE_COOL_PERIOD_MIN;
-            if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
-                hp = gSettings.heatPeriodMin;
-                cp = gSettings.coolPeriodMin;
-                xSemaphoreGive(settingsMutex);
-            }
-
+            // BUG-035: UP/DOWN edit local buffers; gSettings (incl. the mode
+            // switch and cycle restart) is written only on the final OK.
             if (climateCyclicIdx == 0) {
-                if (evt == UI_EVT_UP) {
-                    if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
-                        gSettings.heatPeriodMin = min(gSettings.heatPeriodMin + 30UL, 1440UL);
-                        hp = gSettings.heatPeriodMin;
-                        xSemaphoreGive(settingsMutex);
-                    }
-                } else if (evt == UI_EVT_DOWN) {
-                    if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
-                        if (gSettings.heatPeriodMin > 30) gSettings.heatPeriodMin -= 30;
-                        hp = gSettings.heatPeriodMin;
-                        xSemaphoreGive(settingsMutex);
-                    }
-                }
+                if      (evt == UI_EVT_UP)   editHeatPeriod = min(editHeatPeriod + 30UL, 1440UL);
+                else if (evt == UI_EVT_DOWN) { if (editHeatPeriod > 30) editHeatPeriod -= 30; }
             } else if (climateCyclicIdx == 1) {
-                if (evt == UI_EVT_UP) {
-                    if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
-                        gSettings.coolPeriodMin = min(gSettings.coolPeriodMin + 30UL, 1440UL);
-                        cp = gSettings.coolPeriodMin;
-                        xSemaphoreGive(settingsMutex);
-                    }
-                } else if (evt == UI_EVT_DOWN) {
-                    if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(30)) == pdTRUE) {
-                        if (gSettings.coolPeriodMin > 30) gSettings.coolPeriodMin -= 30;
-                        cp = gSettings.coolPeriodMin;
-                        xSemaphoreGive(settingsMutex);
-                    }
-                }
+                if      (evt == UI_EVT_UP)   editCoolPeriod = min(editCoolPeriod + 30UL, 1440UL);
+                else if (evt == UI_EVT_DOWN) { if (editCoolPeriod > 30) editCoolPeriod -= 30; }
             }
 
             if (evt == UI_EVT_OK) {
                 if (climateCyclicIdx < 2) {
                     climateCyclicIdx++;
                 } else {
+                    if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+                        gSettings.heatPeriodMin   = editHeatPeriod;
+                        gSettings.coolPeriodMin   = editCoolPeriod;
+                        gSettings.climateMode     = CLIMATE_CYCLIC;
+                        gSettings.cycleStartEpoch = 0;  // restart cycle on commit
+                        xSemaphoreGive(settingsMutex);
+                    }
                     saveSettings();
                     uiState = UI_CLIMATE_MODE_MENU; lastMenuIdx = -1;
-                    oled_show_climate_mode_menu(climateModeIdx, climMode);
+                    oled_show_climate_mode_menu(climateModeIdx, CLIMATE_CYCLIC);
                     lastMenuIdx = climateModeIdx;
                     continue;
                 }
             }
-            oled_show_climate_cyclic(climateCyclicIdx, hp, cp);
+            oled_show_climate_cyclic(climateCyclicIdx, editHeatPeriod, editCoolPeriod);
         }
 
         // ═════════════════════════════════════════════════════════════════════
@@ -1569,14 +1600,21 @@ void task_ui(void* pvParameters) {
         // FACTORY RESET CONFIRM
         // ═════════════════════════════════════════════════════════════════════
         else if (uiState == UI_FACTORY_RESET_CONFIRM) {
-            if (evt == UI_EVT_OK) {
-                // Wipe NVS and restart
-                extern void factoryReset(void);
-                factoryReset();
-            } else if (evt == UI_EVT_DOWN) {
-                uiState = UI_SYSTEM_MENU; lastMenuIdx = -1;
-                oled_show_system_menu(sysMenuIdx, sysMenuTop);
-                lastMenuIdx = sysMenuIdx;
+            // BUG-034: explicit No/Yes selection, defaulting to No, so a
+            // single (or replayed) OK press cannot wipe the device.
+            if (evt == UI_EVT_UP || evt == UI_EVT_DOWN) {
+                factoryResetIdx = 1 - factoryResetIdx;
+                oled_show_factory_reset_confirm(factoryResetIdx);
+            } else if (evt == UI_EVT_OK) {
+                if (factoryResetIdx == 1) {
+                    // Wipe NVS and restart
+                    extern void factoryReset(void);
+                    factoryReset();
+                } else {
+                    uiState = UI_SYSTEM_MENU; lastMenuIdx = -1;
+                    oled_show_system_menu(sysMenuIdx, sysMenuTop);
+                    lastMenuIdx = sysMenuIdx;
+                }
             }
         }
 
@@ -1609,22 +1647,14 @@ void task_ui(void* pvParameters) {
                     oled_show_time_edit(tEditField, tH, tM, tS, tD, tMo, tY);
 
                 } else if (timeDateMenuIdx == 1) {
-                    // WIFI SYNC: post request to wifi task (non-blocking); poll for result.
+                    // WIFI SYNC: post request to wifi task, then hand off to the
+                    // non-blocking UI_TIME_WIFI_SYNC state — buttons stay live and
+                    // no presses are queued up for replay (BUG-033).
                     wifi_request_ntp_sync();
+                    ntpSyncStartMs = millis();
+                    ntpSyncResult  = 0;
+                    uiState = UI_TIME_WIFI_SYNC;
                     oled_show_time_wifi_sync(0);  // "Syncing Time..."
-                    // Poll up to ~6 s in 200 ms steps so UI task is not blocked.
-                    int syncResult = 0;
-                    for (int i = 0; i < 30 && syncResult == 0; i++) {
-                        vTaskDelay(pdMS_TO_TICKS(200));
-                        syncResult = wifi_get_ntp_result();
-                    }
-                    if (syncResult == 0) syncResult = 2;  // treat still-pending as timeout
-                    oled_show_time_wifi_sync(syncResult);
-                    vTaskDelay(pdMS_TO_TICKS(1500));
-                    uiState = UI_SYSTEM_MENU;
-                    lastMenuIdx = -1;
-                    oled_show_system_menu(sysMenuIdx, sysMenuTop);
-                    lastMenuIdx = sysMenuIdx;
 
                 } else {
                     // BACK
@@ -1695,13 +1725,16 @@ void task_ui(void* pvParameters) {
         }
 
         // ═════════════════════════════════════════════════════════════════
-        // TIME WIFI SYNC (fallback: any button exits after NTP result is shown)
-        // Note: main NTP sync is performed inline in UI_TIME_DATE_MENU handler.
-        // This state is only entered if the device returns here from that flow.
+        // TIME WIFI SYNC — non-blocking (BUG-033)
+        // Progress is driven by ntpSyncPoll() on idle ticks; while the sync is
+        // pending, button presses are consumed and ignored. Once the result is
+        // shown, any button dismisses it early (auto-dismiss after 1.5 s).
         // ═════════════════════════════════════════════════════════════════
         else if (uiState == UI_TIME_WIFI_SYNC) {
-            // Any button dismisses the result screen
-            if (evt == UI_EVT_OK || evt == UI_EVT_DOWN || evt == UI_EVT_UP) {
+            ntpSyncPoll();
+            if (uiState == UI_TIME_WIFI_SYNC && ntpSyncResult != 0 &&
+                (evt == UI_EVT_OK || evt == UI_EVT_DOWN || evt == UI_EVT_UP)) {
+                drainUiQueue();
                 uiState = UI_SYSTEM_MENU;
                 lastMenuIdx = -1;
                 oled_show_system_menu(sysMenuIdx, sysMenuTop);

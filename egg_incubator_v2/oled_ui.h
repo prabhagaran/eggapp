@@ -53,8 +53,6 @@ void oled_show_climate_chamber_menu(int selected, int topIdx);
 void oled_show_system_menu(int selected, int topIdx);
 void oled_show_pump_settings(int menuIdx, uint16_t durSec, bool editing);
 void oled_show_controller_mode(int selected, ProfileType activeProfile);
-void oled_show_set_environment(int selected, ProfileType profile);
-void oled_show_settings_menu(int selected);
 void oled_show_mode_menu(int selected);
 void oled_show_manual_control(int selected, bool heaterOn, bool coolerOn, ProfileType profile);
 void oled_show_climate_mode_menu(int selected, ClimateModeType active);
@@ -103,7 +101,8 @@ void oled_show_device_info(const char* deviceId,
 
 void oled_show_wifi_menu(int selected, bool connected);
 
-void oled_show_factory_reset_confirm(void);
+// selected: 0 = No (default), 1 = Yes (BUG-034)
+void oled_show_factory_reset_confirm(int selected);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TIME & DATE SCREENS

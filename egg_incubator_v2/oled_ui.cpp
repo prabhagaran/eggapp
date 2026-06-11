@@ -346,67 +346,8 @@ void oled_show_controller_mode(int selected, ProfileType activeProfile) {
     display.display();
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SET ENVIRONMENT MENU — profile-aware (hides irrelevant items)
-// ─────────────────────────────────────────────────────────────────────────────
-void oled_show_set_environment(int selected, ProfileType profile) {
-    display.clearDisplay();
-    display.setTextSize(1);
-    display.setTextColor(SSD1306_WHITE);
-
-    display.setCursor(0, 0);
-    display.print("SET ENVIRONMENT");
-    display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
-
-    // Build full menu list so we can paginate a window around the selected item
-    const char* fullItems[12];
-    int fullCount = 0;
-
-    // Common items
-    fullItems[fullCount++] = "Temperature";
-    fullItems[fullCount++] = "Hysteresis";
-    fullItems[fullCount++] = "Humidity";
-
-    if (profile == PROFILE_EGG_INCUBATOR) {
-        fullItems[fullCount++] = "Inc. Start Day";
-        fullItems[fullCount++] = "Egg Type";
-        fullItems[fullCount++] = "Turner";
-        fullItems[fullCount++] = "Fan";
-        fullItems[fullCount++] = "Back";
-    } else {
-        fullItems[fullCount++] = "Climate Profile";
-        fullItems[fullCount++] = "Back";
-    }
-
-    // Determine visible window size (max rows that fit)
-    int maxRows = 5; // rows at y=14,24,34,44,54
-    if (fullCount < maxRows) maxRows = fullCount;
-
-    // Compute window start so selected stays visible and ideally centered
-    int start = selected - (maxRows / 2);
-    if (start < 0) start = 0;
-    if (start > fullCount - maxRows) start = max(0, fullCount - maxRows);
-
-    // Render window
-    for (int r = 0; r < maxRows; r++) {
-        int idx = start + r;
-        display.setCursor(0, 16 + r * 10);
-        display.print(idx == selected ? "> " : "  ");
-        display.print(fullItems[idx]);
-    }
-
-    // If there are more pages, show a small pager indicator on the right
-    if (fullCount > maxRows) {
-        int page = (start / maxRows) + 1;
-        int totalPages = (fullCount + maxRows - 1) / maxRows;
-        char pbuf[6];
-        snprintf(pbuf, sizeof(pbuf), "%d/%d", page, totalPages);
-        display.setCursor(96, 54);
-        display.print(pbuf);
-    }
-
-    display.display();
-}
+// (BUG-037: dead oled_show_set_environment removed — its UI_SET_ENV_MENU
+// handler was deleted in the BUG-025 cleanup and nothing called it since.)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TEMPERATURE EDIT
@@ -595,23 +536,8 @@ void oled_show_fan_settings(int selected, uint8_t speedPercent)
     display.display();
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SETTINGS MENU
-// ─────────────────────────────────────────────────────────────────────────────
-void oled_show_settings_menu(int selected) {
-    static const char* items[] = {
-        "Time & Date", "WiFi", "Heater Control",
-        "Device Info", "Factory Reset", "Back"
-    };
-    const int total = 6;
-    int top = selected - MENU_ROWS / 2;
-    if (top < 0) top = 0;
-    if (top > total - MENU_ROWS) top = total - MENU_ROWS;
-    display.clearDisplay();
-    drawMenuTitle("SETTINGS");
-    drawMenuItems(items, total, selected, top);
-    display.display();
-}
+// (BUG-037: dead oled_show_settings_menu removed — its UI_SETTINGS_MENU
+// handler was deleted in the BUG-025 cleanup and nothing called it since.)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MODE MENU (Auto / Manual / Back)
@@ -848,7 +774,8 @@ void oled_show_device_info(const char* deviceId,
 // ─────────────────────────────────────────────────────────────────────────────
 // FACTORY RESET CONFIRM
 // ─────────────────────────────────────────────────────────────────────────────
-void oled_show_factory_reset_confirm(void) {
+// selected: 0 = No (default), 1 = Yes — OK confirms the highlighted choice
+void oled_show_factory_reset_confirm(int selected) {
     display.clearDisplay();
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE);
@@ -857,14 +784,28 @@ void oled_show_factory_reset_confirm(void) {
     display.print("!! FACTORY RESET !!");
     display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
 
-    display.setCursor(0, 18);
+    display.setCursor(0, 16);
     display.print("All settings will be");
-    display.setCursor(0, 28);
+    display.setCursor(0, 26);
     display.print("erased and device");
-    display.setCursor(0, 38);
-    display.print("will restart.");
-    display.setCursor(0, 50);
-    display.print("OK=Confirm  DN=Cancel");
+    display.setCursor(0, 36);
+    display.print("will restart. Sure?");
+
+    // No / Yes choices, highlighted like menu rows
+    const char* opts[2] = { " No ", " Yes " };
+    const int   optX[2] = { 20, 76 };
+    for (int i = 0; i < 2; i++) {
+        int w = 6 * strlen(opts[i]);
+        if (i == selected) {
+            display.fillRect(optX[i] - 2, 50, w + 4, 11, SSD1306_WHITE);
+            display.setTextColor(SSD1306_BLACK);
+        } else {
+            display.setTextColor(SSD1306_WHITE);
+        }
+        display.setCursor(optX[i], 52);
+        display.print(opts[i]);
+    }
+    display.setTextColor(SSD1306_WHITE);
 
     display.display();
 }

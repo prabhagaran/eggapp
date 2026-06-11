@@ -4,7 +4,7 @@
 |---|---|
 | **Project** | egg-incubator-esp32-rtos — `egg_incubator_v2/` |
 | **Firmware version** | 2.0.0 (`config.h`) |
-| **Review date** | 2026-06-10 |
+| **Review date** | 2026-06-10 (full firmware) · 2026-06-11 (UI/OLED addendum: BUG-031 … BUG-037) |
 | **Review type** | Static analysis — no code modified |
 | **Scope** | All `.ino` / `.cpp` / `.h` sources (≈ 5 950 LOC): task logic, RTOS usage, sensor handling, relay/heater/fan/pump control, NVS persistence, Wi-Fi/cloud, watchdog, GPIO safety |
 
@@ -14,7 +14,7 @@
 
 The firmware is well above hobby average: relay writes are centralized, shared state is mutex-protected, an over-temperature latch exists in both profiles, sensor-invalid gates shut the heater off, profile switching uses a notification/event-group handshake, and secrets are kept out of git. Many earlier review findings (M-7, M-8, F-01) were clearly fixed.
 
-However, the review found **2 Critical**, **7 High**, **12 Medium** and **9 Low** issues. The most important themes:
+However, the review found **2 Critical**, **7 High**, **12 Medium** and **9 Low** issues. A follow-up UI-focused review (2026-06-11, `task_ui.cpp` / `oled_ui.cpp` / `task_buttons.cpp`) added **4 Medium** and **4 Low** findings (BUG-031 … BUG-038 — all fixed same day and flashed to hardware; BUG-038 was reported from on-device testing). The most important themes:
 
 1. ~~**The task watchdog protects nothing** — it is initialized but no task is subscribed and idle-task monitoring is masked off. A hung control task leaves the heater frozen in its last state with no recovery.~~ **✅ Fixed (BUG-001)**
 2. ~~**Fan output polarity is self-contradictory** for the declared active-LOW relay board — `setFanSpeed(0)` drives the pin LOW, which is `RELAY_ON` on that hardware; `allRelaysOff()` may therefore *energize* the fan channel.~~ **✅ Fixed (BUG-002)**
@@ -28,8 +28,8 @@ However, the review found **2 Critical**, **7 High**, **12 Medium** and **9 Low*
 |----------|-------|-----|
 | Critical | 2 | BUG-001, BUG-002 |
 | High | 7 | BUG-003 … BUG-009 |
-| Medium | 12 | BUG-010 … BUG-021 |
-| Low | 9 | BUG-022 … BUG-030 |
+| Medium | 16 | BUG-010 … BUG-021, BUG-031, BUG-033, BUG-034, BUG-038 |
+| Low | 13 | BUG-022 … BUG-030, BUG-032, BUG-035 … BUG-037 |
 
 ---
 
@@ -213,11 +213,39 @@ However, the review found **2 Critical**, **7 High**, **12 Medium** and **9 Low*
 * **Root cause:** Every 60 s, dozens of temporary `String` concatenations build the URL on the heap, plus `http.getString()` — on a 24/7 device this fragments the heap over weeks (especially alongside TLS buffers). `Serial.printf("[CLOUD] Request: %s", url)` also prints the secret token to the serial log; the token additionally travels as a GET query parameter (cached/logged by intermediaries; visible in Apps Script logs).
 * **Fix applied:** Replaced all `String` URL building with `snprintf`/`strncat` into a `char url[768]` stack buffer (matching the existing `TelemetryMsg_t.url` size). Added `urlEncodeAppend()` to append percent-encoded fields without heap allocation. Added `logUrl()` helper that finds `&token=` in the URL and prints only the portion before it followed by `[token redacted]`. The `http.getString()` body read is retained only to drain the socket (result discarded) — no `String` body variable held across the send. Sketch size decreased by ~500 bytes as a side-effect.
 
+### BUG-031 — First button press is swallowed on entry to the Turner and Fan screens ✅ FIXED
+* **Severity:** Medium (UI review 2026-06-11) → **Fixed** (2026-06-11)
+* **Location:** Turner and Fan init blocks in `task_ui.cpp` (`lastMenuIdx == -1` entry paths)
+* **Root cause:** Both screens' one-time init blocks (`lastMenuIdx == -1`) ended with `continue`, discarding the event that triggered them. Since the screen is already drawn by the parent menu's OK handler, the init block runs on the *next* event after entry — and ate it. This is the exact bug already diagnosed and fixed in the Incubation screen ("caused the first button press to be silently discarded, requiring a double-press"); Turner and Fan still carried the old pattern.
+* **Impact:** After entering Turner or Fan settings, the user's first UP/DOWN/OK did nothing — felt like a missed/laggy button and likely contributed to the OK-double-fire reports that motivated the 300 ms rate-limiter.
+* **Fix applied:** Removed the `continue` at the end of both init blocks so the triggering event falls through to the navigation handler immediately, exactly as in the Incubation screen fix.
+
+### BUG-033 — NTP sync flow still freezes the UI for up to 7.5 s and then replays queued presses (incomplete BUG-016 fix) ✅ FIXED
+* **Severity:** Medium (UI review 2026-06-11) → **Fixed** (2026-06-11)
+* **Location:** `UI_TIME_DATE_MENU` OK handler and `UI_TIME_WIFI_SYNC` state in `task_ui.cpp`
+* **Root cause:** The BUG-016 fix moved the network work to `task_wifi_manager`, but the UI handler still busy-waited inline: a `for` loop of 30 × 200 ms polls plus a fixed 1.5 s result screen, all inside the `UI_TIME_DATE_MENU` OK handler. No events were processed during that window. The `UI_TIME_WIFI_SYNC` state — clearly designed for the non-blocking version — existed but was never entered.
+* **Impact:** Buttons were dead for up to ~7.5 s; presses made during the wait accumulated in the 10-deep `uiEventQueue` and all replayed into the System menu afterwards, causing surprise navigation (e.g. an accidental Factory Reset entry was two queued OKs away).
+* **Fix applied:** The OK handler now only posts `wifi_request_ntp_sync()`, shows "Syncing Time...", and enters `UI_TIME_WIFI_SYNC`. A new `ntpSyncPoll()` helper — driven from the queue-receive timeout branch (50 ms cadence) and from events — polls `wifi_get_ntp_result()`, applies a 6 s timeout, shows the result, auto-dismisses after 1.5 s, and **drains `uiEventQueue`** before returning to the System menu so mid-sync presses never replay. While pending, button presses are consumed and ignored; once the result is shown, any button dismisses early.
+
+### BUG-034 — Factory reset wipes NVS on a single OK press ✅ FIXED
+* **Severity:** Medium (UI review 2026-06-11) → **Fixed** (2026-06-11)
+* **Location:** `UI_FACTORY_RESET_CONFIRM` handler in `task_ui.cpp`; `oled_show_factory_reset_confirm()` in `oled_ui.cpp`/`oled_ui.h`
+* **Root cause:** The confirm screen executed `factoryReset()` on any single OK; the only guard was the 300 ms OK rate-limiter. OK is also the button used to *enter* the confirm screen from the System menu, so one extra press (or a replayed queued press, see BUG-033) erased everything.
+* **Impact:** Mid-incubation, an accidental wipe loses `startEpoch`, egg type, setpoints and the fault latch — and reboots the device. The incubation day calculation restarts from "Not started"; for the user this is a costly, unrecoverable slip.
+* **Fix applied:** The confirm screen is now an explicit **No / Yes selection defaulting to No**: `oled_show_factory_reset_confirm(int selected)` renders both choices with the menu highlight style; UP/DOWN toggles, OK confirms the highlighted choice. OK on entry (or a replayed OK) now lands on No and simply returns to the System menu; only UP/DOWN-then-OK on Yes wipes.
+
+### BUG-038 — Incubation Day menu needs a double press to enter (state switched without drawing) ✅ FIXED
+* **Severity:** Medium (reported from on-device testing 2026-06-11) → **Fixed** (2026-06-11)
+* **Location:** Egg menu `case 5` OK handler and `UI_ENV_INCUBATION_DAY` init block in `task_ui.cpp`
+* **Root cause:** A variant of the BUG-031 entry pattern, but worse: every other menu item draws its target screen inside the OK handler, while Incubation Day only set `uiState`/`lastMenuIdx = -1` and `continue`d — drawing nothing. The screen's init (date snapshot load + draw) lived inside the state handler, which only runs when the *next* button event arrives. The first OK therefore produced no visible change (display still showed the Egg menu), and the second press finally ran the init. The old `lastOkUiMs = 0` reset inside that init was a workaround for this very flow.
+* **Impact:** Entering the Incubation Day screen always took two presses; with a quick second OK the user could also land straight in date-edit mode without ever seeing the navigation view.
+* **Fix applied:** The screen's state (`incubMode`, `incubNavIdx`, display date snapshot) was hoisted to file scope and the init extracted into `enterIncubationScreen()`, which loads the saved/RTC date and draws the navigation view. The Egg menu OK handler now calls it directly, so the screen appears on the first press; the in-handler init remains only as a safety net for unexpected entry paths. The `lastOkUiMs = 0` rate-limiter hack became unnecessary and was removed.
+
 ---
 
 ## 5. Low Findings
 
-All Low findings fixed on 2026-06-11.
+All Low findings fixed on 2026-06-11, including BUG-032 and BUG-035 … BUG-037 from the same-day UI review.
 
 | ID | Finding | Location | Fix applied |
 |----|---------|----------|-------------|
@@ -230,6 +258,17 @@ All Low findings fixed on 2026-06-11.
 | BUG-028 ✅ | RTC fallback to compile time passes the epoch sanity gate (compile date > Nov 2023) so a wrong-but-plausible clock is treated as valid forever | [egg_incubator_v2.ino:303-306](egg_incubator_v2/egg_incubator_v2.ino#L303-L306) | `setup()` sets a `clockSetFromCompileTime` flag on the fallback and pushes `CLOCK_UNSET` (“RTC set from compile time — verify clock”) once the error queue exists. |
 | BUG-029 ✅ | `setRelay()` has no `case RELAY_FAN`; calling it for the fan would `digitalWrite` onto an LEDC-attached pin and leave `fanOn` stale — a latent footgun given the fan/relay ambiguity of BUG-002 | [globals.cpp:64-70](egg_incubator_v2/globals.cpp#L64-L70) | `setRelay()` now whitelists the five supported pins; any other pin (incl. `RELAY_FAN`) is rejected before the `digitalWrite`, with a `FAULT` pushError and serial log. |
 | BUG-030 ✅ | `task_rtc` reads `gRtcTime.epoch` for the sanity check *after* releasing `rtcMutex` (benign today — single writer — but fragile) | [task_rtc.cpp:20-32](egg_incubator_v2/task_rtc.cpp#L20-L32) | Sanity check and first-boot log now use a local `epoch = now.unixtime()` copy; `gRtcTime` is only touched inside the mutex. |
+| BUG-032 ✅ | "Live refresh" of current temperature in the temp-edit screen never ran while idle: all state handlers sit after `xQueueReceive(...)` which `continue`d on timeout, so the 1 s refresh check was only reached on a button press — the displayed "current" value froze between presses. Humidity edit screen had no live refresh at all | temp/hum edit handlers in `task_ui.cpp` | Added `uiIdleRefresh()` called from the queue-receive timeout branch: while in the temp or hum edit screen it re-reads the live sensor value and setpoint every 1 s and redraws. Humidity now live-refreshes too. |
+| BUG-035 ✅ | Climate schedule/cyclic editors mutated `gSettings` live on every UP/DOWN with no cancel path, so the control task acted on half-edited values before OK; selecting a climate mode also committed `gSettings.climateMode` (and reset cycle state) immediately on entry, before anything was configured. Inconsistent with the edit-buffer-then-commit pattern used by Turner/Fan/Pump | climate mode/schedule/cyclic handlers in `task_ui.cpp` | UP/DOWN now edit local buffers (`editSchedStart/End`, `editHeatPeriod/CoolPeriod`) loaded on entry; hours/periods, `climateMode`, and the `cycleStartEpoch` reset are committed together under one mutex take on the editor's final OK, then `saveSettings()`. Ramp (view-only, nothing to configure) still commits on selection. |
+| BUG-036 ✅ | A failed 30 ms `settingsMutex` take in the setpoint/hysteresis editors silently discarded the button press — value didn't change, nothing was logged, user saw an unresponsive button | all eight editor write sites in `task_ui.cpp` | Added `logSettingsMutexTimeout()` (`[UI] settingsMutex timeout — adjustment dropped`) as the `else` branch of every editor mutex take, so the (rare) dropped press is diagnosable from the serial log, matching the visibility principle of the BUG-007 fix. |
+| BUG-037 ✅ | Dead code left over from the BUG-025 cleanup: `oled_show_set_environment()` and `oled_show_settings_menu()` (~75 lines + declarations) had no callers since their handlers were removed | `oled_ui.cpp`, `oled_ui.h` | Both functions and their declarations deleted. `UI_TIME_WIFI_SYNC` is reachable again via the BUG-033 fix and was kept. |
+
+### UI/UX improvement recommendations (advisory, not defects) — 2026-06-11
+
+* **Button auto-repeat:** temperature steps are 0.1 °C, so 35.0 → 37.5 °C is 25 presses; the year field can need 70+. Add hold-to-repeat in `task_buttons.cpp` (e.g. after ~600 ms held, emit the event every ~150 ms). ezButton exposes `getState()`, so this is a small addition.
+* **Inactivity timeout back to HOME:** if the user walks away inside a sub-menu, the at-a-glance home screen never returns. A 30-60 s no-event timeout resetting to `UI_HOME` is standard appliance behavior, and pairs naturally with SSD1306 burn-in mitigation (`display.dim(true)` after idle).
+* **Cancel path in value edits:** OK always saves; there is no way to back out of an accidental setpoint change. A long-press-OK = back/cancel convention would solve this everywhere with only 3 buttons (the hold-measuring mechanism already exists in fault mode).
+* **Structural:** the ~8 copy-pasted "return to parent menu" blocks (`profileMenuParent` if/else) and the repeated `lastMenuIdx = -1; draw(); lastMenuIdx = idx;` idiom would collapse into small helpers (`returnToParentMenu()`, `enterMenu()`); per-state handler functions would make the screen-entry init pattern uniform — BUG-031 survived precisely because each screen reimplements it slightly differently.
 
 ---
 
@@ -255,6 +294,7 @@ All Low findings fixed on 2026-06-11.
 2. **Before next hatch cycle (correctness):** BUG-005/BUG-017 (epoch validity), BUG-006 (new-batch reset), BUG-010, BUG-011, BUG-012, BUG-013.
 3. **Hardening / robustness:** BUG-008, BUG-009, BUG-014, BUG-015, BUG-018, BUG-020, BUG-021.
 4. **Cleanup:** remaining Low items.
+5. **UI review (2026-06-11):** BUG-031 … BUG-038 — ✅ all fixed 2026-06-11, compiled (esp32 core 3.3.7) and flashed to the device. Remaining open item from the original review: **BUG-004** (GPIO12/15 strapping pins — requires a hardware decision: re-pin or eFuse burn).
 
 ## 8. Positive Observations
 
