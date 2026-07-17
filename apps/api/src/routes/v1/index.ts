@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { alertRoutes } from "./alerts.js";
 import { authRoutes } from "./auth.js";
 import { batchRoutes } from "./batches.js";
 import { collectionRoutes } from "./collections.js";
@@ -17,4 +18,5 @@ export async function v1Routes(app: FastifyInstance) {
   app.register(deviceRoutes);
   app.register(collectionRoutes);
   app.register(batchRoutes);
+  app.register(alertRoutes);
 }

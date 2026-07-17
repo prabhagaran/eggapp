@@ -6,6 +6,7 @@ import mqtt from "mqtt";
 import type { FastifyBaseLogger } from "fastify";
 import { z } from "zod";
 import { config } from "../../config.js";
+import { evaluateTelemetry } from "../../services/alert.service.js";
 import { getPrisma } from "../db.js";
 
 const TOPIC_TELEMETRY = "eggapp/devices/+/telemetry";
@@ -65,6 +66,15 @@ async function handleTelemetry(log: FastifyBaseLogger, deviceId: string, raw: Bu
       await tx.deviceEvent.create({ data: { deviceId: device.id, type: "online" } });
     }
   });
+
+  // Outside the write transaction — alert evaluation does its own reads/
+  // writes and a failure here must never roll back the telemetry write
+  // that already succeeded.
+  try {
+    await evaluateTelemetry(device.id, { tempC: parsed.data.temp, humidityPct: parsed.data.hum });
+  } catch (err) {
+    log.error({ err, deviceId }, "[mqtt] alert evaluation failed");
+  }
 }
 
 async function handleStatus(log: FastifyBaseLogger, deviceId: string, raw: Buffer) {

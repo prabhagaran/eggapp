@@ -47,7 +47,7 @@ to prevent overlapping ownership between agents that cover related ground.
 **API** (`docs/api/`)
 - [OpenAPI contract](api/openapi.yaml) — grows per Phase 1 increment;
   currently setup/auth/species/farms/incubators/devices + collections/
-  batches/candling/hatch
+  batches/candling/hatch + alerts
 - [Sync & Conflict Strategy](api/sync-conflict-strategy.md) — BR-010
   server-side rules (clientId idempotency, explicit conflicts);
   android-architect builds the client against this
@@ -64,9 +64,10 @@ to prevent overlapping ownership between agents that cover related ground.
   process used to capture the above; kept for future devices/firmware
   changes
 
-**Code & infra**: `apps/api` (Fastify — includes MQTT ingest,
-`src/infra/mqtt/`), `apps/web` (Next.js — live incubator telemetry on
-dashboard + incubators pages), `apps/android` (placeholder — Android
+**Code & infra**: `apps/api` (Fastify — includes MQTT ingest
+`src/infra/mqtt/` and alert evaluation `src/domain/alerting.ts` +
+`src/services/alert.service.ts`, BR-006), `apps/web` (Next.js — live
+incubator telemetry + an Alerts page with ack), `apps/android` (placeholder — Android
 Studio wizard in Phase 1), `packages/db` (Prisma + Species seed,
 [setup steps](../packages/db/README.md)), `packages/shared-types`
 (canonical enums), `infra/docker` (Mosquitto — deployed to an always-on

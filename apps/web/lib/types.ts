@@ -1,5 +1,5 @@
 // Lightweight response shapes for the web client (per docs/api/openapi.yaml).
-import type { BatchStatus, DeviceStatus } from "@eggapp/shared-types";
+import type { AlertSeverity, AlertState, BatchStatus, DeviceStatus } from "@eggapp/shared-types";
 
 export interface Farm {
   id: string;
@@ -97,6 +97,17 @@ export interface Batch {
   abortReason: string | null;
   species?: { id: string; name: string; incubationDays: number };
   incubator?: { id: string; name: string };
+}
+
+export interface Alert {
+  id: string;
+  incubatorId: string | null;
+  severity: AlertSeverity;
+  state: AlertState;
+  message: string;
+  triggeredAt: string;
+  ackedAt: string | null;
+  resolvedAt: string | null;
 }
 
 export interface BatchDetail extends Batch {

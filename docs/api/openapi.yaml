@@ -24,6 +24,7 @@ tags:
   - name: incubators
   - name: devices
   - name: incubation
+  - name: alerting
 
 paths:
   /health:
@@ -575,6 +576,49 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "409": { $ref: "#/components/responses/Conflict" }
 
+  /v1/farms/{farmId}/alerts:
+    parameters: [{ $ref: "#/components/parameters/farmId" }]
+    get:
+      tags: [alerting]
+      summary: List alerts (US-NOT-004), optional ?state= filter
+      description: >
+        Evaluated automatically from MQTT telemetry (BR-006): stage-aware
+        bounds derived from Species by default (warning ±0.3°C from
+        setpoint / species humidity range; critical at species temp
+        min/max or ±10pp beyond the humidity range), or an AlertRule
+        override if one exists for that incubator+metric. Critical fires
+        immediately; warning requires the breach to persist for
+        sustainMinutes (default 10). Only evaluated while the incubator
+        has an active batch — no eggs, no alerts.
+      parameters:
+        - name: state
+          in: query
+          schema: { type: string, enum: [open, acked, resolved] }
+      responses:
+        "200":
+          description: Alerts, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Alert" }
+
+  /v1/farms/{farmId}/alerts/{id}/ack:
+    parameters:
+      - { $ref: "#/components/parameters/farmId" }
+      - { $ref: "#/components/parameters/id" }
+    post:
+      tags: [alerting]
+      summary: Acknowledge an open alert (US-NOT-003)
+      description: No-op (returns unchanged) if the alert is already acked/resolved — safe to call more than once.
+      responses:
+        "200":
+          description: Updated alert
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Alert" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
 security:
   - bearerAuth: []
 
@@ -737,6 +781,18 @@ components:
         sourceNote: { type: string, nullable: true }
         assignedCount: { type: integer, description: Present on list responses }
         availableCount: { type: integer, description: count − discarded − assigned }
+
+    Alert:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        incubatorId: { type: string, format: uuid, nullable: true }
+        severity: { type: string, enum: [warning, critical] }
+        state: { type: string, enum: [open, acked, resolved] }
+        message: { type: string }
+        triggeredAt: { type: string, format: date-time }
+        ackedAt: { type: string, format: date-time, nullable: true }
+        resolvedAt: { type: string, format: date-time, nullable: true }
 
     EggBatch:
       type: object
