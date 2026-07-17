@@ -85,6 +85,10 @@ export async function logoutAll(userId: string) {
   });
 }
 
+export async function setPushToken(userId: string, fcmToken: string) {
+  await getPrisma().user.update({ where: { id: userId }, data: { fcmToken } });
+}
+
 export async function me(userId: string) {
   const user = await getPrisma().user.findUnique({
     where: { id: userId },

@@ -11,6 +11,8 @@ export const config = {
   mqttUrl: process.env.MQTT_URL ?? "",
   mqttUsername: process.env.MQTT_API_USERNAME ?? "",
   mqttPassword: process.env.MQTT_API_PASSWORD ?? "",
+  // FCM is opt-in: absent path disables push cleanly, same pattern as MQTT above.
+  fcmServiceAccountPath: process.env.FCM_SERVICE_ACCOUNT_PATH ?? "",
 };
 
 if (config.isProd && config.jwtSecret === DEV_SECRET) {

@@ -33,6 +33,7 @@ model User {
   passwordHash String
   name         String
   tokenVersion Int              @default(0) // bump = revoke all refresh tokens
+  fcmToken     String?          // current device's push token (US-NOT-002); one per user — personal-scale, single phone
   createdAt    DateTime         @default(now())
   memberships  FarmMembership[]
 }

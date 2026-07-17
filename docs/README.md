@@ -65,13 +65,16 @@ to prevent overlapping ownership between agents that cover related ground.
   changes
 
 **Code & infra**: `apps/api` (Fastify — includes MQTT ingest
-`src/infra/mqtt/` and alert evaluation `src/domain/alerting.ts` +
-`src/services/alert.service.ts`, BR-006), `apps/web` (Next.js — live
+`src/infra/mqtt/`, alert evaluation `src/domain/alerting.ts` +
+`src/services/alert.service.ts` (BR-006), and FCM push dispatch
+`src/infra/fcm/client.ts` (US-NOT-002)), `apps/web` (Next.js — live
 incubator telemetry + an Alerts page with ack), `apps/android` (Kotlin +
-Compose — login, live incubator status, and offline-first candling/hatch
-recording via Room + WorkManager, all built and verified for real on-
-emulator against the deployed API, including genuine offline/reconnect
-testing; BLE/FCM not yet), `packages/db` (Prisma + Species seed,
+Compose — login, live incubator status, offline-first candling/hatch
+recording via Room + WorkManager, and FCM push notifications
+(`push/EggAppMessagingService.kt`), all built and verified for real
+on-emulator against the deployed API, including genuine offline/
+reconnect testing and a full MQTT→Alert→push chain; BLE not yet),
+`packages/db` (Prisma + Species seed,
 [setup steps](../packages/db/README.md)), `packages/shared-types`
 (canonical enums), `infra/docker` (Mosquitto) + `infra/systemd`/`infra/deploy` (apps/api) —
 both deployed and running on the always-on Radxa host per ADR 0006/0007,

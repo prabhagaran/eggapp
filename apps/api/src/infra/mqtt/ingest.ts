@@ -71,7 +71,7 @@ async function handleTelemetry(log: FastifyBaseLogger, deviceId: string, raw: Bu
   // writes and a failure here must never roll back the telemetry write
   // that already succeeded.
   try {
-    await evaluateTelemetry(device.id, { tempC: parsed.data.temp, humidityPct: parsed.data.hum });
+    await evaluateTelemetry(log, device.id, { tempC: parsed.data.temp, humidityPct: parsed.data.hum });
   } catch (err) {
     log.error({ err, deviceId }, "[mqtt] alert evaluation failed");
   }

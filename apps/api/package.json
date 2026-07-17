@@ -14,6 +14,7 @@
     "@eggapp/shared-types": "workspace:*",
     "@fastify/cors": "^11.0.0",
     "@fastify/jwt": "^9.0.0",
+    "firebase-admin": "^13.0.0",
     "@prisma/client": "^6.0.0",
     "bcryptjs": "^3.0.0",
     "dotenv": "^16.4.0",

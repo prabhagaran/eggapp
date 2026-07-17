@@ -2,6 +2,7 @@
 // write. No business rules live in the ingest adapter; this is where they
 // belong (system-architecture.md layering).
 import type { AlertSeverity as PrismaAlertSeverity } from "@prisma/client";
+import type { FastifyBaseLogger } from "fastify";
 import {
   type AlertMetric,
   type Bounds,
@@ -10,7 +11,20 @@ import {
   type IncubationStage,
 } from "../domain/alerting.js";
 import { getPrisma } from "../infra/db.js";
+import { sendPush } from "../infra/fcm/client.js";
 import { AppError } from "../lib/errors.js";
+
+// US-NOT-002: push every farm member with a registered device — personal
+// scale means this is at most a couple of people, no batching needed.
+async function pushToFarm(log: FastifyBaseLogger, farmId: string, title: string, body: string) {
+  const members = await getPrisma().farmMembership.findMany({
+    where: { farmId, user: { fcmToken: { not: null } } },
+    include: { user: { select: { fcmToken: true } } },
+  });
+  await Promise.all(
+    members.map((m) => sendPush(log, m.user.fcmToken!, { title, body, deepLink: "eggapp://alerts" })),
+  );
+}
 
 // Sustain tracking (BR-006: warning requires the breach to persist for
 // sustainMinutes; critical fires immediately). In-memory, keyed per
@@ -40,6 +54,7 @@ async function effectiveBoundsFor(
 }
 
 async function evaluateMetric(
+  log: FastifyBaseLogger,
   farmId: string,
   incubatorId: string,
   metric: AlertMetric,
@@ -86,18 +101,20 @@ async function evaluateMetric(
 
   const label = metric === "temp_c" ? "Temperature" : "Humidity";
   const unit = metric === "temp_c" ? "°C" : "%";
+  const message = `[${metric}] ${label} out of range: ${value}${unit} (bounds ${bounds.warnMin}-${bounds.warnMax}${unit} warn / ${bounds.critMin}-${bounds.critMax}${unit} crit)`;
   await prisma.alert.create({
-    data: {
-      farmId,
-      incubatorId,
-      severity: severity as PrismaAlertSeverity,
-      state: "open",
-      message: `[${metric}] ${label} out of range: ${value}${unit} (bounds ${bounds.warnMin}-${bounds.warnMax}${unit} warn / ${bounds.critMin}-${bounds.critMax}${unit} crit)`,
-    },
+    data: { farmId, incubatorId, severity: severity as PrismaAlertSeverity, state: "open", message },
   });
+
+  // Push on every new alert, not just critical — a missed warning is how
+  // a critical happens. Never let a push failure break alert evaluation
+  // (sendPush already swallows its own errors).
+  const severityLabel = severity === "critical" ? "🔴 Critical" : "⚠️ Warning";
+  await pushToFarm(log, farmId, `${severityLabel} alert`, `${label} out of range: ${value}${unit}`);
 }
 
 export async function evaluateTelemetry(
+  log: FastifyBaseLogger,
   deviceId: string,
   reading: { tempC: number | null; humidityPct: number | null },
 ) {
@@ -116,8 +133,8 @@ export async function evaluateTelemetry(
   const batch = incubator.batches[0]!;
   const stage: IncubationStage = batch.status === "incubating" ? "incubating" : "lockdown";
 
-  await evaluateMetric(incubator.farmId, incubator.id, "temp_c", reading.tempC, incubator.defaultSpecies, stage);
-  await evaluateMetric(incubator.farmId, incubator.id, "humidity_pct", reading.humidityPct, incubator.defaultSpecies, stage);
+  await evaluateMetric(log, incubator.farmId, incubator.id, "temp_c", reading.tempC, incubator.defaultSpecies, stage);
+  await evaluateMetric(log, incubator.farmId, incubator.id, "humidity_pct", reading.humidityPct, incubator.defaultSpecies, stage);
 }
 
 export async function listAlerts(farmId: string, state?: "open" | "acked" | "resolved") {

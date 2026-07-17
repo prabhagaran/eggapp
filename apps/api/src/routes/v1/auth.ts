@@ -8,6 +8,7 @@ const loginSchema = z.object({
 });
 
 const refreshSchema = z.object({ refreshToken: z.string().min(1) });
+const pushTokenSchema = z.object({ fcmToken: z.string().min(1) });
 
 export async function authRoutes(app: FastifyInstance) {
   app.post("/auth/login", async (req) => {
@@ -27,5 +28,14 @@ export async function authRoutes(app: FastifyInstance) {
 
   app.get("/me", { preHandler: [app.authenticate] }, async (req) => {
     return auth.me(req.user.sub);
+  });
+
+  // US-NOT-002: registers/refreshes this user's current device token.
+  // One token per user (personal scale, single phone) — a fresh login or
+  // FCM token rotation just overwrites it.
+  app.post("/me/push-token", { preHandler: [app.authenticate] }, async (req, reply) => {
+    const body = pushTokenSchema.parse(req.body);
+    await auth.setPushToken(req.user.sub, body.fcmToken);
+    return reply.code(204).send();
   });
 }
