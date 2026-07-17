@@ -14,6 +14,7 @@ coverage/
 *.keystore
 *.jks
 google-services.json
+firebase-service-account.json
 
 # Prisma
 packages/db/generated/
