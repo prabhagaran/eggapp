@@ -14,8 +14,15 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!farmId) return;
-    api<Incubator[]>(`/v1/farms/${farmId}/incubators`).then(setIncubators);
-    api<Batch[]>(`/v1/farms/${farmId}/batches`).then(setBatches);
+    const reload = () => {
+      api<Incubator[]>(`/v1/farms/${farmId}/incubators`).then(setIncubators);
+      api<Batch[]>(`/v1/farms/${farmId}/batches`).then(setBatches);
+    };
+    reload();
+    // Telemetry lands every ~60s; poll a bit faster so live readings
+    // update without a manual page refresh.
+    const t = setInterval(reload, 15_000);
+    return () => clearInterval(t);
   }, [farmId]);
 
   if (!farmId) return null;

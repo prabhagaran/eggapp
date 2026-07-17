@@ -16,6 +16,10 @@ export default function IncubatorsPage() {
   useEffect(() => {
     reload();
     api<Species[]>("/v1/species").then(setSpecies);
+    // Telemetry lands every ~60s; poll a bit faster so a fresh reading
+    // shows up without the user having to manually refresh the page.
+    const t = setInterval(reload, 15_000);
+    return () => clearInterval(t);
   }, [reload]);
 
   async function onCreate(e: React.FormEvent<HTMLFormElement>) {
