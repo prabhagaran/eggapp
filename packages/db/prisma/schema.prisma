@@ -1,0 +1,70 @@
+// Phase 0 baseline — Farm & Access context + Species reference data.
+// Owner: database-architect. Entities follow docs/architecture/domain-model.md;
+// conceptual changes go through system-architect. Incubation/Device/Flock
+// contexts land in Phase 1+ migrations.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum FarmRole {
+  OWNER
+  MANAGER
+  WORKER
+}
+
+model User {
+  id           String           @id @default(uuid())
+  email        String           @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime         @default(now())
+  memberships  FarmMembership[]
+}
+
+model Farm {
+  id          String           @id @default(uuid())
+  name        String
+  location    String?
+  timezone    String
+  createdAt   DateTime         @default(now())
+  memberships FarmMembership[]
+}
+
+// BR-013 / ADR 0003: farm is the tenancy boundary; every domain table in
+// later migrations carries farmId and is queried through membership scoping.
+model FarmMembership {
+  userId    String
+  farmId    String
+  role      FarmRole
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  farm      Farm     @relation(fields: [farmId], references: [id], onDelete: Cascade)
+
+  @@id([userId, farmId])
+  @@index([farmId])
+}
+
+// Seeded reference data (domain-knowledge.md §1) — drives BR-008 batch
+// scheduling and BR-006 stage-aware alert defaults. Not farm-scoped.
+model Species {
+  id                   String @id // slug, e.g. "chicken"
+  name                 String
+  incubationDays       Int
+  lockdownOffsetDays   Int // lockdown = incubationDays - this
+  tempSetC             Float
+  tempMinC             Float // sustained outside min/max = critical (BR-006)
+  tempMaxC             Float
+  humidityIncubMinPct  Int
+  humidityIncubMaxPct  Int
+  humidityLockMinPct   Int
+  humidityLockMaxPct   Int
+  candlingDays         Int[]
+  turnUntilDay         Int
+}

@@ -26,6 +26,15 @@ apps/android/local.properties
 *.apk
 *.aab
 
+# Broker credentials
+infra/docker/mosquitto/passwd
+
+# Raw firmware capture logs (large; summaries belong in the contract docs)
+docs/iot/captures/
+
+# Next.js generated
+apps/web/next-env.d.ts
+
 # IDE / OS
 .idea/
 .vscode/

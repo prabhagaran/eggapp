@@ -42,14 +42,25 @@ to prevent overlapping ownership between agents that cover related ground.
 - [Domain Model](architecture/domain-model.md) — bounded contexts, entity catalog, traceability chain, canonical enums
 - [System Architecture](architecture/system-architecture.md) — topology, monorepo layout, layering, key flows
 - [NFRs](architecture/nfr.md) — scale, retention, availability, performance targets
-- ADRs: [0001 Supabase hosting](architecture/adr/0001-database-hosting-supabase.md) · [0002 BLE supplementary channel](architecture/adr/0002-ble-supplementary-device-channel.md) · [0003 Tenancy](architecture/adr/0003-tenancy-model.md)
+- ADRs: [0001 Supabase hosting](architecture/adr/0001-database-hosting-supabase.md) · [0002 BLE supplementary channel](architecture/adr/0002-ble-supplementary-device-channel.md) · [0003 Tenancy](architecture/adr/0003-tenancy-model.md) · [0004 Mosquitto broker](architecture/adr/0004-mqtt-broker-mosquitto.md)
 
-**Not yet written** (owned by the named agent, Phase 0–1): `docs/iot/*`
-(mqtt-topics, telemetry-contract, device-lifecycle, ble-pairing-protocol —
-iot-integration-architect, requires firmware discovery), `docs/api/*`
-(backend-architect), `docs/database/*` (database-architect),
-`docs/android/*`, `docs/web/*` wireframes (ui-ux-architect),
-`docs/security/threat-model.md`, `docs/testing/test-strategy.md`.
+**IoT** (`docs/iot/`)
+- [Firmware Discovery Guide](iot/firmware-discovery-guide.md) — how to capture
+  the real MQTT + BLE contracts from the incubator (Phase 0 blocker for
+  Phase 1 device work)
+
+**Code & infra** (Phase 0 scaffold): `apps/api` (Fastify), `apps/web`
+(Next.js), `apps/android` (placeholder — Android Studio wizard in Phase 1),
+`packages/db` (Prisma + Species seed, [setup steps](../packages/db/README.md)),
+`packages/shared-types` (canonical enums), `infra/docker` (Mosquitto),
+`.github/workflows/ci.yml`.
+
+**Not yet written** (owned by the named agent, Phase 0–1): the four
+`docs/iot/*` contract docs (iot-integration-architect — produced via the
+discovery guide above), `docs/api/*` (backend-architect), `docs/database/*`
+(database-architect), `docs/android/*`, `docs/web/*` wireframes
+(ui-ux-architect), `docs/security/threat-model.md`,
+`docs/testing/test-strategy.md`.
 
 ## Known Gaps Not Yet Covered By A Dedicated Agent
 

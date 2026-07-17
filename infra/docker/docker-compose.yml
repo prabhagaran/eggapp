@@ -1,0 +1,24 @@
+# Local/production broker for the personal deployment (ADR 0004).
+# Requires Docker Desktop. First run: create the password file per
+# mosquitto/README.md, then: docker compose up -d
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: eggapp-mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mosquitto/passwd:/mosquitto/config/passwd:ro
+      - mosquitto-data:/mosquitto/data
+
+  # Phase 1, once apps/api has a Dockerfile:
+  # api:
+  #   build: ../../apps/api
+  #   env_file: ../../apps/api/.env
+  #   ports: ["3001:3001"]
+  #   depends_on: [mosquitto]
+
+volumes:
+  mosquitto-data:

@@ -1,0 +1,24 @@
+{
+  "name": "eggapp",
+  "private": true,
+  "description": "Smart Poultry Farm Management System — personal deployment",
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r --if-present test",
+    "dev:api": "pnpm --filter @eggapp/api dev",
+    "dev:web": "pnpm --filter @eggapp/web dev",
+    "db:generate": "pnpm --filter @eggapp/db db:generate",
+    "db:migrate": "pnpm --filter @eggapp/db db:migrate",
+    "db:seed": "pnpm --filter @eggapp/db db:seed"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma",
+      "esbuild",
+      "sharp"
+    ]
+  },
+  "packageManager": "pnpm@10.34.5+sha512.a4ee05f2f73658255bd6a89859c065a45c28a57daefae2c893a168ee2b73168c37b91e83e57ea67654ad03f03031746430e8bce38e362e042605fb8abc80192e"
+}
