@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:allowBackup="false"
+        android:label="@string/app_name"
+        android:theme="@style/Theme.EggAppField"
+        android:usesCleartextTraffic="true">
+        <!-- usesCleartextTraffic: API is plain HTTP on the LAN (no TLS
+             cert available for a bare IP address) — acceptable for a
+             personal LAN-only deployment; revisit if ever exposed
+             beyond the LAN (see ADR 0006 consequences). -->
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.EggAppField">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

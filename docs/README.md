@@ -67,8 +67,10 @@ to prevent overlapping ownership between agents that cover related ground.
 **Code & infra**: `apps/api` (Fastify — includes MQTT ingest
 `src/infra/mqtt/` and alert evaluation `src/domain/alerting.ts` +
 `src/services/alert.service.ts`, BR-006), `apps/web` (Next.js — live
-incubator telemetry + an Alerts page with ack), `apps/android` (placeholder — Android
-Studio wizard in Phase 1), `packages/db` (Prisma + Species seed,
+incubator telemetry + an Alerts page with ack), `apps/android` (Kotlin +
+Compose — login + live incubator status built and verified on-emulator
+against the real deployed API; offline field entry/BLE/FCM not yet),
+`packages/db` (Prisma + Species seed,
 [setup steps](../packages/db/README.md)), `packages/shared-types`
 (canonical enums), `infra/docker` (Mosquitto) + `infra/systemd`/`infra/deploy` (apps/api) —
 both deployed and running on the always-on Radxa host per ADR 0006/0007,
