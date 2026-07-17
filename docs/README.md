@@ -46,7 +46,11 @@ to prevent overlapping ownership between agents that cover related ground.
 
 **API** (`docs/api/`)
 - [OpenAPI contract](api/openapi.yaml) — grows per Phase 1 increment;
-  currently setup/auth/species/farms/incubators/devices
+  currently setup/auth/species/farms/incubators/devices + collections/
+  batches/candling/hatch
+- [Sync & Conflict Strategy](api/sync-conflict-strategy.md) — BR-010
+  server-side rules (clientId idempotency, explicit conflicts);
+  android-architect builds the client against this
 
 **IoT** (`docs/iot/`)
 - [Firmware Discovery Guide](iot/firmware-discovery-guide.md) — how to capture
@@ -61,11 +65,9 @@ to prevent overlapping ownership between agents that cover related ground.
 
 **Not yet written** (owned by the named agent, Phase 0–1): the four
 `docs/iot/*` contract docs (iot-integration-architect — produced via the
-discovery guide above), `docs/api/sync-conflict-strategy.md`
-(backend-architect, with the batch/candling increment), `docs/database/*`
-(database-architect), `docs/android/*`, `docs/web/*` wireframes
-(ui-ux-architect), `docs/security/threat-model.md`,
-`docs/testing/test-strategy.md`.
+discovery guide above), `docs/database/*` (database-architect),
+`docs/android/*`, `docs/web/*` wireframes (ui-ux-architect),
+`docs/security/threat-model.md`, `docs/testing/test-strategy.md`.
 
 ## Known Gaps Not Yet Covered By A Dedicated Agent
 

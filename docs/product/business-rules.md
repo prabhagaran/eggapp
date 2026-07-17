@@ -11,7 +11,10 @@ schedules) come from `domain-knowledge.md` via seeded species reference data
 
 - **BR-001** Batch statuses: `planned → setting → incubating → lockdown →
   hatching → completed → closed`, plus `aborted` reachable from any active
-  status (reason required). No backward transitions.
+  status (reason required). No backward transitions. `setting` is an
+  optional intermediate — `planned → incubating` directly is valid for
+  same-day setting. `completed` is only reachable by recording a hatch
+  outcome.
 - **BR-002** Candling sessions can only be recorded for a batch in
   `incubating` status. The system schedules candling days from the species
   reference (e.g., chicken 7/14/18); the day-18 session is part of lockdown

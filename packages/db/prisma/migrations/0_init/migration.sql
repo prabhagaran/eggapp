@@ -174,6 +174,7 @@ CREATE TABLE "EggBatch" (
     "hatchOfSetPct" DOUBLE PRECISION,
     "hatchOfFertilePct" DOUBLE PRECISION,
     "abortReason" TEXT,
+    "storageOverrideNote" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "EggBatch_pkey" PRIMARY KEY ("id")

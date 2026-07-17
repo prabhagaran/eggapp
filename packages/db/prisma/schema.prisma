@@ -234,6 +234,7 @@ model EggBatch {
   hatchOfSetPct     Float?
   hatchOfFertilePct Float?
   abortReason       String?
+  storageOverrideNote String? // BR-011: why >14-day eggs were set anyway
   createdAt         DateTime          @default(now())
   farm              Farm              @relation(fields: [farmId], references: [id], onDelete: Cascade)
   incubator         Incubator         @relation(fields: [incubatorId], references: [id])

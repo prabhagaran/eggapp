@@ -23,6 +23,7 @@ tags:
   - name: farms
   - name: incubators
   - name: devices
+  - name: incubation
 
 paths:
   /health:
@@ -325,6 +326,240 @@ paths:
               schema: { $ref: "#/components/schemas/Device" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /v1/farms/{farmId}/collections:
+    parameters: [{ $ref: "#/components/parameters/farmId" }]
+    post:
+      tags: [incubation]
+      summary: Record an egg collection (US-EGG-001) — field record, worker+
+      description: >
+        Offline-capable (BR-010): supply a client-generated `clientId` UUID;
+        replaying the same clientId returns the original record with 200
+        instead of duplicating. See docs/api/sync-conflict-strategy.md.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [collectedOn, count]
+              properties:
+                collectedOn: { type: string, format: date-time }
+                count: { type: integer, minimum: 1 }
+                avgWeightGrams: { type: number }
+                sourceNote: { type: string }
+                clientId: { type: string, format: uuid }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/EggCollection" } } } }
+        "200": { description: Idempotent replay — original record, content: { application/json: { schema: { $ref: "#/components/schemas/EggCollection" } } } }
+    get:
+      tags: [incubation]
+      summary: List collections with assigned/available counts
+      responses:
+        "200":
+          description: Collections
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/EggCollection" }
+
+  /v1/farms/{farmId}/collections/{id}/discard:
+    parameters:
+      - { $ref: "#/components/parameters/farmId" }
+      - { $ref: "#/components/parameters/id" }
+    post:
+      tags: [incubation]
+      summary: Discard eggs from a collection (US-EGG-004)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [count, reason]
+              properties:
+                count: { type: integer, minimum: 1 }
+                reason: { type: string }
+      responses:
+        "200": { description: Updated collection }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /v1/farms/{farmId}/batches:
+    parameters: [{ $ref: "#/components/parameters/farmId" }]
+    post:
+      tags: [incubation]
+      summary: Create a batch (US-BAT-001) — manager+
+      description: >
+        Snapshots the species' candling days (BR-008) and validates egg
+        storage age (BR-011: >7 d returns warnings[], >14 d is rejected
+        unless overrideNote is provided). Response is { batch, warnings }.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [incubatorId, speciesId, sources]
+              properties:
+                incubatorId: { type: string, format: uuid }
+                speciesId: { type: string, example: chicken }
+                sources:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required: [collectionId, count]
+                    properties:
+                      collectionId: { type: string, format: uuid }
+                      count: { type: integer, minimum: 1 }
+                overrideNote: { type: string }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  batch: { $ref: "#/components/schemas/EggBatch" }
+                  warnings: { type: array, items: { type: string } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    get:
+      tags: [incubation]
+      summary: List batches (optional ?status= filter)
+      responses:
+        "200":
+          description: Batches
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/EggBatch" }
+
+  /v1/farms/{farmId}/batches/{id}:
+    parameters:
+      - { $ref: "#/components/parameters/farmId" }
+      - { $ref: "#/components/parameters/id" }
+    get:
+      tags: [incubation]
+      summary: Batch detail — sources, candlings, hatch (US-BAT-003 timeline data)
+      responses:
+        "200": { description: Batch with relations }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/farms/{farmId}/batches/{id}/set:
+    parameters:
+      - { $ref: "#/components/parameters/farmId" }
+      - { $ref: "#/components/parameters/id" }
+    post:
+      tags: [incubation]
+      summary: Mark eggs physically set — computes the schedule (BR-008) — manager+
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                setAt: { type: string, format: date-time, description: Defaults to now }
+      responses:
+        "200": { description: Batch now incubating with lockdownAt/expectedHatchAt }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /v1/farms/{farmId}/batches/{id}/status:
+    parameters:
+      - { $ref: "#/components/parameters/farmId" }
+      - { $ref: "#/components/parameters/id" }
+    post:
+      tags: [incubation]
+      summary: Manual lifecycle transition (BR-001) — manager+
+      description: >
+        Valid targets: setting, lockdown, hatching, aborted (reason
+        required), closed. `incubating` must go through /set; `completed`
+        only via /hatch.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [setting, lockdown, hatching, aborted, closed] }
+                reason: { type: string }
+      responses:
+        "200": { description: Updated batch }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /v1/farms/{farmId}/batches/{id}/candlings:
+    parameters:
+      - { $ref: "#/components/parameters/farmId" }
+      - { $ref: "#/components/parameters/id" }
+    post:
+      tags: [incubation]
+      summary: Record a candling session (US-CAN-002) — field record, worker+
+      description: >
+        Only while `incubating` (BR-002). Viable count becomes
+        fertile+unsure (BR-003); counts that don't sum to the current viable
+        count require discrepancyNote. First session fixes fertilityPct
+        (BR-015). Offline-capable via clientId (BR-010). One session per
+        (batch, dayNo).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [dayNo, candledAt, fertile, clear, bloodRing, unsure]
+              properties:
+                dayNo: { type: integer, minimum: 1 }
+                candledAt: { type: string, format: date-time }
+                fertile: { type: integer, minimum: 0 }
+                clear: { type: integer, minimum: 0 }
+                bloodRing: { type: integer, minimum: 0 }
+                unsure: { type: integer, minimum: 0 }
+                discrepancyNote: { type: string }
+                clientId: { type: string, format: uuid }
+      responses:
+        "201": { description: "{ session, batch } with updated viableCount/fertilityPct" }
+        "200": { description: Idempotent replay }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /v1/farms/{farmId}/batches/{id}/hatch:
+    parameters:
+      - { $ref: "#/components/parameters/farmId" }
+      - { $ref: "#/components/parameters/id" }
+    post:
+      tags: [incubation]
+      summary: Record the hatch outcome (US-HAT-002/003) — field record, worker+
+      description: >
+        Allowed from lockdown/hatching, not before expectedHatch − 2 days
+        (BR-008). Counts must reconcile against viable count or carry
+        discrepancyNote (BR-003). Completes the batch and stores
+        hatchOfSetPct / hatchOfFertilePct (BR-015). Offline-capable via
+        clientId. One hatch event per batch.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [hatchedAt, hatched, pippedDead, deadInShell, unhatched]
+              properties:
+                hatchedAt: { type: string, format: date-time }
+                hatched: { type: integer, minimum: 0 }
+                pippedDead: { type: integer, minimum: 0 }
+                deadInShell: { type: integer, minimum: 0 }
+                unhatched: { type: integer, minimum: 0 }
+                discrepancyNote: { type: string }
+                clientId: { type: string, format: uuid }
+      responses:
+        "201": { description: "{ event, batch } — batch completed with metrics" }
+        "200": { description: Idempotent replay }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
 security:
   - bearerAuth: []
 
@@ -464,3 +699,36 @@ components:
             name: { type: string, nullable: true }
             status: { type: string }
             lastSeenAt: { type: string, format: date-time, nullable: true }
+
+    EggCollection:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        collectedOn: { type: string, format: date-time }
+        count: { type: integer }
+        discardedCount: { type: integer }
+        discardNote: { type: string, nullable: true }
+        avgWeightGrams: { type: number, nullable: true }
+        sourceNote: { type: string, nullable: true }
+        assignedCount: { type: integer, description: Present on list responses }
+        availableCount: { type: integer, description: count − discarded − assigned }
+
+    EggBatch:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        incubatorId: { type: string, format: uuid }
+        speciesId: { type: string }
+        status:
+          type: string
+          enum: [planned, setting, incubating, lockdown, hatching, completed, closed, aborted]
+        setAt: { type: string, format: date-time, nullable: true }
+        candlingDays: { type: array, items: { type: integer } }
+        lockdownAt: { type: string, format: date-time, nullable: true }
+        expectedHatchAt: { type: string, format: date-time, nullable: true }
+        viableCount: { type: integer }
+        fertilityPct: { type: number, nullable: true }
+        hatchOfSetPct: { type: number, nullable: true }
+        hatchOfFertilePct: { type: number, nullable: true }
+        abortReason: { type: string, nullable: true }
+        storageOverrideNote: { type: string, nullable: true }
