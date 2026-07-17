@@ -22,8 +22,9 @@ The Radxa is the deployment host for always-on services:
 - **Mosquitto broker** — running now (`infra/docker/docker-compose.yml`
   deployed to the Radxa via Docker; Docker Engine + Compose installed
   directly on the board, not the laptop).
-- **API server** — to be deployed the same way once its Docker image
-  exists (tracked as follow-up work, not yet done as of this ADR).
+- **API server** — deployed to the Radxa (2026-07-18), running and
+  verified against real hardware. **Mechanism revised from the original
+  plan below: see ADR 0007** — native Node + systemd, not Docker.
 - **Web dashboard** — does not need to be always-on (opened on demand);
   may run on the Radxa too for anytime phone/LAN access, or stay
   laptop-only. Not decided here — low-stakes, revisit whenever.

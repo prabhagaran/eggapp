@@ -42,7 +42,7 @@ to prevent overlapping ownership between agents that cover related ground.
 - [Domain Model](architecture/domain-model.md) — bounded contexts, entity catalog, traceability chain, canonical enums
 - [System Architecture](architecture/system-architecture.md) — topology, monorepo layout, layering, key flows
 - [NFRs](architecture/nfr.md) — scale, retention, availability, performance targets
-- ADRs: [0001 Supabase hosting](architecture/adr/0001-database-hosting-supabase.md) · [0002 BLE supplementary channel](architecture/adr/0002-ble-supplementary-device-channel.md) · [0003 Tenancy](architecture/adr/0003-tenancy-model.md) · [0004 Mosquitto broker](architecture/adr/0004-mqtt-broker-mosquitto.md) · [0005 Interim web field entry](architecture/adr/0005-interim-web-field-entry.md) · [0006 Radxa always-on host](architecture/adr/0006-radxa-always-on-host.md)
+- ADRs: [0001 Supabase hosting](architecture/adr/0001-database-hosting-supabase.md) · [0002 BLE supplementary channel](architecture/adr/0002-ble-supplementary-device-channel.md) · [0003 Tenancy](architecture/adr/0003-tenancy-model.md) · [0004 Mosquitto broker](architecture/adr/0004-mqtt-broker-mosquitto.md) · [0005 Interim web field entry](architecture/adr/0005-interim-web-field-entry.md) · [0006 Radxa always-on host](architecture/adr/0006-radxa-always-on-host.md) · [0007 API via systemd](architecture/adr/0007-api-deployment-systemd.md)
 
 **API** (`docs/api/`)
 - [OpenAPI contract](api/openapi.yaml) — grows per Phase 1 increment;
@@ -70,8 +70,9 @@ to prevent overlapping ownership between agents that cover related ground.
 incubator telemetry + an Alerts page with ack), `apps/android` (placeholder — Android
 Studio wizard in Phase 1), `packages/db` (Prisma + Species seed,
 [setup steps](../packages/db/README.md)), `packages/shared-types`
-(canonical enums), `infra/docker` (Mosquitto — deployed to an always-on
-Radxa host per ADR 0006, not the dev machine), `.github/workflows/ci.yml`.
+(canonical enums), `infra/docker` (Mosquitto) + `infra/systemd`/`infra/deploy` (apps/api) —
+both deployed and running on the always-on Radxa host per ADR 0006/0007,
+not the dev machine — `.github/workflows/ci.yml`.
 
 **Firmware** (separate repo, `egg-incubator-esp32-rtos`): MQTT publish
 added alongside the pre-existing Google Sheets telemetry path (both run

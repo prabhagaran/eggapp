@@ -13,12 +13,9 @@ services:
       - ./mosquitto/passwd:/mosquitto/config/passwd:ro
       - mosquitto-data:/mosquitto/data
 
-  # Phase 1, once apps/api has a Dockerfile:
-  # api:
-  #   build: ../../apps/api
-  #   env_file: ../../apps/api/.env
-  #   ports: ["3001:3001"]
-  #   depends_on: [mosquitto]
+  # apps/api runs natively via systemd on this same host, not in Docker —
+  # see ADR 0007 and infra/systemd/eggapp-api.service. Reconnects to this
+  # broker over localhost:1883.
 
 volumes:
   mosquitto-data:

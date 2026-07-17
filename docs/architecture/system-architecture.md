@@ -52,8 +52,10 @@ services as REST — business rules never live in the adapter.
   versions → server applies or returns explicit per-record conflicts
   (BR-010) → client resolves per `docs/api/sync-conflict-strategy.md`.
   Idempotent by client UUID — a retried upload never duplicates.
-- **Heartbeat:** ingest tracks last_seen; background job marks `offline`
-  past timeout → DeviceEvent + critical alert (US-DEV-003).
+- **Heartbeat:** revised from the original plan below — online/offline is
+  event-driven via MQTT's Last Will (retained `status` topic), not a
+  background timeout job; see `docs/iot/device-lifecycle.md`. Telemetry
+  still updates `lastSeenAt` as a freshness signal.
 - **BLE provisioning:** Android ↔ device per `docs/iot/ble-pairing-protocol.md`;
   app then registers binding via REST (US-DEV-001).
 
@@ -69,9 +71,14 @@ services as REST — business rules never live in the adapter.
 - **Reporting:** SQL views/rollups in Postgres (database-architect owns
   shape) — no separate analytics store at this scale (see NFR).
 
-## Pending ADRs (owned by the named agent, needed in Phase 0)
+## Resolved (were "Pending ADRs" here)
 
-- **MQTT broker choice** — iot-integration-architect. Recommendation:
-  Mosquitto (single-node, tiny footprint, fits personal scale).
-- **API/web hosting target** — security-devops-engineer (self-host box vs.
-  free-tier PaaS).
+- **MQTT broker choice** — Mosquitto (ADR 0004).
+- **API/broker hosting target** — self-hosted Radxa SBC, not a PaaS
+  (ADR 0006), API via systemd not Docker (ADR 0007).
+
+## Still open
+
+- **Web dashboard hosting** — laptop-only (opened on demand) vs. also
+  deployed to the Radxa for anytime phone/LAN access. Not decided; low
+  stakes either way (see ADR 0006 consequences).

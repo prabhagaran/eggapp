@@ -1,0 +1,22 @@
+# Installed on the Radxa at /etc/systemd/system/eggapp-api.service.
+# Not symlinked from here — systemd needs it in that exact path, and this
+# copy exists so the unit definition is version-controlled. Re-copy +
+# `systemctl daemon-reload` after editing this file (see infra/deploy/README.md).
+[Unit]
+Description=eggAPP API server (Fastify + MQTT ingest + alerting)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=radxa
+WorkingDirectory=/home/radxa/eggapp-app/apps/api
+ExecStart=/usr/local/bin/node dist/index.js
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=eggapp-api
+
+[Install]
+WantedBy=multi-user.target
