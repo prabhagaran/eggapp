@@ -76,6 +76,21 @@ paths:
                       farm: { $ref: "#/components/schemas/Farm" }
         "409": { $ref: "#/components/responses/Conflict" }
 
+  /v1/setup/status:
+    get:
+      tags: [setup]
+      summary: Whether first-run setup has been completed
+      security: []
+      responses:
+        "200":
+          description: Status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  initialized: { type: boolean }
+
   /v1/auth/login:
     post:
       tags: [auth]

@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { getPrisma } from "../../infra/db.js";
 import { setupFirstRun } from "../../services/auth.service.js";
 
 const setupSchema = z.object({
@@ -17,5 +18,10 @@ export async function setupRoutes(app: FastifyInstance) {
     const body = setupSchema.parse(req.body);
     const result = await setupFirstRun(app, body);
     return reply.code(201).send(result);
+  });
+
+  // Lets clients route between the setup wizard and login on first load.
+  app.get("/setup/status", async () => {
+    return { initialized: (await getPrisma().user.count()) > 0 };
   });
 }
