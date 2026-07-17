@@ -41,3 +41,15 @@ export function dayOf(setAt: string | null): number | null {
   if (!setAt) return null;
   return Math.floor((Date.now() - Date.parse(setAt)) / 86_400_000);
 }
+
+// US-INC-002/ENV-001 target ≤60s freshness; 90s gives one missed-interval
+// margin before flagging stale (publish cadence is 60s).
+export function isFresh(ts: string): boolean {
+  return Date.now() - Date.parse(ts) < 90_000;
+}
+
+export function fmtAge(ts: string): string {
+  const s = Math.floor((Date.now() - Date.parse(ts)) / 1000);
+  if (s < 60) return `${s}s ago`;
+  return `${Math.floor(s / 60)}m ago`;
+}

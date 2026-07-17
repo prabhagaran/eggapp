@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import type { Incubator, Species } from "../../lib/types";
-import { useAuthedFarm } from "../../lib/useAuthedFarm";
+import { fmtAge, isFresh, useAuthedFarm } from "../../lib/useAuthedFarm";
 
 export default function IncubatorsPage() {
   const farmId = useAuthedFarm();
@@ -87,6 +87,21 @@ export default function IncubatorsPage() {
               <div>
                 <span className="badge warn">no device bound</span>{" "}
                 <span className="muted">bind one on the Devices page</span>
+              </div>
+            )}
+            {inc.latestTelemetry && (
+              <div className="metrics" style={{ marginTop: "0.4rem" }}>
+                <span className="stat">
+                  <b>{inc.latestTelemetry.tempC != null ? `${inc.latestTelemetry.tempC.toFixed(1)}°C` : "—"}</b>
+                  <span className="muted">temp</span>
+                </span>
+                <span className="stat">
+                  <b>{inc.latestTelemetry.humidityPct != null ? `${Math.round(inc.latestTelemetry.humidityPct)}%` : "—"}</b>
+                  <span className="muted">humidity</span>
+                </span>
+                <span className={isFresh(inc.latestTelemetry.ts) ? "muted" : "badge warn"}>
+                  {fmtAge(inc.latestTelemetry.ts)}
+                </span>
               </div>
             )}
           </div>

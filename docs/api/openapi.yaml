@@ -714,6 +714,16 @@ components:
             name: { type: string, nullable: true }
             status: { type: string }
             lastSeenAt: { type: string, format: date-time, nullable: true }
+        latestTelemetry:
+          type: object
+          nullable: true
+          description: Most recent reading for the bound device (null if none/unbound). Freshness — compare `ts` to now; no server-side staleness flag yet.
+          properties:
+            ts: { type: string, format: date-time }
+            tempC: { type: number, nullable: true }
+            humidityPct: { type: number, nullable: true }
+            turnerOn: { type: boolean, nullable: true }
+            source: { type: string, enum: [mqtt, ble] }
 
     EggCollection:
       type: object

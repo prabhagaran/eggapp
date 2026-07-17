@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import type { Batch, Incubator } from "../lib/types";
-import { dayOf, useAuthedFarm } from "../lib/useAuthedFarm";
+import { dayOf, fmtAge, isFresh, useAuthedFarm } from "../lib/useAuthedFarm";
 
 const ACTIVE: Batch["status"][] = ["planned", "setting", "incubating", "lockdown", "hatching"];
 
@@ -72,6 +72,22 @@ export default function Dashboard() {
               </div>
             ) : (
               <span className="badge warn">no device</span>
+            )}
+            {inc.latestTelemetry && (
+              <div className="metrics" style={{ marginTop: "0.4rem" }}>
+                <span className="stat">
+                  <b>{inc.latestTelemetry.tempC != null ? `${inc.latestTelemetry.tempC.toFixed(1)}°C` : "—"}</b>
+                </span>
+                <span className="stat">
+                  <b>{inc.latestTelemetry.humidityPct != null ? `${Math.round(inc.latestTelemetry.humidityPct)}%` : "—"}</b>
+                </span>
+                <span
+                  className={`muted ${isFresh(inc.latestTelemetry.ts) ? "" : "alert-warn"}`}
+                  style={{ alignSelf: "center" }}
+                >
+                  {fmtAge(inc.latestTelemetry.ts)}
+                </span>
+              </div>
             )}
           </div>
         ))}

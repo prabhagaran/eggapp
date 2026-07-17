@@ -25,6 +25,14 @@ export interface DeviceSummary {
   lastSeenAt: string | null;
 }
 
+export interface LatestTelemetry {
+  ts: string;
+  tempC: number | null;
+  humidityPct: number | null;
+  turnerOn: boolean | null;
+  source: "mqtt" | "ble";
+}
+
 export interface Incubator {
   id: string;
   name: string;
@@ -32,6 +40,7 @@ export interface Incubator {
   defaultSpeciesId: string | null;
   deviceId: string | null;
   device: DeviceSummary | null;
+  latestTelemetry: LatestTelemetry | null;
 }
 
 export interface Device extends DeviceSummary {

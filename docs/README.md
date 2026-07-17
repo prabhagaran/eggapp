@@ -42,7 +42,7 @@ to prevent overlapping ownership between agents that cover related ground.
 - [Domain Model](architecture/domain-model.md) — bounded contexts, entity catalog, traceability chain, canonical enums
 - [System Architecture](architecture/system-architecture.md) — topology, monorepo layout, layering, key flows
 - [NFRs](architecture/nfr.md) — scale, retention, availability, performance targets
-- ADRs: [0001 Supabase hosting](architecture/adr/0001-database-hosting-supabase.md) · [0002 BLE supplementary channel](architecture/adr/0002-ble-supplementary-device-channel.md) · [0003 Tenancy](architecture/adr/0003-tenancy-model.md) · [0004 Mosquitto broker](architecture/adr/0004-mqtt-broker-mosquitto.md)
+- ADRs: [0001 Supabase hosting](architecture/adr/0001-database-hosting-supabase.md) · [0002 BLE supplementary channel](architecture/adr/0002-ble-supplementary-device-channel.md) · [0003 Tenancy](architecture/adr/0003-tenancy-model.md) · [0004 Mosquitto broker](architecture/adr/0004-mqtt-broker-mosquitto.md) · [0005 Interim web field entry](architecture/adr/0005-interim-web-field-entry.md) · [0006 Radxa always-on host](architecture/adr/0006-radxa-always-on-host.md)
 
 **API** (`docs/api/`)
 - [OpenAPI contract](api/openapi.yaml) — grows per Phase 1 increment;
@@ -53,21 +53,33 @@ to prevent overlapping ownership between agents that cover related ground.
   android-architect builds the client against this
 
 **IoT** (`docs/iot/`)
-- [Firmware Discovery Guide](iot/firmware-discovery-guide.md) — how to capture
-  the real MQTT + BLE contracts from the incubator (Phase 0 blocker for
-  Phase 1 device work)
+- [MQTT Topics](iot/mqtt-topics.md) — real topic structure, captured live
+  (not guessed) from the actual firmware and broker
+- [Telemetry Contract](iot/telemetry-contract.md) — exact JSON payload
+  schema, field-by-field, with a captured real example
+- [Device Lifecycle](iot/device-lifecycle.md) — provisioning (manual
+  today, BLE not yet implemented in firmware), online/offline detection
+  via LWT, de-provisioning
+- [Firmware Discovery Guide](iot/firmware-discovery-guide.md) — the
+  process used to capture the above; kept for future devices/firmware
+  changes
 
-**Code & infra** (Phase 0 scaffold): `apps/api` (Fastify), `apps/web`
-(Next.js), `apps/android` (placeholder — Android Studio wizard in Phase 1),
-`packages/db` (Prisma + Species seed, [setup steps](../packages/db/README.md)),
-`packages/shared-types` (canonical enums), `infra/docker` (Mosquitto),
-`.github/workflows/ci.yml`.
+**Code & infra**: `apps/api` (Fastify — includes MQTT ingest,
+`src/infra/mqtt/`), `apps/web` (Next.js — live incubator telemetry on
+dashboard + incubators pages), `apps/android` (placeholder — Android
+Studio wizard in Phase 1), `packages/db` (Prisma + Species seed,
+[setup steps](../packages/db/README.md)), `packages/shared-types`
+(canonical enums), `infra/docker` (Mosquitto — deployed to an always-on
+Radxa host per ADR 0006, not the dev machine), `.github/workflows/ci.yml`.
 
-**Not yet written** (owned by the named agent, Phase 0–1): the four
-`docs/iot/*` contract docs (iot-integration-architect — produced via the
-discovery guide above), `docs/database/*` (database-architect),
-`docs/android/*`, `docs/web/*` wireframes (ui-ux-architect),
-`docs/security/threat-model.md`, `docs/testing/test-strategy.md`.
+**Firmware** (separate repo, `egg-incubator-esp32-rtos`): MQTT publish
+added alongside the pre-existing Google Sheets telemetry path (both run
+independently) — see that repo's `CHANGELOG.md` entry dated 2026-07-17.
+
+**Not yet written** (owned by the named agent): `docs/database/*`
+(database-architect), `docs/android/*`, `docs/web/*` wireframes
+(ui-ux-architect), `docs/security/threat-model.md`,
+`docs/testing/test-strategy.md`.
 
 ## Known Gaps Not Yet Covered By A Dedicated Agent
 
