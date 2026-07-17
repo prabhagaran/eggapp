@@ -5,7 +5,11 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [CandlingEntity::class, HatchEntity::class], version = 1, exportSchema = false)
+@Database(
+    entities = [CandlingEntity::class, HatchEntity::class, CollectionEntity::class],
+    version = 2,
+    exportSchema = false,
+)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun fieldRecordDao(): FieldRecordDao
 
@@ -18,7 +22,11 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "eggapp-field.db",
-                ).build().also { instance = it }
+                )
+                    // No prior release to preserve queued rows across —
+                    // safe to drop and recreate on the version 1 -> 2 bump.
+                    .fallbackToDestructiveMigration()
+                    .build().also { instance = it }
             }
     }
 }

@@ -95,3 +95,26 @@ data class HatchRequest(
 // needed client-side; Gson ignores the other field automatically.
 data class CandlingResponse(val batch: Batch)
 data class HatchResponse(val batch: Batch)
+
+// BR-010: clientId makes this create idempotent, same as candling/hatch.
+data class CollectionRequest(
+    val collectedOn: String,
+    val count: Int,
+    val avgWeightGrams: Double?,
+    val sourceNote: String?,
+    val clientId: String,
+)
+
+data class DiscardRequest(val count: Int, val reason: String)
+
+data class Collection(
+    val id: String,
+    val collectedOn: String,
+    val count: Int,
+    val discardedCount: Int,
+    val discardNote: String?,
+    val avgWeightGrams: Double?,
+    val sourceNote: String?,
+    val assignedCount: Int,
+    val availableCount: Int,
+)

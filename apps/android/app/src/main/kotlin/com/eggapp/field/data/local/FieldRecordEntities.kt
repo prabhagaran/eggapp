@@ -39,3 +39,16 @@ data class HatchEntity(
     val errorMessage: String? = null,
     val createdAtMillis: Long,
 )
+
+@Entity(tableName = "pending_collection")
+data class CollectionEntity(
+    @PrimaryKey val clientId: String,
+    val farmId: String,
+    val collectedOn: String,
+    val count: Int,
+    val avgWeightGrams: Double?,
+    val sourceNote: String?,
+    val status: String, // "queued" | "synced" | "conflict"
+    val errorMessage: String? = null,
+    val createdAtMillis: Long,
+)

@@ -5,6 +5,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.eggapp.field.data.ApiClient
 import com.eggapp.field.data.CandlingRequest
+import com.eggapp.field.data.CollectionRequest
 import com.eggapp.field.data.HatchRequest
 import com.eggapp.field.data.TokenStore
 import com.eggapp.field.data.local.AppDatabase
@@ -70,6 +71,26 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
             when (val classification = classify(outcome)) {
                 is SyncOutcome.Success -> dao.updateHatchStatus(record.clientId, "synced", null)
                 is SyncOutcome.Rejected -> dao.updateHatchStatus(record.clientId, "conflict", classification.message)
+                is SyncOutcome.NetworkFailure -> hadNetworkFailure = true
+            }
+        }
+
+        for (record in dao.pendingCollections()) {
+            val outcome = runCatching {
+                api.recordCollection(
+                    record.farmId,
+                    CollectionRequest(
+                        collectedOn = record.collectedOn,
+                        count = record.count,
+                        avgWeightGrams = record.avgWeightGrams,
+                        sourceNote = record.sourceNote,
+                        clientId = record.clientId,
+                    ),
+                )
+            }
+            when (val classification = classify(outcome)) {
+                is SyncOutcome.Success -> dao.updateCollectionStatus(record.clientId, "synced", null)
+                is SyncOutcome.Rejected -> dao.updateCollectionStatus(record.clientId, "conflict", classification.message)
                 is SyncOutcome.NetworkFailure -> hadNetworkFailure = true
             }
         }

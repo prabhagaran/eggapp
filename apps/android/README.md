@@ -54,8 +54,7 @@ offline exactly.
 
 **Not built yet**: BLE device provisioning (blocked on the firmware —
 see `docs/iot/device-lifecycle.md`, BLE isn't implemented there yet
-either), egg collection recording (same offline pattern as
-candling/hatch, just not built this increment).
+either).
 
 ## Status (third increment, 2026-07-18): push notifications (US-NOT-002)
 
@@ -89,6 +88,42 @@ logcat — that eggAPP delivered: **"eggAPP • now — 🔴 Critical alert —
 Temperature out of range: 60°C"**. Delivery took ~1m45s end-to-end
 (MQTT publish → Alert → FCM → device), consistent with normal FCM
 latency on an emulator, not an error.
+
+## Status (fourth increment, 2026-07-18): egg collection recording (US-EGG-001/004)
+
+Closes the last unbuilt P1 Android gap (besides BLE, which stays
+blocked on the firmware) — same offline-first pattern as candling/hatch,
+reusing the already-shipped backend (`POST /farms/:farmId/collections`,
+clientId-idempotent per BR-010; `POST .../collections/:id/discard`).
+
+- **`ui/collections/`**: a farm-level screen (not tied to a batch, since
+  collection→batch assignment is a web-only workflow, US-EGG-003) with
+  a record-collection form and a live list. New `CollectionEntity`
+  (Room, `pending_collection` table) queues saves offline exactly like
+  `CandlingEntity`/`HatchEntity`; `SyncWorker` gained a third push loop.
+  Bumped `AppDatabase` to version 2 with `fallbackToDestructiveMigration()`
+  — no released version to preserve queued rows across.
+- **Discard is online-only, deliberately**: unlike create, the discard
+  endpoint has no `clientId` idempotency (no per-discard audit row to
+  key off — counts are aggregated in place). Queuing it for
+  retry-on-reconnect risks a retried request double-deducting eggs, so
+  `CollectionsViewModel.discard()` calls the API directly and surfaces
+  failure instead. Discarding normally happens while reviewing a
+  freshly-fetched list anyway, so this isn't a real gap in practice.
+
+**Verified for real, full chain, on the emulator**: isolated test user
+(`collection-qa@test.local`) logged in through the actual UI. Disabled
+the emulator's wifi/data radios, confirmed via `ping` the network was
+actually unreachable, recorded a 40-egg collection through the real
+form — it queued locally (`"queued"`, visible immediately, zero
+connectivity). Re-enabled connectivity; WorkManager synced it
+automatically within ~15s, no manual action or restart, confirmed via
+OkHttp logs (`201 Created`) and a direct Postgres check
+(`count: 40`, correct `clientId`). Re-entering the screen showed the
+server-computed `availableCount`/`assignedCount`. Then discarded 3 eggs
+with a reason through the real dialog — confirmed via OkHttp (`200 OK`)
+and the UI updating to `available 37 · discarded 3`. Test farm/user
+cleaned up by exact ID afterward; real account confirmed untouched.
 
 ## Toolchain used to build/verify this (none of it required a separate install)
 
@@ -127,14 +162,16 @@ different host).
 
 ```
 com.eggapp.field/
-  MainActivity.kt        NavHost: login -> incubators -> batches -> batch detail
+  MainActivity.kt        NavHost: login -> incubators -> batches/collections -> batch detail
+  push/                  EggAppMessagingService (FCM receive + display)
   data/                  Retrofit API client, DTOs, TokenStore, BatchCache,
                          FieldRecordRepository (offline-first saves)
-  data/local/            Room: CandlingEntity/HatchEntity, DAO, Database
+  data/local/            Room: CandlingEntity/HatchEntity/CollectionEntity, DAO, Database
   sync/                  SyncWorker (WorkManager)
   ui/login/               Login screen + ViewModel
   ui/incubators/          Incubator list screen + ViewModel
   ui/batch/               Batches list, batch detail + candling/hatch forms
+  ui/collections/         Egg collection recording + discard
   ui/theme/               Compose theme (brand color matches apps/web)
 ```
 

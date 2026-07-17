@@ -69,11 +69,12 @@ to prevent overlapping ownership between agents that cover related ground.
 `src/services/alert.service.ts` (BR-006), and FCM push dispatch
 `src/infra/fcm/client.ts` (US-NOT-002)), `apps/web` (Next.js — live
 incubator telemetry + an Alerts page with ack), `apps/android` (Kotlin +
-Compose — login, live incubator status, offline-first candling/hatch
-recording via Room + WorkManager, and FCM push notifications
-(`push/EggAppMessagingService.kt`), all built and verified for real
-on-emulator against the deployed API, including genuine offline/
-reconnect testing and a full MQTT→Alert→push chain; BLE not yet),
+Compose — login, live incubator status, offline-first candling/hatch/
+egg-collection recording via Room + WorkManager, and FCM push
+notifications (`push/EggAppMessagingService.kt`), all built and
+verified for real on-emulator against the deployed API, including
+genuine offline/reconnect testing and a full MQTT→Alert→push chain;
+BLE not yet — the only remaining P1 Android gap, blocked on firmware),
 `packages/db` (Prisma + Species seed,
 [setup steps](../packages/db/README.md)), `packages/shared-types`
 (canonical enums), `infra/docker` (Mosquitto) + `infra/systemd`/`infra/deploy` (apps/api) —

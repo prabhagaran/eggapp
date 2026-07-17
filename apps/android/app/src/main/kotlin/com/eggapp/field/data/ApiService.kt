@@ -42,4 +42,20 @@ interface ApiService {
         @Path("batchId") batchId: String,
         @Body body: HatchRequest,
     ): Response<HatchResponse>
+
+    @GET("v1/farms/{farmId}/collections")
+    suspend fun collections(@Path("farmId") farmId: String): Response<List<Collection>>
+
+    @POST("v1/farms/{farmId}/collections")
+    suspend fun recordCollection(
+        @Path("farmId") farmId: String,
+        @Body body: CollectionRequest,
+    ): Response<Collection>
+
+    @POST("v1/farms/{farmId}/collections/{id}/discard")
+    suspend fun discardEggs(
+        @Path("farmId") farmId: String,
+        @Path("id") id: String,
+        @Body body: DiscardRequest,
+    ): Response<Collection>
 }

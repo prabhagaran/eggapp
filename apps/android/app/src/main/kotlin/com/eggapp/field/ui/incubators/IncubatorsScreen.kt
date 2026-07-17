@@ -43,6 +43,7 @@ fun IncubatorsScreen(
     viewModel: IncubatorsViewModel = viewModel(),
     onLogout: () -> Unit,
     onOpenBatches: () -> Unit,
+    onOpenCollections: () -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
 
@@ -61,6 +62,7 @@ fun IncubatorsScreen(
                 title = { Text("Incubators") },
                 actions = {
                     TextButton(onClick = onOpenBatches) { Text("Batches") }
+                    TextButton(onClick = onOpenCollections) { Text("Collections") }
                     TextButton(onClick = { viewModel.logout(); onLogout() }) { Text("Log out") }
                 },
             )

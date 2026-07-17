@@ -20,6 +20,7 @@ import androidx.navigation.navArgument
 import com.eggapp.field.data.TokenStore
 import com.eggapp.field.ui.batch.BatchDetailScreen
 import com.eggapp.field.ui.batch.BatchesScreen
+import com.eggapp.field.ui.collections.CollectionsScreen
 import com.eggapp.field.ui.incubators.IncubatorsScreen
 import com.eggapp.field.ui.login.LoginScreen
 import com.eggapp.field.ui.theme.EggAppTheme
@@ -28,6 +29,7 @@ private const val ROUTE_LOGIN = "login"
 private const val ROUTE_INCUBATORS = "incubators"
 private const val ROUTE_BATCHES = "batches"
 private const val ROUTE_BATCH_DETAIL = "batch/{batchId}"
+private const val ROUTE_COLLECTIONS = "collections"
 
 class MainActivity : ComponentActivity() {
 
@@ -63,10 +65,14 @@ class MainActivity : ComponentActivity() {
                                     }
                                 },
                                 onOpenBatches = { navController.navigate(ROUTE_BATCHES) },
+                                onOpenCollections = { navController.navigate(ROUTE_COLLECTIONS) },
                             )
                         }
                         composable(ROUTE_BATCHES) {
                             BatchesScreen(onOpenBatch = { batch -> navController.navigate("batch/${batch.id}") })
+                        }
+                        composable(ROUTE_COLLECTIONS) {
+                            CollectionsScreen(onBack = { navController.popBackStack() })
                         }
                         composable(
                             ROUTE_BATCH_DETAIL,

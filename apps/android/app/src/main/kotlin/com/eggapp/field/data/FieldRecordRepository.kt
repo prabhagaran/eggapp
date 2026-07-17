@@ -7,6 +7,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.eggapp.field.data.local.AppDatabase
 import com.eggapp.field.data.local.CandlingEntity
+import com.eggapp.field.data.local.CollectionEntity
 import com.eggapp.field.data.local.HatchEntity
 import com.eggapp.field.sync.SyncWorker
 import java.time.Instant
@@ -78,8 +79,31 @@ class FieldRecordRepository(context: Context) {
         enqueueSync()
     }
 
+    suspend fun saveCollection(
+        farmId: String,
+        collectedOn: String,
+        count: Int,
+        avgWeightGrams: Double?,
+        sourceNote: String?,
+    ) {
+        dao.insertCollection(
+            CollectionEntity(
+                clientId = UUID.randomUUID().toString(),
+                farmId = farmId,
+                collectedOn = collectedOn,
+                count = count,
+                avgWeightGrams = avgWeightGrams,
+                sourceNote = sourceNote,
+                status = "queued",
+                createdAtMillis = System.currentTimeMillis(),
+            ),
+        )
+        enqueueSync()
+    }
+
     fun observeCandlingsForBatch(batchId: String) = dao.observeCandlingsForBatch(batchId)
     fun observeHatchForBatch(batchId: String) = dao.observeHatchForBatch(batchId)
+    fun observeCollectionsForFarm(farmId: String) = dao.observeCollectionsForFarm(farmId)
 
     /** Runs immediately if online, otherwise WorkManager waits for connectivity and retries with backoff. */
     private fun enqueueSync() {
