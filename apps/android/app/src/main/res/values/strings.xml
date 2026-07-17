@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">eggAPP</string>
+    <string name="fcm_default_channel_id">eggapp_alerts</string>
 </resources>

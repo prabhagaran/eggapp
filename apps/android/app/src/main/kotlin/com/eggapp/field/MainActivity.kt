@@ -1,12 +1,17 @@
 package com.eggapp.field
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.core.content.ContextCompat
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -25,8 +30,14 @@ private const val ROUTE_BATCHES = "batches"
 private const val ROUTE_BATCH_DETAIL = "batch/{batchId}"
 
 class MainActivity : ComponentActivity() {
+
+    private val requestNotificationPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* no-op either way — pushes just won't show if denied */ }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        requestNotificationPermissionIfNeeded()
+
         setContent {
             EggAppTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
@@ -68,5 +79,14 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    // Android 13+ (API 33) requires runtime consent to show notifications
+    // at all — without this, FCM messages still arrive but never display.
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        if (!granted) requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 }

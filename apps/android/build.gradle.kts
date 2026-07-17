@@ -5,4 +5,5 @@ plugins {
     // Kotlin 2.0+ requires this separate plugin when Compose is enabled —
     // it used to be bundled into the Kotlin compiler itself.
     id("org.jetbrains.kotlin.plugin.compose") version "2.0.20" apply false
+    id("com.google.gms.google-services") version "4.4.2" apply false
 }

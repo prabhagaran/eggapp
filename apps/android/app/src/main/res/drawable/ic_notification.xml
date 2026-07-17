@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status-bar notification icon: must be a simple white-on-transparent
+     silhouette per Android's notification icon guidelines (the OS tints
+     it, so color/detail is ignored anyway). A minimal circle stands in
+     for an egg silhouette. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFF">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M12,2C8,2 5,7 5,11a7,9 0,0 0,14 0C19,7 16,2 12,2Z" />
+</vector>

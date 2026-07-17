@@ -54,9 +54,41 @@ offline exactly.
 
 **Not built yet**: BLE device provisioning (blocked on the firmware —
 see `docs/iot/device-lifecycle.md`, BLE isn't implemented there yet
-either), FCM push notifications (needs a Firebase project — external
-setup, not started), egg collection recording (same offline pattern as
+either), egg collection recording (same offline pattern as
 candling/hatch, just not built this increment).
+
+## Status (third increment, 2026-07-18): push notifications (US-NOT-002)
+
+Alerts now reach the phone as a real push notification through eggAPP
+itself — explicitly not a third-party relay (e.g. Telegram); the
+requirement was notifications inside the app only.
+
+- **`push/EggAppMessagingService.kt`**: `FirebaseMessagingService` that
+  displays incoming pushes as a high-priority notification (channel
+  `eggapp_alerts`) deep-linking back into the app, and registers the
+  device's FCM token with `POST /v1/me/push-token` — once right after
+  login (`LoginViewModel`, since `onNewToken` only fires on rotation,
+  not every app start) and again whenever the token rotates.
+- **Runtime permission** (`MainActivity`): Android 13+ requires
+  `POST_NOTIFICATIONS` consent or pushes arrive but never display;
+  requested once on first launch.
+- `google-services.json` (gitignored, real Firebase Android app config)
+  is required in `app/` for the Google Services Gradle plugin to
+  generate the FCM config baked into the APK.
+
+**Verified for real, full chain, on the emulator** (`Pixel_9a`,
+`google_apis_playstore` image — needed for real Play Services/FCM):
+isolated test user logged in through the actual login UI (screenshots
+at each step, not assumed), confirmed server-side via a Prisma query
+that the real FCM token registered on login landed in `User.fcmToken`,
+then published a genuinely out-of-range MQTT telemetry reading
+(`temp: 60`) for a fake test device to the real broker on the Radxa.
+Confirmed server-side that this created a real `critical` Alert row,
+then confirmed on-device — via the notification shade, not just
+logcat — that eggAPP delivered: **"eggAPP • now — 🔴 Critical alert —
+Temperature out of range: 60°C"**. Delivery took ~1m45s end-to-end
+(MQTT publish → Alert → FCM → device), consistent with normal FCM
+latency on an emulator, not an error.
 
 ## Toolchain used to build/verify this (none of it required a separate install)
 

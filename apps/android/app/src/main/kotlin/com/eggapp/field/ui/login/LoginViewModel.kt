@@ -5,10 +5,13 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.eggapp.field.data.ApiClient
 import com.eggapp.field.data.LoginRequest
+import com.eggapp.field.data.PushTokenRequest
 import com.eggapp.field.data.TokenStore
+import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 data class LoginUiState(
     val busy: Boolean = false,
@@ -49,6 +52,15 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
                 return@launch
             }
             tokenStore.saveFarmId(farms[0].id)
+
+            // Register this device for push (US-NOT-002). Best-effort —
+            // a failure here shouldn't block login; onNewToken will
+            // retry registration on the next token rotation regardless.
+            runCatching {
+                val fcmToken = FirebaseMessaging.getInstance().token.await()
+                authed.registerPushToken(PushTokenRequest(fcmToken))
+            }
+
             _state.value = LoginUiState(loggedIn = true)
         }
     }
