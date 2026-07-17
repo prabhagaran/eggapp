@@ -14,6 +14,7 @@
 #include "task_buttons.h"
 #include "task_ui.h"
 #include "task_cloud.h"
+#include "task_mqtt.h"
 #include "task_incubator.h"
 #include "task_wifi_manager.h"
 
@@ -21,6 +22,7 @@
 // after their own header, causing C-linkage/C++-linkage mismatch with this TU.
 void task_rtc(void* pvParameters);
 void task_cloud(void* pvParameters);
+void task_mqtt(void* pvParameters);
 void task_wifi_manager(void* pvParameters);
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -447,6 +449,10 @@ void setup() {
 
     // Cloud on Core 0
     xTaskCreatePinnedToCore(task_cloud,                  "Cloud",       12288, nullptr, 1, nullptr,            0);
+
+    // MQTT on Core 0 — additive alongside Cloud, publishes the same
+    // telemetry to a local broker; independent of the Google Sheets path.
+    xTaskCreatePinnedToCore(task_mqtt,                   "MQTT",         6144, nullptr, 1, nullptr,            0);
 
     // WiFi manager on Core 0 (lowest priority — never blocks other tasks)
     xTaskCreatePinnedToCore(task_wifi_manager,           "WifiMgr",     8192,  nullptr, 1, nullptr,            0);

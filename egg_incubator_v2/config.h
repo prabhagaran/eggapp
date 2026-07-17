@@ -193,6 +193,17 @@
 // Telemetry queue size (messages held for retry)
 #define TELEMETRY_QUEUE_SIZE           16
 
+// ─────────────────────────────────────────────────────────────────────────────
+// MQTT (additive — publishes alongside Google Sheets in task_cloud; does not
+// replace it. See task_mqtt.h/.cpp. Broker credentials live in secrets.h,
+// same pattern as the cloud secrets below.)
+// ─────────────────────────────────────────────────────────────────────────────
+#define MQTT_TOPIC_PREFIX             "eggapp/devices"    // full topic: <prefix>/<DEVICE_ID>/telemetry
+#define MQTT_TELEMETRY_INTERVAL_MS    60000UL             // 60 s — same cadence as Sheets
+#define MQTT_KEEPALIVE_SEC               30
+#define MQTT_RECONNECT_BACKOFF_MS      5000UL
+#define MQTT_BUFFER_SIZE                 512              // JSON payload fits comfortably
+
 // Root CA certificate is defined in secrets.h (or the fallback block below).
 // See ROOT_CA_EXTRACT.md for instructions on obtaining the PEM.
 
@@ -231,6 +242,12 @@
 #    define GOOGLE_SCRIPT_URL ""
 #    define CLOUD_TOKEN        ""
 #    define CLOUD_ROOT_CA      ""
+// MQTT fallbacks — empty host disables the MQTT task safely (same
+// opt-in-via-secrets.h pattern as the cloud macros above).
+#    define MQTT_BROKER_HOST   ""
+#    define MQTT_BROKER_PORT   1883
+#    define MQTT_USERNAME      ""
+#    define MQTT_PASSWORD      ""
 #  endif
 #else
 // Fallback for toolchains without __has_include

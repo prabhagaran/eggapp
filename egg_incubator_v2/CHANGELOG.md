@@ -2,6 +2,30 @@
 
 All notable changes and fixes for the egg_incubator_v2 workspace.
 
+## 2026-07-17 — MQTT telemetry (additive)
+
+- Added MQTT publishing (roadmap item 5.1) alongside the existing Google
+  Sheets upload — additive, not a replacement; both run independently.
+  - New task `task_mqtt` (Core 0, priority 1, same as `task_cloud`):
+    connects to a local Mosquitto broker via `PubSubClient`, publishes a
+    JSON telemetry snapshot every `MQTT_TELEMETRY_INTERVAL_MS` to
+    `<MQTT_TOPIC_PREFIX>/<DEVICE_ID>/telemetry`, and publishes retained
+    `online`/`offline` status to `.../status` (offline via LWT, so the
+    broker reports it automatically on an ungraceful disconnect).
+  - Disabled safely (idles, no reconnect spam) when `MQTT_BROKER_HOST` is
+    empty — same opt-in-via-`secrets.h` pattern as the cloud macros.
+  - New library dependency: **PubSubClient** (Nick O'Leary) — install via
+    Library Manager or `arduino-cli lib install "PubSubClient"`.
+  - Files changed: [task_mqtt.h](task_mqtt.h) (new), [task_mqtt.cpp](task_mqtt.cpp)
+    (new), [config.h](config.h) (new `MQTT_*` macros appended, nothing
+    existing altered), [secrets.h.example](secrets.h.example) /
+    [secrets.h](secrets.h) (new `MQTT_BROKER_HOST/PORT/USERNAME/PASSWORD`
+    appended), [egg_incubator_v2.ino](egg_incubator_v2.ino) (one new
+    `#include`, one new prototype, one new `xTaskCreatePinnedToCore` call).
+  - Test: compiles via `arduino-cli compile`; not yet flashed/run on
+    device — verify broker connect, telemetry publish, and LWT
+    offline-on-disconnect on real hardware before relying on it.
+
 ## v2 — 2026-03-05 — Released
 
 - Release `v2`: consolidated documentation, updated README, added per-FSM
