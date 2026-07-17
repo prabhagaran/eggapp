@@ -22,9 +22,11 @@ candling, hatching, batches, incubators" are all facets of **Incubation**
 
 ## Entity catalog
 
-Every entity below carries `farm_id` (scoping, BR-013) unless it *is* the
-farm/user layer. Offline-creatable records (marked ⇅) also carry a
-client-generated UUID + version for sync (BR-010).
+Aggregate roots carry `farm_id` (scoping, BR-013); nested records
+(BatchEggSource, CandlingSession, HatchEvent, telemetry/config/events)
+scope through their root's foreign key. Cross-context references
+(recordedBy, ackedBy) are plain IDs, not FKs. Offline-creatable records
+(marked ⇅) also carry a client-generated UUID + version for sync (BR-010).
 
 ### Farm & Access
 - **Farm** — name, location, timezone.

@@ -11,15 +11,24 @@ Owner: database-architect. Hosting per ADR 0001 (Supabase, managed Postgres only
    - `DIRECT_URL` — direct (port 5432) — migrations
 4. From repo root:
    ```
-   pnpm db:migrate   # creates tables (prisma migrate dev)
-   pnpm db:seed      # seeds Species reference data
+   pnpm --filter @eggapp/db db:deploy   # applies committed migrations (0_init)
+   pnpm db:seed                         # seeds Species reference data
    ```
+   (Day-to-day schema work uses `pnpm db:migrate` / prisma migrate dev.)
 
-## Contents (Phase 0 baseline)
+## Contents (Phase 1 schema)
 
-- **Farm & Access context:** User, Farm, FarmMembership (+ FarmRole) — ADR 0003.
+- **Farm & Access:** User, Farm, FarmMembership (+ FarmRole) — ADR 0003.
 - **Species reference:** incubation parameters from domain-knowledge §1,
   seeded idempotently by `prisma/seed.ts`; drives BR-008 scheduling.
+- **Device & Telemetry:** Device, TelemetryReading (append-only),
+  DeviceEvent, DeviceConfig (ack states, US-INC-003) — BR-007 binding via
+  unique FK.
+- **Incubation:** EggCollection, EggBatch (+ BatchStatus lifecycle BR-001),
+  BatchEggSource, CandlingSession, HatchEvent — offline-sync `clientId`
+  idempotency per BR-010.
+- **Alerting:** AlertRule (overrides; species defaults are stage-aware),
+  Alert, Notification.
 
-Later phases add Incubation, Device & Telemetry, Flock Operations, Alerting,
-and Inventory contexts via migrations — see `docs/architecture/domain-model.md`.
+Phase 2 adds the Flock Operations context (Flock, Vaccination, Feed/Water,
+Mortality) — see `docs/architecture/domain-model.md`.

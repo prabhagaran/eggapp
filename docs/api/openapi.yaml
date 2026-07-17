@@ -1,0 +1,466 @@
+openapi: 3.1.0
+info:
+  title: eggAPP API
+  version: 0.1.0
+  description: >
+    Smart Poultry Farm Management System API. Owner: backend-architect.
+    Grows per Phase 1 increment — currently: first-run setup, auth, species
+    reference, farms, incubators, devices. Conventions: JWT bearer auth
+    (access 15 min / refresh 30 d, rotation via tokenVersion); all farm data
+    scoped by membership (BR-013) — non-membership returns 404, never 403,
+    so farm existence is not leaked; role gates: worker=read+field records,
+    manager=configuration, owner=administration. Errors are always
+    `{ error: { code, message } }`.
+
+servers:
+  - url: http://localhost:3001
+
+tags:
+  - name: system
+  - name: setup
+  - name: auth
+  - name: reference
+  - name: farms
+  - name: incubators
+  - name: devices
+
+paths:
+  /health:
+    get:
+      tags: [system]
+      summary: Liveness check
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  service: { type: string, example: eggapp-api }
+
+  /v1/setup:
+    post:
+      tags: [setup]
+      summary: First-run wizard (US-FRM-001)
+      description: Creates the Owner account and first farm. 409 once any user exists.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ownerName, email, password, farmName, timezone]
+              properties:
+                ownerName: { type: string }
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+                farmName: { type: string }
+                timezone: { type: string, example: Asia/Kolkata }
+                location: { type: string }
+      responses:
+        "201":
+          description: System initialized
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/TokenPair"
+                  - type: object
+                    properties:
+                      user: { $ref: "#/components/schemas/User" }
+                      farm: { $ref: "#/components/schemas/Farm" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /v1/auth/login:
+    post:
+      tags: [auth]
+      summary: Log in
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        "200":
+          description: Tokens + user
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/TokenPair"
+                  - type: object
+                    properties:
+                      user: { $ref: "#/components/schemas/User" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /v1/auth/refresh:
+    post:
+      tags: [auth]
+      summary: Exchange a refresh token for a new token pair
+      description: Refresh tokens carry the user's tokenVersion; logout-all bumps it, revoking them all.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string }
+      responses:
+        "200":
+          description: New token pair
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TokenPair" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /v1/auth/logout-all:
+    post:
+      tags: [auth]
+      summary: Revoke all refresh tokens (all devices)
+      responses:
+        "204": { description: Revoked }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /v1/me:
+    get:
+      tags: [auth]
+      summary: Current user with farm memberships
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/User"
+                  - type: object
+                    properties:
+                      farms:
+                        type: array
+                        items: { $ref: "#/components/schemas/FarmWithRole" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /v1/species:
+    get:
+      tags: [reference]
+      summary: Species reference data (seeded from domain-knowledge §1)
+      description: Drives batch schedule generation (BR-008) and stage-aware alert defaults (BR-006).
+      responses:
+        "200":
+          description: All species
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Species" }
+
+  /v1/farms:
+    get:
+      tags: [farms]
+      summary: Farms the caller belongs to
+      responses:
+        "200":
+          description: Farms with the caller's role
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/FarmWithRole" }
+
+  /v1/farms/{farmId}/incubators:
+    parameters: [{ $ref: "#/components/parameters/farmId" }]
+    post:
+      tags: [incubators]
+      summary: Register an incubator (US-INC-001) — manager+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, capacity]
+              properties:
+                name: { type: string }
+                capacity: { type: integer, minimum: 1 }
+                defaultSpeciesId: { type: string, example: chicken }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Incubator" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    get:
+      tags: [incubators]
+      summary: List incubators with bound-device summary
+      responses:
+        "200":
+          description: Incubators
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Incubator" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/farms/{farmId}/incubators/{id}:
+    parameters:
+      - { $ref: "#/components/parameters/farmId" }
+      - { $ref: "#/components/parameters/id" }
+    get:
+      tags: [incubators]
+      summary: Incubator detail (device + default species)
+      responses:
+        "200":
+          description: Incubator
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Incubator" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/farms/{farmId}/devices:
+    parameters: [{ $ref: "#/components/parameters/farmId" }]
+    post:
+      tags: [devices]
+      summary: Register a device record — manager+
+      description: >
+        Creates the platform-side record (status `provisioned`). Physical
+        provisioning (WiFi credentials, farm binding confirmation) happens via
+        BLE per docs/iot/ble-pairing-protocol.md; MQTT broker credentials are
+        currently issued manually per infra/docker/mosquitto/README.md.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [hardwareId]
+              properties:
+                hardwareId: { type: string, description: "e.g. ESP32 MAC", example: "A0:B7:65:12:34:56" }
+                name: { type: string }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Device" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    get:
+      tags: [devices]
+      summary: List devices with binding summary
+      responses:
+        "200":
+          description: Devices
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Device" }
+
+  /v1/farms/{farmId}/devices/{id}/bind:
+    parameters:
+      - { $ref: "#/components/parameters/farmId" }
+      - { $ref: "#/components/parameters/id" }
+    post:
+      tags: [devices]
+      summary: Bind device to an incubator (BR-007) — manager+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [incubatorId]
+              properties:
+                incubatorId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Bound (returns the incubator)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Incubator" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/farms/{farmId}/devices/{id}/unbind:
+    parameters:
+      - { $ref: "#/components/parameters/farmId" }
+      - { $ref: "#/components/parameters/id" }
+    post:
+      tags: [devices]
+      summary: Unbind device from its incubator — manager+
+      responses:
+        "200": { description: Unbound }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/farms/{farmId}/devices/{id}/decommission:
+    parameters:
+      - { $ref: "#/components/parameters/farmId" }
+      - { $ref: "#/components/parameters/id" }
+    post:
+      tags: [devices]
+      summary: Decommission a device (US-DEV-004) — manager+
+      description: Unbinds, marks decommissioned, records a DeviceEvent. Subsequent telemetry is rejected (BR-007). Idempotent.
+      responses:
+        "200":
+          description: Decommissioned
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Device" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    farmId:
+      name: farmId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    BadRequest:
+      description: Validation failure
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthorized:
+      description: Missing/invalid/revoked token
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Forbidden:
+      description: Role too low (BR-013)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Not found (includes non-membership — existence not leaked)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Conflict:
+      description: State conflict (duplicate, occupied binding, already initialized)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string, example: conflict }
+            message: { type: string }
+
+    TokenPair:
+      type: object
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+
+    User:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        name: { type: string }
+
+    Farm:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        timezone: { type: string }
+        location: { type: string, nullable: true }
+
+    FarmWithRole:
+      allOf:
+        - $ref: "#/components/schemas/Farm"
+        - type: object
+          properties:
+            role: { type: string, enum: [owner, manager, worker] }
+
+    Species:
+      type: object
+      description: Reference data — see packages/db seed and domain-knowledge §1.
+      properties:
+        id: { type: string, example: chicken }
+        name: { type: string }
+        incubationDays: { type: integer }
+        lockdownOffsetDays: { type: integer }
+        tempSetC: { type: number }
+        tempMinC: { type: number }
+        tempMaxC: { type: number }
+        humidityIncubMinPct: { type: integer }
+        humidityIncubMaxPct: { type: integer }
+        humidityLockMinPct: { type: integer }
+        humidityLockMaxPct: { type: integer }
+        candlingDays: { type: array, items: { type: integer } }
+        turnUntilDay: { type: integer }
+
+    Device:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        hardwareId: { type: string }
+        name: { type: string, nullable: true }
+        status: { type: string, enum: [provisioned, active, offline, decommissioned] }
+        lastSeenAt: { type: string, format: date-time, nullable: true }
+        firmwareVersion: { type: string, nullable: true }
+        incubator:
+          type: object
+          nullable: true
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+
+    Incubator:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        capacity: { type: integer }
+        defaultSpeciesId: { type: string, nullable: true }
+        deviceId: { type: string, format: uuid, nullable: true }
+        device:
+          type: object
+          nullable: true
+          properties:
+            id: { type: string, format: uuid }
+            hardwareId: { type: string }
+            name: { type: string, nullable: true }
+            status: { type: string }
+            lastSeenAt: { type: string, format: date-time, nullable: true }

@@ -1,7 +1,13 @@
-// Phase 0 baseline — Farm & Access context + Species reference data.
 // Owner: database-architect. Entities follow docs/architecture/domain-model.md;
-// conceptual changes go through system-architect. Incubation/Device/Flock
-// contexts land in Phase 1+ migrations.
+// conceptual changes go through system-architect.
+//
+// Scoping (BR-013 / ADR 0003): aggregate roots carry farmId; nested records
+// (BatchEggSource, CandlingSession, HatchEvent, telemetry/config/events)
+// scope through their root's FK. Cross-context references (recordedById,
+// ackedById) are plain IDs, not FKs — contexts stay loosely coupled.
+//
+// Enum values are lowercase to match the canonical enums in
+// packages/shared-types (no mapping layer at the API boundary).
 
 generator client {
   provider = "prisma-client-js"
@@ -13,10 +19,12 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// ── Farm & Access ────────────────────────────────────────────────
+
 enum FarmRole {
-  OWNER
-  MANAGER
-  WORKER
+  owner
+  manager
+  worker
 }
 
 model User {
@@ -24,6 +32,7 @@ model User {
   email        String           @unique
   passwordHash String
   name         String
+  tokenVersion Int              @default(0) // bump = revoke all refresh tokens
   createdAt    DateTime         @default(now())
   memberships  FarmMembership[]
 }
@@ -35,10 +44,14 @@ model Farm {
   timezone    String
   createdAt   DateTime         @default(now())
   memberships FarmMembership[]
+  devices     Device[]
+  incubators  Incubator[]
+  collections EggCollection[]
+  batches     EggBatch[]
+  alertRules  AlertRule[]
+  alerts      Alert[]
 }
 
-// BR-013 / ADR 0003: farm is the tenancy boundary; every domain table in
-// later migrations carries farmId and is queried through membership scoping.
 model FarmMembership {
   userId    String
   farmId    String
@@ -51,20 +64,292 @@ model FarmMembership {
   @@index([farmId])
 }
 
-// Seeded reference data (domain-knowledge.md §1) — drives BR-008 batch
-// scheduling and BR-006 stage-aware alert defaults. Not farm-scoped.
+// ── Species reference (seeded, domain-knowledge §1; drives BR-008) ──
+
 model Species {
-  id                   String @id // slug, e.g. "chicken"
-  name                 String
-  incubationDays       Int
-  lockdownOffsetDays   Int // lockdown = incubationDays - this
-  tempSetC             Float
-  tempMinC             Float // sustained outside min/max = critical (BR-006)
-  tempMaxC             Float
-  humidityIncubMinPct  Int
-  humidityIncubMaxPct  Int
-  humidityLockMinPct   Int
-  humidityLockMaxPct   Int
-  candlingDays         Int[]
-  turnUntilDay         Int
+  id                  String      @id // slug, e.g. "chicken"
+  name                String
+  incubationDays      Int
+  lockdownOffsetDays  Int // lockdown = incubationDays - this
+  tempSetC            Float
+  tempMinC            Float // sustained outside min/max = critical (BR-006)
+  tempMaxC            Float
+  humidityIncubMinPct Int
+  humidityIncubMaxPct Int
+  humidityLockMinPct  Int
+  humidityLockMaxPct  Int
+  candlingDays        Int[]
+  turnUntilDay        Int
+  batches             EggBatch[]
+  incubators          Incubator[]
+}
+
+// ── Device & Telemetry ───────────────────────────────────────────
+
+enum DeviceStatus {
+  provisioned
+  active
+  offline
+  decommissioned
+}
+
+enum ConfigState {
+  sent
+  received
+  applied
+  unconfirmed
+}
+
+enum TelemetrySource {
+  mqtt
+  ble
+}
+
+enum DeviceEventType {
+  provisioned
+  online
+  offline
+  decommissioned
+  config_sent
+  config_received
+  config_applied
+}
+
+model Device {
+  id              String             @id @default(uuid())
+  farmId          String
+  hardwareId      String             @unique // e.g. ESP32 MAC
+  name            String?
+  status          DeviceStatus       @default(provisioned)
+  lastSeenAt      DateTime?
+  firmwareVersion String?
+  createdAt       DateTime           @default(now())
+  farm            Farm               @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  incubator       Incubator? // set via Incubator.deviceId (BR-007: 0..1)
+  events          DeviceEvent[]
+  configs         DeviceConfig[]
+  telemetry       TelemetryReading[]
+
+  @@index([farmId])
+}
+
+model Incubator {
+  id               String     @id @default(uuid())
+  farmId           String
+  name             String
+  capacity         Int
+  defaultSpeciesId String?
+  deviceId         String?    @unique // BR-007: a device binds to at most one incubator
+  createdAt        DateTime   @default(now())
+  farm             Farm       @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  defaultSpecies   Species?   @relation(fields: [defaultSpeciesId], references: [id])
+  device           Device?    @relation(fields: [deviceId], references: [id])
+  batches          EggBatch[]
+
+  @@index([farmId])
+}
+
+// Append-only time series (NFR: plain table + index is sufficient at scale)
+model TelemetryReading {
+  id          BigInt          @id @default(autoincrement())
+  deviceId    String
+  ts          DateTime
+  tempC       Float?
+  humidityPct Float?
+  turnerOn    Boolean?
+  source      TelemetrySource @default(mqtt)
+  device      Device          @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([deviceId, ts(sort: Desc)])
+}
+
+model DeviceEvent {
+  id       String          @id @default(uuid())
+  deviceId String
+  ts       DateTime        @default(now())
+  type     DeviceEventType
+  detail   Json?
+  device   Device          @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([deviceId, ts(sort: Desc)])
+}
+
+// Config push with acknowledgement states (US-INC-003)
+model DeviceConfig {
+  id         String      @id @default(uuid())
+  deviceId   String
+  version    Int // monotonic per device
+  payload    Json
+  state      ConfigState @default(sent)
+  sentAt     DateTime    @default(now())
+  receivedAt DateTime?
+  appliedAt  DateTime?
+  device     Device      @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@unique([deviceId, version])
+}
+
+// ── Incubation ───────────────────────────────────────────────────
+
+enum BatchStatus {
+  planned
+  setting
+  incubating
+  lockdown
+  hatching
+  completed
+  closed
+  aborted
+}
+
+model EggCollection {
+  id             String           @id @default(uuid())
+  farmId         String
+  collectedOn    DateTime // date eggs were collected (BR-011 age basis)
+  count          Int
+  discardedCount Int              @default(0)
+  discardNote    String?
+  avgWeightGrams Float?
+  sourceNote     String? // Phase 2 replaces with flockId FK (Flock context)
+  clientId       String?          @unique // offline-sync idempotency (BR-010)
+  createdAt      DateTime         @default(now())
+  farm           Farm             @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  batchSources   BatchEggSource[]
+
+  @@index([farmId, collectedOn(sort: Desc)])
+}
+
+model EggBatch {
+  id                String            @id @default(uuid())
+  farmId            String
+  incubatorId       String
+  speciesId         String
+  status            BatchStatus       @default(planned)
+  setAt             DateTime?
+  candlingDays      Int[] // day numbers, from Species at creation (BR-008)
+  lockdownAt        DateTime?
+  expectedHatchAt   DateTime?
+  viableCount       Int               @default(0) // maintained by candling results (BR-003)
+  fertilityPct      Float? // BR-015: stored at completion, never recomputed
+  hatchOfSetPct     Float?
+  hatchOfFertilePct Float?
+  abortReason       String?
+  createdAt         DateTime          @default(now())
+  farm              Farm              @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  incubator         Incubator         @relation(fields: [incubatorId], references: [id])
+  species           Species           @relation(fields: [speciesId], references: [id])
+  sources           BatchEggSource[]
+  candlings         CandlingSession[]
+  hatch             HatchEvent?
+
+  @@index([farmId, status])
+}
+
+model BatchEggSource {
+  batchId      String
+  collectionId String
+  count        Int
+  batch        EggBatch      @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  collection   EggCollection @relation(fields: [collectionId], references: [id])
+
+  @@id([batchId, collectionId])
+}
+
+model CandlingSession {
+  id              String   @id @default(uuid())
+  batchId         String
+  dayNo           Int
+  candledAt       DateTime
+  fertile         Int
+  clear           Int
+  bloodRing       Int
+  unsure          Int
+  discrepancyNote String? // BR-003: mismatches recorded, not absorbed
+  recordedById    String? // User id (cross-context, no FK)
+  clientId        String?  @unique // offline-sync idempotency (BR-010)
+  createdAt       DateTime @default(now())
+  batch           EggBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@unique([batchId, dayNo])
+}
+
+model HatchEvent {
+  id              String   @id @default(uuid())
+  batchId         String   @unique
+  hatchedAt       DateTime
+  hatched         Int
+  pippedDead      Int
+  deadInShell     Int
+  unhatched       Int
+  discrepancyNote String?
+  recordedById    String?
+  clientId        String?  @unique
+  createdAt       DateTime @default(now())
+  batch           EggBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  // Phase 2: resultingFlockId (Flock context)
+}
+
+// ── Alerting ─────────────────────────────────────────────────────
+
+enum AlertSeverity {
+  warning
+  critical
+}
+
+enum AlertState {
+  open
+  acked
+  resolved
+}
+
+// Overrides only — default bounds come from Species (stage-aware, BR-006)
+model AlertRule {
+  id             String   @id @default(uuid())
+  farmId         String
+  incubatorId    String?
+  metric         String // "temp_c" | "humidity_pct" (validated in app layer)
+  warnMin        Float?
+  warnMax        Float?
+  critMin        Float?
+  critMax        Float?
+  sustainMinutes Int      @default(10)
+  quietHours     Json? // { start: "22:00", end: "06:00" } — warnings only (BR-014)
+  enabled        Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  farm           Farm     @relation(fields: [farmId], references: [id], onDelete: Cascade)
+
+  @@index([farmId])
+}
+
+model Alert {
+  id          String        @id @default(uuid())
+  farmId      String
+  ruleId      String?
+  incubatorId String?
+  deviceId    String?
+  severity    AlertSeverity
+  state       AlertState    @default(open)
+  message     String
+  triggeredAt DateTime      @default(now())
+  ackedAt     DateTime?
+  ackedById   String? // User id (cross-context, no FK)
+  resolvedAt  DateTime?
+  farm        Farm          @relation(fields: [farmId], references: [id], onDelete: Cascade)
+
+  @@index([farmId, state, triggeredAt(sort: Desc)])
+}
+
+model Notification {
+  id       String    @id @default(uuid())
+  userId   String
+  alertId  String?
+  kind     String // "alert" | "candling_due" | "vaccination_due" | ...
+  title    String
+  body     String
+  deepLink String?
+  channel  String // "fcm" | "web"
+  sentAt   DateTime?
+  readAt   DateTime?
+
+  @@index([userId, sentAt(sort: Desc)])
 }

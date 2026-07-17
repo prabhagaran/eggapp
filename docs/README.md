@@ -44,6 +44,10 @@ to prevent overlapping ownership between agents that cover related ground.
 - [NFRs](architecture/nfr.md) — scale, retention, availability, performance targets
 - ADRs: [0001 Supabase hosting](architecture/adr/0001-database-hosting-supabase.md) · [0002 BLE supplementary channel](architecture/adr/0002-ble-supplementary-device-channel.md) · [0003 Tenancy](architecture/adr/0003-tenancy-model.md) · [0004 Mosquitto broker](architecture/adr/0004-mqtt-broker-mosquitto.md)
 
+**API** (`docs/api/`)
+- [OpenAPI contract](api/openapi.yaml) — grows per Phase 1 increment;
+  currently setup/auth/species/farms/incubators/devices
+
 **IoT** (`docs/iot/`)
 - [Firmware Discovery Guide](iot/firmware-discovery-guide.md) — how to capture
   the real MQTT + BLE contracts from the incubator (Phase 0 blocker for
@@ -57,7 +61,8 @@ to prevent overlapping ownership between agents that cover related ground.
 
 **Not yet written** (owned by the named agent, Phase 0–1): the four
 `docs/iot/*` contract docs (iot-integration-architect — produced via the
-discovery guide above), `docs/api/*` (backend-architect), `docs/database/*`
+discovery guide above), `docs/api/sync-conflict-strategy.md`
+(backend-architect, with the batch/candling increment), `docs/database/*`
 (database-architect), `docs/android/*`, `docs/web/*` wireframes
 (ui-ux-architect), `docs/security/threat-model.md`,
 `docs/testing/test-strategy.md`.

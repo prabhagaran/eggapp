@@ -1,0 +1,16 @@
+import type { FastifyInstance } from "fastify";
+import { authRoutes } from "./auth.js";
+import { deviceRoutes } from "./devices.js";
+import { farmRoutes } from "./farms.js";
+import { incubatorRoutes } from "./incubators.js";
+import { setupRoutes } from "./setup.js";
+import { speciesRoutes } from "./species.js";
+
+export async function v1Routes(app: FastifyInstance) {
+  app.register(setupRoutes);
+  app.register(authRoutes);
+  app.register(speciesRoutes);
+  app.register(farmRoutes);
+  app.register(incubatorRoutes);
+  app.register(deviceRoutes);
+}
