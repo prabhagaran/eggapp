@@ -11,6 +11,8 @@ describe.runIf(hasDb)("first-run → auth → incubator → device flow (DB)", (
   const email = `owner-${suffix}@test.local`;
   const password = "correct-horse-battery";
 
+  // 30s: many sequential round-trips against a live remote DB (Supabase
+  // transaction pooler adds latency vs. local Postgres) — not a hang.
   it("runs setup, logs in, creates and binds resources with RBAC intact", async () => {
     const app = buildApp();
 
@@ -104,5 +106,5 @@ describe.runIf(hasDb)("first-run → auth → incubator → device flow (DB)", (
     expect(foreignRes.statusCode).toBe(404);
 
     await app.close();
-  });
+  }, 30000);
 });

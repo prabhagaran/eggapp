@@ -5,13 +5,18 @@ Owner: database-architect. Hosting per ADR 0001 (Supabase, managed Postgres only
 ## One-time Supabase setup
 
 1. Create a project at supabase.com (free tier is fine — see NFR volumes).
-2. Dashboard → Settings → Database → copy both connection strings.
+2. Dashboard → Settings → Database → **Connection string**.
 3. Copy the repo root `.env.example` to `packages/db/.env` and fill:
-   - `DATABASE_URL` — pooled (port 6543, `?pgbouncer=true`) — runtime
-   - `DIRECT_URL` — direct (port 5432) — migrations
+   - `DATABASE_URL` — **Transaction pooler**, port 6543, `?pgbouncer=true` — runtime
+   - `DIRECT_URL` — **Session pooler**, port 5432 — migrations. Use the
+     pooler host here, *not* the "Direct connection" string the dashboard
+     also offers (`db.<project-ref>.supabase.co`) — that host is IPv6-only
+     and `P1001: Can't reach database server` on networks without IPv6.
+   - Percent-encode special characters in your password (`@`→`%40`, etc.)
+     or the URL won't parse.
 4. From repo root:
    ```
-   pnpm --filter @eggapp/db db:deploy   # applies committed migrations (0_init)
+   pnpm --filter @eggapp/db db:deploy   # applies all committed migrations
    pnpm db:seed                         # seeds Species reference data
    ```
    (Day-to-day schema work uses `pnpm db:migrate` / prisma migrate dev.)

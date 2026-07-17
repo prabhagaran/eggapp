@@ -251,7 +251,7 @@ model BatchEggSource {
   collectionId String
   count        Int
   batch        EggBatch      @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  collection   EggCollection @relation(fields: [collectionId], references: [id])
+  collection   EggCollection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
 
   @@id([batchId, collectionId])
 }

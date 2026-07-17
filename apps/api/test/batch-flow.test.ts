@@ -6,6 +6,7 @@ import { buildApp } from "../src/app.js";
 const hasDb = Boolean(process.env.DATABASE_URL);
 
 describe.runIf(hasDb)("collection → batch → candle → hatch flow (DB)", () => {
+  // 30s: ~15 sequential round-trips against a live remote DB — not a hang.
   it("runs the full lifecycle with BR-002/003/008/010/015 enforced", async () => {
     const app = buildApp();
     const suffix = Date.now();
@@ -112,5 +113,5 @@ describe.runIf(hasDb)("collection → batch → candle → hatch flow (DB)", () 
     expect(done.hatchOfFertilePct).toBe(88.9); // 40/45
 
     await app.close();
-  });
+  }, 30000);
 });

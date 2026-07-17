@@ -2,6 +2,7 @@
 // Idempotent: upserts by slug. Ranged values use the typical midpoint;
 // tolerance semantics (warning ±0.3°C etc.) live in alerting logic, while
 // tempMin/Max here are the species' critical bounds.
+import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
