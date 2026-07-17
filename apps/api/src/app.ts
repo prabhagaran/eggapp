@@ -1,3 +1,4 @@
+import cors from "@fastify/cors";
 import { Prisma } from "@prisma/client";
 import Fastify, { type FastifyError } from "fastify";
 import { ZodError } from "zod";
@@ -39,6 +40,11 @@ export function buildApp() {
     return reply.code(500).send({ error: { code: "internal", message: "Internal server error" } });
   });
 
+  // Personal LAN app behind JWT auth — origin isn't the security
+  // boundary here, so reflect any origin rather than maintaining an
+  // allowlist for every place the dashboard might be opened from
+  // (dev laptop, phone on the LAN, the Radxa itself later).
+  app.register(cors, { origin: true });
   app.register(authPlugin);
   app.register(healthRoutes);
   app.register(v1Routes, { prefix: "/v1" });
