@@ -17,12 +17,46 @@ not just written:
 - Retrofit client with an `Authenticator` that refreshes the access
   token once on a 401 and retries, mirroring `apps/web/lib/api.ts`.
 
-**Not built yet** (this was the first slice, not full P1 Android scope):
-offline-first field entry (candling/hatch/collection — needs Room +
-WorkManager sync per BR-010), BLE device provisioning (blocked on the
-firmware — see `docs/iot/device-lifecycle.md`, BLE isn't implemented
-there yet either), FCM push notifications (needs a Firebase project —
-external setup, not started).
+## Status (second increment, 2026-07-18): offline-first field entry
+
+- **Candling & hatch recording** (US-CAN-002, US-HAT-002): Room-backed
+  offline queue (`data/local/`) — saves always succeed locally first,
+  regardless of connectivity. A WorkManager `SyncWorker`
+  (`NetworkType.CONNECTED` constraint) pushes queued records via the
+  same `clientId`-idempotent endpoints the web client uses (BR-010).
+  Rejections (e.g. missing discrepancy note) are marked `conflict`
+  rather than retried forever; network failures retry with WorkManager's
+  backoff.
+- **Batch list & detail** (`ui/batch/`): active batches for the farm,
+  with the candling form (while `incubating`) or hatch form (while
+  `lockdown`/`hatching`) shown inline. The next unrecorded candling day
+  is pre-filled from the batch's schedule.
+- **Found and fixed during verification, not before**: the batch detail
+  screen originally only showed the recording forms once the batch had
+  been fetched from the server — meaning the entire offline-recording UI
+  vanished when actually offline, exactly backwards for a field app.
+  Fixed with `BatchCache` (`data/BatchCache.kt`): the last successfully
+  fetched batch is cached locally and shown immediately, with a live
+  refresh attempted on top when reachable.
+
+**Verified for real — genuine offline, not simulated**: disabled the
+emulator's wifi/data radios (`svc wifi disable` / `svc data disable`;
+the `airplane_mode` *setting* alone doesn't cut connectivity in an
+emulator), confirmed via `ping` that the network was actually
+unreachable, then recorded a candling session through the real UI. It
+saved locally and displayed `queued`. Re-enabled connectivity;
+WorkManager fired the sync automatically within ~15s with **no manual
+action or app restart** — confirmed via OkHttp logs (`201 Created`) and
+the UI flipping to `synced`. Then confirmed server-side, independently,
+that the exact data landed correctly: `viableCount` 50→45,
+`fertilityPct` computed as 90% (BR-015), matching what was entered
+offline exactly.
+
+**Not built yet**: BLE device provisioning (blocked on the firmware —
+see `docs/iot/device-lifecycle.md`, BLE isn't implemented there yet
+either), FCM push notifications (needs a Firebase project — external
+setup, not started), egg collection recording (same offline pattern as
+candling/hatch, just not built this increment).
 
 ## Toolchain used to build/verify this (none of it required a separate install)
 
@@ -61,9 +95,19 @@ different host).
 
 ```
 com.eggapp.field/
-  MainActivity.kt        NavHost: login -> incubators
-  data/                  Retrofit API client, DTOs, TokenStore
+  MainActivity.kt        NavHost: login -> incubators -> batches -> batch detail
+  data/                  Retrofit API client, DTOs, TokenStore, BatchCache,
+                         FieldRecordRepository (offline-first saves)
+  data/local/            Room: CandlingEntity/HatchEntity, DAO, Database
+  sync/                  SyncWorker (WorkManager)
   ui/login/               Login screen + ViewModel
   ui/incubators/          Incubator list screen + ViewModel
+  ui/batch/               Batches list, batch detail + candling/hatch forms
   ui/theme/               Compose theme (brand color matches apps/web)
 ```
+
+Kapt (Room's annotation processor) is used instead of KSP — avoids a
+second Kotlin-version-matched plugin to keep in sync; falls back to
+Kotlin 1.9 language mode for the annotation-processing step only (a
+harmless warning, not an error), since kapt doesn't yet support Kotlin
+2.0's language version.

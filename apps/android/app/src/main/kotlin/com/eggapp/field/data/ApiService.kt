@@ -5,6 +5,7 @@ import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 interface ApiService {
     @POST("v1/auth/login")
@@ -18,4 +19,24 @@ interface ApiService {
 
     @GET("v1/farms/{farmId}/incubators")
     suspend fun incubators(@Path("farmId") farmId: String): Response<List<Incubator>>
+
+    @GET("v1/farms/{farmId}/batches")
+    suspend fun batches(
+        @Path("farmId") farmId: String,
+        @Query("status") status: String? = null,
+    ): Response<List<Batch>>
+
+    @POST("v1/farms/{farmId}/batches/{batchId}/candlings")
+    suspend fun recordCandling(
+        @Path("farmId") farmId: String,
+        @Path("batchId") batchId: String,
+        @Body body: CandlingRequest,
+    ): Response<CandlingResponse>
+
+    @POST("v1/farms/{farmId}/batches/{batchId}/hatch")
+    suspend fun recordHatch(
+        @Path("farmId") farmId: String,
+        @Path("batchId") batchId: String,
+        @Body body: HatchRequest,
+    ): Response<HatchResponse>
 }

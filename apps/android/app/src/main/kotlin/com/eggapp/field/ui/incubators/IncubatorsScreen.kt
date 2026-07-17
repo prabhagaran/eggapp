@@ -39,7 +39,11 @@ private fun ageLabel(ts: String, nowMillis: Long): Pair<String, Boolean> {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun IncubatorsScreen(viewModel: IncubatorsViewModel = viewModel(), onLogout: () -> Unit) {
+fun IncubatorsScreen(
+    viewModel: IncubatorsViewModel = viewModel(),
+    onLogout: () -> Unit,
+    onOpenBatches: () -> Unit,
+) {
     val state by viewModel.state.collectAsState()
 
     // Drives the on-screen "Xs ago" labels forward between poll cycles.
@@ -56,6 +60,7 @@ fun IncubatorsScreen(viewModel: IncubatorsViewModel = viewModel(), onLogout: () 
             TopAppBar(
                 title = { Text("Incubators") },
                 actions = {
+                    TextButton(onClick = onOpenBatches) { Text("Batches") }
                     TextButton(onClick = { viewModel.logout(); onLogout() }) { Text("Log out") }
                 },
             )
