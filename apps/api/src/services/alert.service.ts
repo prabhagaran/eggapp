@@ -137,6 +137,45 @@ export async function evaluateTelemetry(
   await evaluateMetric(log, incubator.farmId, incubator.id, "humidity_pct", reading.humidityPct, incubator.defaultSpecies, stage);
 }
 
+// US-ENV-004: a device can claim "online" (status topic / LWT) while its
+// telemetry has actually gone silent — a distinct fault from an
+// environmental breach, since the device isn't reporting anything to
+// evaluate. lastSeenAt is documented as "a freshness indicator, not the
+// offline signal" (device-lifecycle.md) — exactly what this checks.
+const READING_GAP_THRESHOLD_MS = 5 * 60_000;
+const DEVICE_SILENCE_PREFIX = "[device_silence]";
+
+export async function checkDeviceSilence(log: FastifyBaseLogger) {
+  const prisma = getPrisma();
+  const staleCutoff = new Date(Date.now() - READING_GAP_THRESHOLD_MS);
+  const silentDevices = await prisma.device.findMany({
+    where: { status: "active", lastSeenAt: { lt: staleCutoff } },
+    include: { incubator: { select: { id: true } } },
+  });
+
+  for (const device of silentDevices) {
+    const openForDevice = await prisma.alert.findFirst({
+      where: { farmId: device.farmId, deviceId: device.id, state: "open", message: { startsWith: DEVICE_SILENCE_PREFIX } },
+    });
+    if (openForDevice) continue; // already alerting, don't spam a new row every tick
+
+    const minutesSilent = device.lastSeenAt ? Math.round((Date.now() - device.lastSeenAt.getTime()) / 60_000) : null;
+    const label = device.name ?? device.hardwareId;
+    const message = `${DEVICE_SILENCE_PREFIX} ${label} has reported no telemetry for ${minutesSilent}m though it claims online (last seen ${device.lastSeenAt?.toISOString()})`;
+    await prisma.alert.create({
+      data: {
+        farmId: device.farmId,
+        deviceId: device.id,
+        incubatorId: device.incubator?.id ?? null,
+        severity: "warning",
+        state: "open",
+        message,
+      },
+    });
+    await pushToFarm(log, device.farmId, "⚠️ Device silent", `${label} hasn't reported in ${minutesSilent}m`);
+  }
+}
+
 export async function listAlerts(farmId: string, state?: "open" | "acked" | "resolved") {
   return getPrisma().alert.findMany({
     where: { farmId, ...(state ? { state } : {}) },

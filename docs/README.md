@@ -47,14 +47,15 @@ to prevent overlapping ownership between agents that cover related ground.
 **API** (`docs/api/`)
 - [OpenAPI contract](api/openapi.yaml) — grows per Phase 1 increment;
   currently setup/auth/species/farms/incubators/devices + collections/
-  batches/candling/hatch + alerts
+  batches/candling/hatch + alerts + environmental history + setpoint config
 - [Sync & Conflict Strategy](api/sync-conflict-strategy.md) — BR-010
   server-side rules (clientId idempotency, explicit conflicts);
   android-architect builds the client against this
 
 **IoT** (`docs/iot/`)
 - [MQTT Topics](iot/mqtt-topics.md) — real topic structure, captured live
-  (not guessed) from the actual firmware and broker
+  (not guessed) from the actual firmware and broker; now includes the
+  `cmd`/`cmd/ack` command channel (US-INC-003)
 - [Telemetry Contract](iot/telemetry-contract.md) — exact JSON payload
   schema, field-by-field, with a captured real example
 - [Device Lifecycle](iot/device-lifecycle.md) — provisioning (manual
@@ -65,10 +66,14 @@ to prevent overlapping ownership between agents that cover related ground.
   changes
 
 **Code & infra**: `apps/api` (Fastify — includes MQTT ingest
-`src/infra/mqtt/`, alert evaluation `src/domain/alerting.ts` +
-`src/services/alert.service.ts` (BR-006), and FCM push dispatch
-`src/infra/fcm/client.ts` (US-NOT-002)), `apps/web` (Next.js — live
-incubator telemetry + an Alerts page with ack), `apps/android` (Kotlin +
+`src/infra/mqtt/` (telemetry, status, and now cmd/ack), alert evaluation
+`src/domain/alerting.ts` + `src/services/alert.service.ts` (BR-006,
+plus US-ENV-004 device-silence detection), setpoint config dispatch
+`src/services/deviceConfig.service.ts` (US-INC-003), environmental
+history `src/services/telemetry.service.ts` (US-ENV-002), and FCM push
+dispatch `src/infra/fcm/client.ts` (US-NOT-002)), `apps/web` (Next.js —
+live incubator telemetry, per-incubator history charts + setpoint
+control, and an Alerts page with ack), `apps/android` (Kotlin +
 Compose — login, live incubator status, offline-first candling/hatch/
 egg-collection recording via Room + WorkManager, and FCM push
 notifications (`push/EggAppMessagingService.kt`), all built and

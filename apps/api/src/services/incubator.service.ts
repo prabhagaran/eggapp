@@ -2,7 +2,17 @@ import { getPrisma } from "../infra/db.js";
 import { AppError } from "../lib/errors.js";
 
 const deviceSummary = {
-  select: { id: true, hardwareId: true, name: true, status: true, lastSeenAt: true },
+  select: {
+    id: true,
+    hardwareId: true,
+    name: true,
+    status: true,
+    lastSeenAt: true,
+    currentTempSetpoint: true,
+    currentTempHysteresis: true,
+    currentHumSetpoint: true,
+    currentHumHysteresis: true,
+  },
 } as const;
 
 export interface CreateIncubatorInput {

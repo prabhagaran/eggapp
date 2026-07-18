@@ -11,7 +11,8 @@ wire order. Example, captured live:
 
 ```json
 {"id":"INCUBATOR_01","fw":"2.0.0","profile":"EGG","temp":24.1,"hum":89,
- "setTemp":37.5,"setHum":60,"mode":"AUTO","heater":1,"cooler":0,
+ "setTemp":37.5,"setHum":60,"setTempHyst":0.3,"setHumHyst":3,
+ "mode":"AUTO","heater":1,"cooler":0,
  "humidifier":0,"fan":1,"pump":0,"turner":0,"day":44,"daysLeft":0,
  "hatchEpoch":1782345600}
 ```
@@ -25,6 +26,8 @@ wire order. Example, captured live:
 | `hum` | number \| `null` | % | DHT22 reading; `null` when out of 0..100% |
 | `setTemp` | number | °C | Current temperature setpoint |
 | `setHum` | number (int) | % | Current humidity setpoint |
+| `setTempHyst` | number | °C | Current temperature hysteresis (added for US-INC-003 — the remote-config UI needs to show the value it's about to change) |
+| `setHumHyst` | number | % | Current humidity hysteresis (same reason) |
 | `mode` | string | — | `"AUTO"` or `"MANUAL"` |
 | `heater`,`cooler`,`humidifier`,`fan`,`pump`,`turner` | 0 \| 1 | — | Relay states at publish time |
 | `day` | int | — | Incubation day. **Only present when `profile:"EGG"`.** |

@@ -250,6 +250,68 @@ paths:
               schema: { $ref: "#/components/schemas/Incubator" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /v1/farms/{farmId}/incubators/{id}/history:
+    parameters:
+      - { $ref: "#/components/parameters/farmId" }
+      - { $ref: "#/components/parameters/id" }
+    get:
+      tags: [incubators]
+      summary: Environmental history — 24h/7d/full-batch, with min/max/avg (US-ENV-002)
+      parameters:
+        - name: range
+          in: query
+          required: true
+          schema: { type: string, enum: [24h, 7d, batch] }
+        - name: batchId
+          in: query
+          description: Required when range=batch
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: History points (downsampled server-side to ≤500) + summary stats
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/farms/{farmId}/incubators/{id}/config:
+    parameters:
+      - { $ref: "#/components/parameters/farmId" }
+      - { $ref: "#/components/parameters/id" }
+    post:
+      tags: [incubators]
+      summary: Push setpoints to the bound device over MQTT (US-INC-003) — manager+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: At least one field required. Only the fields present are changed on the device.
+              properties:
+                tempSetpoint: { type: number }
+                tempHysteresis: { type: number }
+                humSetpoint: { type: number }
+                humHysteresis: { type: number }
+      responses:
+        "201":
+          description: Created — DeviceConfig row in state "sent"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeviceConfig" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "503": { description: Broker not connected — command not sent }
+    get:
+      tags: [incubators]
+      summary: Latest setpoint push + its ack state
+      responses:
+        "200":
+          description: Latest DeviceConfig, or null if none yet
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeviceConfig" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /v1/farms/{farmId}/devices:
     parameters: [{ $ref: "#/components/parameters/farmId" }]
     post:
@@ -758,6 +820,10 @@ components:
             name: { type: string, nullable: true }
             status: { type: string }
             lastSeenAt: { type: string, format: date-time, nullable: true }
+            currentTempSetpoint: { type: number, nullable: true, description: "Snapshot from telemetry's setTemp (US-INC-003)" }
+            currentTempHysteresis: { type: number, nullable: true }
+            currentHumSetpoint: { type: number, nullable: true }
+            currentHumHysteresis: { type: number, nullable: true }
         latestTelemetry:
           type: object
           nullable: true
@@ -768,6 +834,24 @@ components:
             humidityPct: { type: number, nullable: true }
             turnerOn: { type: boolean, nullable: true }
             source: { type: string, enum: [mqtt, ble] }
+
+    DeviceConfig:
+      type: object
+      description: Setpoint push with sent → received → applied ack (US-INC-003). See docs/iot/mqtt-topics.md.
+      properties:
+        id: { type: string, format: uuid }
+        version: { type: integer }
+        payload:
+          type: object
+          properties:
+            tempSetpoint: { type: number }
+            tempHysteresis: { type: number }
+            humSetpoint: { type: number }
+            humHysteresis: { type: number }
+        state: { type: string, enum: [sent, received, applied, unconfirmed] }
+        sentAt: { type: string, format: date-time }
+        receivedAt: { type: string, format: date-time, nullable: true }
+        appliedAt: { type: string, format: date-time, nullable: true }
 
     EggCollection:
       type: object

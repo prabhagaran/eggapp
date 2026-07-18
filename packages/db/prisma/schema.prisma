@@ -124,6 +124,14 @@ model Device {
   status          DeviceStatus       @default(provisioned)
   lastSeenAt      DateTime?
   firmwareVersion String?
+  // Latest known control-loop values, mirrored from telemetry's setTemp/
+  // setHum/setTempHyst/setHumHyst on every message (US-INC-003 — the
+  // remote setpoint UI needs to show what it's about to change). A
+  // snapshot, not a history — TelemetryReading rows stay unchanged.
+  currentTempSetpoint   Float?
+  currentTempHysteresis Float?
+  currentHumSetpoint    Float?
+  currentHumHysteresis  Float?
   createdAt       DateTime           @default(now())
   farm            Farm               @relation(fields: [farmId], references: [id], onDelete: Cascade)
   incubator       Incubator? // set via Incubator.deviceId (BR-007: 0..1)

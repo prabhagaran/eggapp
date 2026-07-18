@@ -1,0 +1,4 @@
+ALTER TABLE "Device" ADD COLUMN "currentTempSetpoint" DOUBLE PRECISION;
+ALTER TABLE "Device" ADD COLUMN "currentTempHysteresis" DOUBLE PRECISION;
+ALTER TABLE "Device" ADD COLUMN "currentHumSetpoint" DOUBLE PRECISION;
+ALTER TABLE "Device" ADD COLUMN "currentHumHysteresis" DOUBLE PRECISION;

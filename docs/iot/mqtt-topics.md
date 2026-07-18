@@ -24,6 +24,8 @@ despite the API's `hardwareId` field name (see Reconciliation below).
 |---|---|---|---|---|
 | `eggapp/devices/<id>/telemetry` | device → platform | 0 | no | JSON, see `telemetry-contract.md` |
 | `eggapp/devices/<id>/status` | device → platform | 1 | **yes** | `"online"` or `"offline"` (plain string, not JSON) |
+| `eggapp/devices/<id>/cmd` | platform → device | 1 | no | JSON, see "Commands" below |
+| `eggapp/devices/<id>/cmd/ack` | device → platform | 1 | no | JSON, see "Commands" below |
 
 ## Client identity & connection
 
@@ -52,9 +54,52 @@ incoming topics against this field verbatim. Field is not renamed (would
 touch already-shipped API surface); this note is the correction of
 record.
 
-## Commands (not yet implemented)
+## Commands (US-INC-003 — setpoint config with sent/received/applied ack)
 
-No command topic exists yet — MQTT is currently telemetry-only (device →
-platform). Config push (US-INC-003, sent/received/applied states) is
-Phase 2+ scope; when added, `eggapp/devices/<id>/cmd` will follow the
-same client-implements-what-firmware-supports discipline as this file.
+Scope for this increment: the four EGG-incubator control-loop values
+already exposed in telemetry as `setTemp`/`setHum` (plus their
+hysteresis, newly added to telemetry alongside this — see
+`telemetry-contract.md`). Turner/fan/pump/mode are **not** covered yet —
+their current values aren't surfaced in telemetry, so a remote edit UI
+couldn't show what it's changing *from*; a follow-up increment can add
+those once telemetry mirrors them.
+
+### `eggapp/devices/<id>/cmd` (platform → device)
+
+```json
+{"version":4,"tempSetpoint":37.6,"tempHysteresis":0.3,"humSetpoint":62,"humHysteresis":3}
+```
+
+- `version` is a per-device monotonic integer, assigned by the backend
+  (`DeviceConfig.version`) — lets the device (and backend) tell commands
+  apart and ignore anything older than the last one it acted on.
+- All setpoint fields are optional; only the fields present are changed.
+  Firmware clamps each to the existing `config.h` edit limits
+  (`TEMP_SETPOINT_MIN/MAX`, `TEMP_HYST_MIN/MAX`, `HUM_SETPOINT_MIN/MAX`,
+  `HUM_HYST_MIN/MAX` — the same bounds the physical button UI already
+  enforces in `task_ui.cpp`) rather than rejecting an out-of-range value
+  outright, so a slightly-off request still lands somewhere sane.
+
+### `eggapp/devices/<id>/cmd/ack` (device → platform)
+
+```json
+{"version":4,"state":"received"}
+```
+```json
+{"version":4,"state":"applied"}
+```
+
+Firmware publishes `"received"` immediately on parsing a well-formed
+command (before taking `settingsMutex`), then `"applied"` once the
+mutex-protected write actually lands. Both typically arrive within
+milliseconds of each other and of the `cmd` publish — there's no slow
+convergence step (unlike, say, waiting for actual temperature to reach
+a new setpoint), but the schema still models the states distinctly per
+the original design.
+
+Backend-side: no ack within a retry window (2 minutes) flips the
+`DeviceConfig` row to `unconfirmed` and raises a warning alert — the
+device may be offline, or the command topic message may have been
+dropped (QoS 1, but the backend's own subscribe could still miss it
+across a restart window). Matches the given/when in
+`docs/product/user-stories/incubators.md` US-INC-003.

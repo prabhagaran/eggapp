@@ -11,23 +11,46 @@ import { getPrisma } from "../db.js";
 
 const TOPIC_TELEMETRY = "eggapp/devices/+/telemetry";
 const TOPIC_STATUS = "eggapp/devices/+/status";
+const TOPIC_CMD_ACK = "eggapp/devices/+/cmd/ack";
+
+// Set once by startMqttIngest — lets services publish commands (US-INC-003)
+// without each one standing up its own MQTT connection. Personal-scale,
+// single-process deployment; no need for a pub/sub abstraction layer.
+let sharedClient: mqtt.MqttClient | null = null;
+
+const cmdAckSchema = z.object({
+  version: z.number().int(),
+  state: z.enum(["received", "applied"]),
+});
 
 // Matches task_mqtt.cpp's payload exactly (telemetry-contract.md).
 // EGG-only fields are optional since CLIMATE-profile payloads omit them.
+// setTemp/setHum/setTempHyst/setHumHyst are optional too — older firmware
+// (pre US-INC-003) won't send the hysteresis fields.
 const telemetrySchema = z.object({
   id: z.string(),
   profile: z.enum(["EGG", "CLIMATE"]),
   temp: z.number().nullable(),
   hum: z.number().nullable(),
   turner: z.union([z.literal(0), z.literal(1)]),
+  setTemp: z.number().optional(),
+  setHum: z.number().optional(),
+  setTempHyst: z.number().optional(),
+  setHumHyst: z.number().optional(),
 });
 
-function parseTopic(topic: string): { deviceId: string; kind: "telemetry" | "status" } | null {
+function parseTopic(topic: string): { deviceId: string; kind: "telemetry" | "status" | "cmd_ack" } | null {
   const parts = topic.split("/");
-  if (parts.length !== 4 || parts[0] !== "eggapp" || parts[1] !== "devices") return null;
-  const kind = parts[3];
-  if (kind !== "telemetry" && kind !== "status") return null;
-  return { deviceId: parts[2]!, kind };
+  if (parts[0] !== "eggapp" || parts[1] !== "devices") return null;
+  const deviceId = parts[2];
+  if (!deviceId) return null;
+  if (parts.length === 4 && (parts[3] === "telemetry" || parts[3] === "status")) {
+    return { deviceId, kind: parts[3] };
+  }
+  if (parts.length === 5 && parts[3] === "cmd" && parts[4] === "ack") {
+    return { deviceId, kind: "cmd_ack" };
+  }
+  return null;
 }
 
 async function handleTelemetry(log: FastifyBaseLogger, deviceId: string, raw: Buffer) {
@@ -54,7 +77,20 @@ async function handleTelemetry(log: FastifyBaseLogger, deviceId: string, raw: Bu
         source: "mqtt",
       },
     });
-    await tx.device.update({ where: { id: device.id }, data: { lastSeenAt: new Date() } });
+    await tx.device.update({
+      where: { id: device.id },
+      data: {
+        lastSeenAt: new Date(),
+        // US-INC-003: snapshot of the device's current control-loop
+        // values — only touched when the field is actually present, so
+        // firmware that hasn't sent it yet doesn't overwrite a value
+        // with null.
+        ...(parsed.data.setTemp != null ? { currentTempSetpoint: parsed.data.setTemp } : {}),
+        ...(parsed.data.setTempHyst != null ? { currentTempHysteresis: parsed.data.setTempHyst } : {}),
+        ...(parsed.data.setHum != null ? { currentHumSetpoint: parsed.data.setHum } : {}),
+        ...(parsed.data.setHumHyst != null ? { currentHumHysteresis: parsed.data.setHumHyst } : {}),
+      },
+    });
     // Live telemetry is itself proof-of-life: promote status even if the
     // one-off retained `status` message was missed (e.g. it arrived
     // before this device was registered — observed in practice, not
@@ -65,6 +101,12 @@ async function handleTelemetry(log: FastifyBaseLogger, deviceId: string, raw: Bu
       await tx.device.update({ where: { id: device.id }, data: { status: "active" } });
       await tx.deviceEvent.create({ data: { deviceId: device.id, type: "online" } });
     }
+    // US-ENV-004: telemetry resuming resolves any open device-silence fault
+    // — the thing it was flagging (no readings) is no longer true.
+    await tx.alert.updateMany({
+      where: { deviceId: device.id, state: "open", message: { startsWith: "[device_silence]" } },
+      data: { state: "resolved", resolvedAt: new Date() },
+    });
   });
 
   // Outside the write transaction — alert evaluation does its own reads/
@@ -101,6 +143,50 @@ async function handleStatus(log: FastifyBaseLogger, deviceId: string, raw: Buffe
   log.info({ deviceId, value }, "[mqtt] device status updated");
 }
 
+async function handleCmdAck(log: FastifyBaseLogger, deviceId: string, raw: Buffer) {
+  const parsed = cmdAckSchema.safeParse(JSON.parse(raw.toString()));
+  if (!parsed.success) {
+    log.warn({ deviceId, issues: parsed.error.issues }, "[mqtt] malformed cmd ack");
+    return;
+  }
+  const prisma = getPrisma();
+  const device = await prisma.device.findUnique({ where: { hardwareId: deviceId } });
+  if (!device) {
+    log.warn({ deviceId }, "[mqtt] cmd ack from unregistered device — dropped");
+    return;
+  }
+  const deviceConfig = await prisma.deviceConfig.findUnique({
+    where: { deviceId_version: { deviceId: device.id, version: parsed.data.version } },
+  });
+  if (!deviceConfig) {
+    log.warn({ deviceId, version: parsed.data.version }, "[mqtt] cmd ack for unknown config version — dropped");
+    return;
+  }
+
+  const now = new Date();
+  await prisma.$transaction([
+    prisma.deviceConfig.update({
+      where: { id: deviceConfig.id },
+      data:
+        parsed.data.state === "applied"
+          ? { state: "applied", appliedAt: now, receivedAt: deviceConfig.receivedAt ?? now }
+          : { state: "received", receivedAt: now },
+    }),
+    prisma.deviceEvent.create({
+      data: { deviceId: device.id, type: parsed.data.state === "applied" ? "config_applied" : "config_received" },
+    }),
+  ]);
+  log.info({ deviceId, version: parsed.data.version, state: parsed.data.state }, "[mqtt] config ack");
+}
+
+/** Publishes a setpoint command to a device's cmd topic (US-INC-003). Returns false if MQTT isn't connected. */
+export function publishCommand(hardwareId: string, payload: object): boolean {
+  if (!sharedClient?.connected) return false;
+  const topic = `eggapp/devices/${hardwareId}/cmd`;
+  sharedClient.publish(topic, JSON.stringify(payload), { qos: 1 });
+  return true;
+}
+
 /** Starts the MQTT ingest client. No-op (returns null) if MQTT_URL is unset. */
 export function startMqttIngest(log: FastifyBaseLogger): mqtt.MqttClient | null {
   if (!config.mqttUrl) {
@@ -114,10 +200,11 @@ export function startMqttIngest(log: FastifyBaseLogger): mqtt.MqttClient | null 
     password: config.mqttPassword || undefined,
     reconnectPeriod: 5000,
   });
+  sharedClient = client;
 
   client.on("connect", () => {
     log.info({ url: config.mqttUrl }, "[mqtt] connected");
-    client.subscribe([TOPIC_TELEMETRY, TOPIC_STATUS], (err) => {
+    client.subscribe([TOPIC_TELEMETRY, TOPIC_STATUS, TOPIC_CMD_ACK], (err) => {
       if (err) log.error({ err }, "[mqtt] subscribe failed");
     });
   });
@@ -128,7 +215,8 @@ export function startMqttIngest(log: FastifyBaseLogger): mqtt.MqttClient | null 
       log.warn({ topic }, "[mqtt] message on unrecognized topic shape");
       return;
     }
-    const handler = parsed.kind === "telemetry" ? handleTelemetry : handleStatus;
+    const handler =
+      parsed.kind === "telemetry" ? handleTelemetry : parsed.kind === "status" ? handleStatus : handleCmdAck;
     handler(log, parsed.deviceId, payload).catch((err) =>
       log.error({ err, topic }, "[mqtt] handler failed"),
     );
