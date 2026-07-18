@@ -21,6 +21,16 @@ extern "C" {
 //                                                 connect; "offline"
 //                                                 (retained) via LWT on
 //                                                 unexpected disconnect
+//   <MQTT_TOPIC_PREFIX>/<DEVICE_ID>/cmd/ack    — "received"/"applied" per
+//                                                 incoming cmd (US-INC-003)
+//
+// Subscribes:
+//   <MQTT_TOPIC_PREFIX>/<DEVICE_ID>/cmd — setpoint config push
+//                                          (US-INC-003); applies whichever
+//                                          of tempSetpoint/tempHysteresis/
+//                                          humSetpoint/humHysteresis are
+//                                          present, clamped to config.h's
+//                                          existing edit limits.
 //
 // Entirely independent of task_cloud: a Google Sheets outage does not
 // affect MQTT publishing and vice versa. Never blocks other tasks —
