@@ -37,6 +37,8 @@ export function NavBar() {
       <Link href="/batches">Batches</Link>
       <Link href="/collections">Collections</Link>
       <Link href="/incubators">Incubators</Link>
+      <Link href="/flocks">Flocks</Link>
+      <Link href="/vaccination-templates">Vaccination</Link>
       <Link href="/devices">Devices</Link>
       <Link href="/alerts">
         Alerts{openAlerts > 0 && <span className="badge danger" style={{ marginLeft: "0.3rem" }}>{openAlerts}</span>}

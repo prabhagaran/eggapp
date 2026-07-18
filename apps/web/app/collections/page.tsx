@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../../lib/api";
-import type { EggCollection } from "../../lib/types";
+import type { EggCollection, Flock } from "../../lib/types";
 import { fmtDate, useAuthedFarm } from "../../lib/useAuthedFarm";
 
 function ageDays(collectedOn: string) {
@@ -11,12 +11,16 @@ function ageDays(collectedOn: string) {
 export default function CollectionsPage() {
   const farmId = useAuthedFarm();
   const [rows, setRows] = useState<EggCollection[] | null>(null);
+  const [flocks, setFlocks] = useState<Flock[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(() => {
     if (farmId) api<EggCollection[]>(`/v1/farms/${farmId}/collections`).then(setRows);
   }, [farmId]);
   useEffect(reload, [reload]);
+  useEffect(() => {
+    if (farmId) api<Flock[]>(`/v1/farms/${farmId}/flocks`).then(setFlocks);
+  }, [farmId]);
 
   async function onCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -29,6 +33,7 @@ export default function CollectionsPage() {
         body: {
           collectedOn: new Date(String(f.get("collectedOn"))).toISOString(),
           count: Number(f.get("count")),
+          flockId: f.get("flockId") || undefined,
           sourceNote: f.get("sourceNote") || undefined,
         },
       });
@@ -73,8 +78,19 @@ export default function CollectionsPage() {
             <input name="count" type="number" min={1} required />
           </label>
           <label>
+            Source flock
+            <select name="flockId" defaultValue="">
+              <option value="">—</option>
+              {flocks.map((flk) => (
+                <option key={flk.id} value={flk.id}>
+                  {flk.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
             Source note
-            <input name="sourceNote" placeholder="e.g. own hens, coop 1" />
+            <input name="sourceNote" placeholder="e.g. coop 1" />
           </label>
           <button className="primary">Record collection</button>
         </form>
@@ -90,6 +106,7 @@ export default function CollectionsPage() {
               <th>Discarded</th>
               <th>Assigned</th>
               <th>Available</th>
+              <th>Flock</th>
               <th>Source</th>
               <th />
             </tr>
@@ -109,6 +126,7 @@ export default function CollectionsPage() {
                   <td>
                     <b>{c.availableCount}</b>
                   </td>
+                  <td className="muted">{c.flock?.name ?? "—"}</td>
                   <td className="muted">{c.sourceNote ?? "—"}</td>
                   <td>
                     {c.availableCount > 0 && (

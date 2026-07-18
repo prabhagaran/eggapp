@@ -1,5 +1,5 @@
 // Lightweight response shapes for the web client (per docs/api/openapi.yaml).
-import type { AlertSeverity, AlertState, BatchStatus, DeviceStatus } from "@eggapp/shared-types";
+import type { AlertSeverity, AlertState, BatchStatus, DeviceStatus, FlockPurpose, FlockStage, MortalityCause } from "@eggapp/shared-types";
 
 export interface Farm {
   id: string;
@@ -77,6 +77,8 @@ export interface EggCollection {
   discardNote: string | null;
   avgWeightGrams: number | null;
   sourceNote: string | null;
+  flockId: string | null;
+  flock?: { id: string; name: string } | null;
   assignedCount: number;
   availableCount: number;
 }
@@ -118,6 +120,7 @@ export interface Batch {
   abortReason: string | null;
   species?: { id: string; name: string; incubationDays: number };
   incubator?: { id: string; name: string };
+  hatch?: { id: string; flock: { id: string } | null } | null;
 }
 
 export interface Alert {
@@ -131,10 +134,103 @@ export interface Alert {
   resolvedAt: string | null;
 }
 
-export interface BatchDetail extends Batch {
+export interface BatchDetail extends Omit<Batch, "hatch"> {
   species: Species & { name: string; id: string; incubationDays: number };
   incubator: { id: string; name: string };
   sources: { collectionId: string; count: number; collection: EggCollection }[];
   candlings: CandlingSession[];
-  hatch: HatchEvent | null;
+  hatch: (HatchEvent & { id: string }) | null;
+}
+
+// ── Flock operations (Phase 2) ──────────────────────────────────
+
+export interface Flock {
+  id: string;
+  name: string;
+  speciesId: string;
+  purpose: FlockPurpose;
+  hatchEventId: string | null;
+  acquisitionDate: string | null;
+  acquisitionAgeDays: number | null;
+  acquisitionNote: string | null;
+  placedCount: number;
+  createdAt: string;
+  species?: { id: string; name: string };
+  // Derived server-side, never stored (US-FLK-002).
+  ageDays: number | null;
+  stage: FlockStage | null;
+  currentCount: number;
+}
+
+export interface MortalityRecord {
+  id: string;
+  date: string;
+  count: number;
+  cause: MortalityCause;
+  notes: string | null;
+}
+
+export interface VaccinationTemplateItem {
+  id: string;
+  speciesId: string;
+  purpose: FlockPurpose;
+  ageDaysFrom: number;
+  ageDaysTo: number;
+  vaccine: string;
+  disease: string;
+  route: string;
+}
+
+export interface VaccinationRecord {
+  id: string;
+  flockId: string;
+  templateItemId: string | null;
+  date: string;
+  vaccine: string;
+  disease: string;
+  manufacturer: string | null;
+  lotNumber: string | null;
+  expiry: string | null;
+  route: string;
+  dose: string | null;
+  count: number;
+  administeredBy: string;
+  reactions: string | null;
+  nextDueDate: string | null;
+  amendsRecordId: string | null;
+}
+
+export type ComplianceStatus = "administered" | "overdue" | "due" | "upcoming";
+
+export interface ComplianceItem {
+  id: string; // templateItemId
+  ageDaysFrom: number;
+  ageDaysTo: number;
+  vaccine: string;
+  disease: string;
+  route: string;
+  dueDate: string;
+  status: ComplianceStatus;
+  record: { id: string; date: string } | null;
+}
+
+export interface FeedLog {
+  id: string;
+  loggedAt: string;
+  feedType: string;
+  quantityKg: number;
+  stageMismatch: boolean;
+}
+
+export interface WaterLog {
+  id: string;
+  loggedAt: string;
+  quantityLiters: number;
+}
+
+export interface FlockDetail extends Flock {
+  mortalityRecords: MortalityRecord[];
+  vaccinationRecords: VaccinationRecord[];
+  recentFeed: FeedLog[];
+  recentWater: WaterLog[];
 }
