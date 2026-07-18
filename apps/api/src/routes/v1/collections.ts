@@ -11,6 +11,7 @@ const createSchema = z.object({
   count: z.number().int().positive(),
   avgWeightGrams: z.number().positive().optional(),
   sourceNote: z.string().max(500).optional(),
+  flockId: z.uuid().optional(), // Phase 2 — primary source link
   clientId: z.uuid().optional(), // offline-sync idempotency (BR-010)
 });
 

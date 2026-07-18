@@ -5,9 +5,12 @@ import { batchRoutes } from "./batches.js";
 import { collectionRoutes } from "./collections.js";
 import { deviceRoutes } from "./devices.js";
 import { farmRoutes } from "./farms.js";
+import { feedWaterRoutes } from "./feedwater.js";
+import { flockRoutes } from "./flocks.js";
 import { incubatorRoutes } from "./incubators.js";
 import { setupRoutes } from "./setup.js";
 import { speciesRoutes } from "./species.js";
+import { vaccinationRoutes } from "./vaccination.js";
 
 export async function v1Routes(app: FastifyInstance) {
   app.register(setupRoutes);
@@ -19,4 +22,7 @@ export async function v1Routes(app: FastifyInstance) {
   app.register(collectionRoutes);
   app.register(batchRoutes);
   app.register(alertRoutes);
+  app.register(flockRoutes);
+  app.register(vaccinationRoutes);
+  app.register(feedWaterRoutes);
 }

@@ -33,3 +33,23 @@ export type FarmRole = (typeof FARM_ROLES)[number];
 /** Client-side sync state (android-architect) — never sent to the server. */
 export const SYNC_STATES = ["queued", "syncing", "synced", "conflict"] as const;
 export type SyncState = (typeof SYNC_STATES)[number];
+
+export const FLOCK_PURPOSES = ["layer", "broiler", "breeder"] as const;
+export type FlockPurpose = (typeof FLOCK_PURPOSES)[number];
+
+export const MORTALITY_CAUSES = ["death", "cull", "sale"] as const;
+export type MortalityCause = (typeof MORTALITY_CAUSES)[number];
+
+// Derived server-side from age + purpose (domain-knowledge §5) — never
+// stored, but exported here so clients can render a stable label set.
+export const FLOCK_STAGES = [
+  "brooding",
+  "grower",
+  "pre_lay",
+  "layer",
+  "spent",
+  "broiler_starter",
+  "broiler_grower",
+  "broiler_finisher",
+] as const;
+export type FlockStage = (typeof FLOCK_STAGES)[number];

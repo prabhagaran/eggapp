@@ -33,24 +33,26 @@ model User {
   passwordHash String
   name         String
   tokenVersion Int              @default(0) // bump = revoke all refresh tokens
-  fcmToken     String?          // current device's push token (US-NOT-002); one per user — personal-scale, single phone
+  fcmToken     String? // current device's push token (US-NOT-002); one per user — personal-scale, single phone
   createdAt    DateTime         @default(now())
   memberships  FarmMembership[]
 }
 
 model Farm {
-  id          String           @id @default(uuid())
-  name        String
-  location    String?
-  timezone    String
-  createdAt   DateTime         @default(now())
-  memberships FarmMembership[]
-  devices     Device[]
-  incubators  Incubator[]
-  collections EggCollection[]
-  batches     EggBatch[]
-  alertRules  AlertRule[]
-  alerts      Alert[]
+  id                       String                    @id @default(uuid())
+  name                     String
+  location                 String?
+  timezone                 String
+  createdAt                DateTime                  @default(now())
+  memberships              FarmMembership[]
+  devices                  Device[]
+  incubators               Incubator[]
+  collections              EggCollection[]
+  batches                  EggBatch[]
+  alertRules               AlertRule[]
+  alerts                   Alert[]
+  flocks                   Flock[]
+  vaccinationTemplateItems VaccinationTemplateItem[]
 }
 
 model FarmMembership {
@@ -68,21 +70,23 @@ model FarmMembership {
 // ── Species reference (seeded, domain-knowledge §1; drives BR-008) ──
 
 model Species {
-  id                  String      @id // slug, e.g. "chicken"
-  name                String
-  incubationDays      Int
-  lockdownOffsetDays  Int // lockdown = incubationDays - this
-  tempSetC            Float
-  tempMinC            Float // sustained outside min/max = critical (BR-006)
-  tempMaxC            Float
-  humidityIncubMinPct Int
-  humidityIncubMaxPct Int
-  humidityLockMinPct  Int
-  humidityLockMaxPct  Int
-  candlingDays        Int[]
-  turnUntilDay        Int
-  batches             EggBatch[]
-  incubators          Incubator[]
+  id                       String                    @id // slug, e.g. "chicken"
+  name                     String
+  incubationDays           Int
+  lockdownOffsetDays       Int // lockdown = incubationDays - this
+  tempSetC                 Float
+  tempMinC                 Float // sustained outside min/max = critical (BR-006)
+  tempMaxC                 Float
+  humidityIncubMinPct      Int
+  humidityIncubMaxPct      Int
+  humidityLockMinPct       Int
+  humidityLockMaxPct       Int
+  candlingDays             Int[]
+  turnUntilDay             Int
+  batches                  EggBatch[]
+  incubators               Incubator[]
+  flocks                   Flock[]
+  vaccinationTemplateItems VaccinationTemplateItem[]
 }
 
 // ── Device & Telemetry ───────────────────────────────────────────
@@ -117,13 +121,13 @@ enum DeviceEventType {
 }
 
 model Device {
-  id              String             @id @default(uuid())
-  farmId          String
-  hardwareId      String             @unique // e.g. ESP32 MAC
-  name            String?
-  status          DeviceStatus       @default(provisioned)
-  lastSeenAt      DateTime?
-  firmwareVersion String?
+  id                    String             @id @default(uuid())
+  farmId                String
+  hardwareId            String             @unique // e.g. ESP32 MAC
+  name                  String?
+  status                DeviceStatus       @default(provisioned)
+  lastSeenAt            DateTime?
+  firmwareVersion       String?
   // Latest known control-loop values, mirrored from telemetry's setTemp/
   // setHum/setTempHyst/setHumHyst on every message (US-INC-003 — the
   // remote setpoint UI needs to show what it's about to change). A
@@ -132,12 +136,12 @@ model Device {
   currentTempHysteresis Float?
   currentHumSetpoint    Float?
   currentHumHysteresis  Float?
-  createdAt       DateTime           @default(now())
-  farm            Farm               @relation(fields: [farmId], references: [id], onDelete: Cascade)
-  incubator       Incubator? // set via Incubator.deviceId (BR-007: 0..1)
-  events          DeviceEvent[]
-  configs         DeviceConfig[]
-  telemetry       TelemetryReading[]
+  createdAt             DateTime           @default(now())
+  farm                  Farm               @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  incubator             Incubator? // set via Incubator.deviceId (BR-007: 0..1)
+  events                DeviceEvent[]
+  configs               DeviceConfig[]
+  telemetry             TelemetryReading[]
 
   @@index([farmId])
 }
@@ -219,38 +223,40 @@ model EggCollection {
   discardedCount Int              @default(0)
   discardNote    String?
   avgWeightGrams Float?
-  sourceNote     String? // Phase 2 replaces with flockId FK (Flock context)
+  sourceNote     String? // free-text detail (e.g. "coop 1"); flockId is the primary link (Phase 2)
+  flockId        String?
   clientId       String?          @unique // offline-sync idempotency (BR-010)
   createdAt      DateTime         @default(now())
   farm           Farm             @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  flock          Flock?           @relation(fields: [flockId], references: [id])
   batchSources   BatchEggSource[]
 
   @@index([farmId, collectedOn(sort: Desc)])
 }
 
 model EggBatch {
-  id                String            @id @default(uuid())
-  farmId            String
-  incubatorId       String
-  speciesId         String
-  status            BatchStatus       @default(planned)
-  setAt             DateTime?
-  candlingDays      Int[] // day numbers, from Species at creation (BR-008)
-  lockdownAt        DateTime?
-  expectedHatchAt   DateTime?
-  viableCount       Int               @default(0) // maintained by candling results (BR-003)
-  fertilityPct      Float? // BR-015: stored at completion, never recomputed
-  hatchOfSetPct     Float?
-  hatchOfFertilePct Float?
-  abortReason       String?
+  id                  String            @id @default(uuid())
+  farmId              String
+  incubatorId         String
+  speciesId           String
+  status              BatchStatus       @default(planned)
+  setAt               DateTime?
+  candlingDays        Int[] // day numbers, from Species at creation (BR-008)
+  lockdownAt          DateTime?
+  expectedHatchAt     DateTime?
+  viableCount         Int               @default(0) // maintained by candling results (BR-003)
+  fertilityPct        Float? // BR-015: stored at completion, never recomputed
+  hatchOfSetPct       Float?
+  hatchOfFertilePct   Float?
+  abortReason         String?
   storageOverrideNote String? // BR-011: why >14-day eggs were set anyway
-  createdAt         DateTime          @default(now())
-  farm              Farm              @relation(fields: [farmId], references: [id], onDelete: Cascade)
-  incubator         Incubator         @relation(fields: [incubatorId], references: [id])
-  species           Species           @relation(fields: [speciesId], references: [id])
-  sources           BatchEggSource[]
-  candlings         CandlingSession[]
-  hatch             HatchEvent?
+  createdAt           DateTime          @default(now())
+  farm                Farm              @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  incubator           Incubator         @relation(fields: [incubatorId], references: [id])
+  species             Species           @relation(fields: [speciesId], references: [id])
+  sources             BatchEggSource[]
+  candlings           CandlingSession[]
+  hatch               HatchEvent?
 
   @@index([farmId, status])
 }
@@ -296,7 +302,7 @@ model HatchEvent {
   clientId        String?  @unique
   createdAt       DateTime @default(now())
   batch           EggBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  // Phase 2: resultingFlockId (Flock context)
+  flock           Flock? // reverse of Flock.hatchEventId — set when this hatch becomes a tracked flock
 }
 
 // ── Alerting ─────────────────────────────────────────────────────
@@ -337,6 +343,7 @@ model Alert {
   ruleId      String?
   incubatorId String?
   deviceId    String?
+  flockId     String? // US-FED-003/US-WTR-002 consumption anomalies
   severity    AlertSeverity
   state       AlertState    @default(open)
   message     String
@@ -362,4 +369,145 @@ model Notification {
   readAt   DateTime?
 
   @@index([userId, sentAt(sort: Desc)])
+}
+
+// ── Flock Operations (Phase 2) ───────────────────────────────────
+
+enum FlockPurpose {
+  layer
+  broiler
+  breeder
+}
+
+enum MortalityCause {
+  death
+  cull
+  sale
+}
+
+model Flock {
+  id                 String              @id @default(uuid())
+  farmId             String
+  name               String
+  speciesId          String
+  purpose            FlockPurpose
+  // Origin is exactly one of these two (BR-009 traceability): a flock
+  // either comes from a completed hatch (hatchEventId set) or was
+  // acquired manually (acquisitionDate + acquisitionAgeDays set, an
+  // explicit provenance note required so origin is never unknown).
+  hatchEventId       String?             @unique
+  acquisitionDate    DateTime?
+  acquisitionAgeDays Int?
+  acquisitionNote    String?
+  placedCount        Int // ledger base — current count is always derived, never edited directly (BR-009)
+  createdAt          DateTime            @default(now())
+  farm               Farm                @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  species            Species             @relation(fields: [speciesId], references: [id])
+  hatchEvent         HatchEvent?         @relation(fields: [hatchEventId], references: [id])
+  mortalityRecords   MortalityRecord[]
+  vaccinationRecords VaccinationRecord[]
+  feedLogs           FeedLog[]
+  waterLogs          WaterLog[]
+  eggCollections     EggCollection[]
+
+  @@index([farmId])
+}
+
+// The only way a flock's count changes (BR-009) — current = placed +
+// additions(none modeled yet, no restocking UI) − deaths − culls − sales.
+model MortalityRecord {
+  id           String         @id @default(uuid())
+  flockId      String
+  date         DateTime
+  count        Int
+  cause        MortalityCause
+  notes        String?
+  recordedById String? // User id (cross-context, no FK)
+  clientId     String?        @unique // offline-sync idempotency (BR-010)
+  createdAt    DateTime       @default(now())
+  flock        Flock          @relation(fields: [flockId], references: [id], onDelete: Cascade)
+
+  @@index([flockId, date(sort: Desc)])
+}
+
+// Farm-scoped, not global: US-VAC-001 templates are editable starting
+// points seeded from domain-knowledge §6, not hardcoded truth — each
+// farm can diverge from the seed.
+model VaccinationTemplateItem {
+  id          String              @id @default(uuid())
+  farmId      String
+  speciesId   String
+  purpose     FlockPurpose
+  ageDaysFrom Int
+  ageDaysTo   Int
+  vaccine     String
+  disease     String
+  route       String
+  createdAt   DateTime            @default(now())
+  farm        Farm                @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  species     Species             @relation(fields: [speciesId], references: [id])
+  records     VaccinationRecord[]
+
+  @@index([farmId, speciesId, purpose])
+}
+
+// Immutable once saved (BR-005) — the service layer never updates a row
+// after creation; corrections are new rows with amendsRecordId set.
+// amendsRecordId always points at the true original (not the previous
+// amendment), so every amendment in a chain is one hop from the source.
+model VaccinationRecord {
+  id             String                   @id @default(uuid())
+  flockId        String
+  templateItemId String?
+  date           DateTime
+  vaccine        String
+  disease        String
+  manufacturer   String?
+  lotNumber      String?
+  expiry         DateTime?
+  route          String
+  dose           String?
+  count          Int
+  administeredBy String
+  reactions      String?
+  nextDueDate    DateTime?
+  amendsRecordId String?
+  recordedById   String? // User id (cross-context, no FK)
+  clientId       String?                  @unique // offline-sync idempotency (BR-010)
+  createdAt      DateTime                 @default(now())
+  flock          Flock                    @relation(fields: [flockId], references: [id], onDelete: Cascade)
+  templateItem   VaccinationTemplateItem? @relation(fields: [templateItemId], references: [id])
+  amendsRecord   VaccinationRecord?       @relation("Amendment", fields: [amendsRecordId], references: [id])
+  amendments     VaccinationRecord[]      @relation("Amendment")
+
+  @@index([flockId, date(sort: Desc)])
+}
+
+// BR-012: one record per flock per check, standardized units.
+model FeedLog {
+  id            String   @id @default(uuid())
+  flockId       String
+  loggedAt      DateTime
+  feedType      String
+  quantityKg    Float
+  stageMismatch Boolean  @default(false) // US-FED-002, computed at write time
+  recordedById  String?
+  clientId      String?  @unique // offline-sync idempotency (BR-010)
+  createdAt     DateTime @default(now())
+  flock         Flock    @relation(fields: [flockId], references: [id], onDelete: Cascade)
+
+  @@index([flockId, loggedAt(sort: Desc)])
+}
+
+model WaterLog {
+  id             String   @id @default(uuid())
+  flockId        String
+  loggedAt       DateTime
+  quantityLiters Float
+  recordedById   String?
+  clientId       String?  @unique // offline-sync idempotency (BR-010)
+  createdAt      DateTime @default(now())
+  flock          Flock    @relation(fields: [flockId], references: [id], onDelete: Cascade)
+
+  @@index([flockId, loggedAt(sort: Desc)])
 }

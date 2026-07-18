@@ -4,6 +4,7 @@ import { compare, hash } from "bcryptjs";
 import { config } from "../config.js";
 import { getPrisma } from "../infra/db.js";
 import { AppError } from "../lib/errors.js";
+import { seedDefaultVaccinationTemplates } from "./vaccination.service.js";
 
 const BCRYPT_ROUNDS = 10;
 
@@ -49,6 +50,10 @@ export async function setupFirstRun(app: FastifyInstance, input: SetupInput) {
     });
     return { user, farm };
   });
+  // Outside the transaction — seeding a starting-point template set isn't
+  // part of the atomic "did setup succeed" guarantee; a failure here
+  // shouldn't roll back a real farm/user that was just created.
+  await seedDefaultVaccinationTemplates(farm.id).catch((err) => app.log.error({ err }, "[setup] template seed failed"));
   return { user: publicUser(user), farm, ...signTokens(app, user) };
 }
 

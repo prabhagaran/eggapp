@@ -247,6 +247,9 @@ export async function listBatches(farmId: string, status?: BatchStatus) {
     include: {
       species: { select: { id: true, name: true, incubationDays: true } },
       incubator: { select: { id: true, name: true } },
+      // Phase 2 — lets the Flocks page offer "create from this hatch",
+      // and hide hatches that already became a flock.
+      hatch: { select: { id: true, flock: { select: { id: true } } } },
     },
     orderBy: { createdAt: "desc" },
   });

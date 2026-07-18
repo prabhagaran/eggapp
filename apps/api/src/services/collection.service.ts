@@ -6,6 +6,7 @@ export interface CreateCollectionInput {
   count: number;
   avgWeightGrams?: number;
   sourceNote?: string;
+  flockId?: string; // Phase 2 — the primary source link; sourceNote is now just a free-text detail
   clientId?: string;
 }
 
@@ -20,6 +21,10 @@ export async function createCollection(farmId: string, input: CreateCollectionIn
       return { collection: existing, replay: true };
     }
   }
+  if (input.flockId) {
+    const flock = await prisma.flock.findFirst({ where: { id: input.flockId, farmId } });
+    if (!flock) throw new AppError(404, "not_found", "Flock not found");
+  }
   const collection = await prisma.eggCollection.create({ data: { farmId, ...input } });
   return { collection, replay: false };
 }
@@ -27,7 +32,10 @@ export async function createCollection(farmId: string, input: CreateCollectionIn
 export async function listCollections(farmId: string) {
   const collections = await getPrisma().eggCollection.findMany({
     where: { farmId },
-    include: { batchSources: { select: { count: true, batchId: true } } },
+    include: {
+      batchSources: { select: { count: true, batchId: true } },
+      flock: { select: { id: true, name: true } },
+    },
     orderBy: { collectedOn: "desc" },
   });
   return collections.map(({ batchSources, ...c }) => {
