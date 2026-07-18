@@ -49,6 +49,25 @@ async function tryRefresh(): Promise<boolean> {
   return true;
 }
 
+// CSV export — a plain <a href> can't carry the Bearer token, so this
+// fetches as a blob with the auth header and triggers a client-side
+// download instead. Simplified vs api(): no refresh-on-401 retry, since
+// a mid-export token expiry is rare and re-clicking after a refresh
+// elsewhere is an acceptable fallback for an export action.
+export async function downloadCsv(path: string, filename: string) {
+  const res = await fetch(`${BASE}${path}`, {
+    headers: localStorage.getItem("accessToken") ? { authorization: `Bearer ${localStorage.getItem("accessToken")}` } : {},
+  });
+  if (!res.ok) throw new ApiError(res.status, "export_failed", "Export failed");
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export async function api<T>(
   path: string,
   options: { method?: string; body?: unknown; auth?: boolean } = {},

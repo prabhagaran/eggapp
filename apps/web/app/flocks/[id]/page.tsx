@@ -2,7 +2,7 @@
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../../../lib/api";
-import type { ComplianceItem, FlockDetail } from "../../../lib/types";
+import type { ComplianceItem, FlockDetail, InventoryItem } from "../../../lib/types";
 import { fmtDate, useAuthedFarm } from "../../../lib/useAuthedFarm";
 
 const STAGE_LABEL: Record<string, string> = {
@@ -27,6 +27,7 @@ export default function FlockDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [flock, setFlock] = useState<FlockDetail | null>(null);
   const [compliance, setCompliance] = useState<ComplianceItem[]>([]);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(() => {
@@ -35,6 +36,11 @@ export default function FlockDetailPage() {
     api<ComplianceItem[]>(`/v1/farms/${farmId}/flocks/${id}/vaccination/compliance`).then(setCompliance);
   }, [farmId, id]);
   useEffect(reload, [reload]);
+  useEffect(() => {
+    if (farmId) api<InventoryItem[]>(`/v1/farms/${farmId}/inventory`).then(setInventory);
+  }, [farmId]);
+  const vaccineItems = inventory.filter((i) => i.kind === "vaccine");
+  const feedItems = inventory.filter((i) => i.kind === "feed");
 
   async function post(path: string, body: unknown) {
     setError(null);
@@ -76,6 +82,7 @@ export default function FlockDetailPage() {
       lotNumber: f.get("lotNumber") || undefined,
       dose: f.get("dose") || undefined,
       reactions: f.get("reactions") || undefined,
+      inventoryItemId: f.get("inventoryItemId") || undefined,
     });
     if (ok) e.currentTarget.reset();
   }
@@ -87,6 +94,7 @@ export default function FlockDetailPage() {
       loggedAt: new Date().toISOString(),
       feedType: f.get("feedType"),
       quantityKg: Number(f.get("quantityKg")),
+      inventoryItemId: f.get("inventoryItemId") || undefined,
     });
     if (ok) e.currentTarget.reset();
   }
@@ -229,6 +237,17 @@ export default function FlockDetailPage() {
             Reactions
             <input name="reactions" placeholder="optional" />
           </label>
+          <label>
+            Deduct from stock (optional)
+            <select name="inventoryItemId" defaultValue="">
+              <option value="">— don&apos;t track stock —</option>
+              {vaccineItems.map((i) => (
+                <option key={i.id} value={i.id}>
+                  {i.name} ({i.quantity} {i.unit} left)
+                </option>
+              ))}
+            </select>
+          </label>
           <button className="primary">Record vaccination</button>
         </form>
       </div>
@@ -272,6 +291,17 @@ export default function FlockDetailPage() {
             <label>
               Quantity (kg)
               <input name="quantityKg" type="number" step="0.1" min={0.1} required />
+            </label>
+            <label>
+              Deduct from stock (optional)
+              <select name="inventoryItemId" defaultValue="">
+                <option value="">— don&apos;t track stock —</option>
+                {feedItems.map((i) => (
+                  <option key={i.id} value={i.id}>
+                    {i.name} ({i.quantity} {i.unit} left)
+                  </option>
+                ))}
+              </select>
             </label>
             <button className="primary">Log feed</button>
           </form>

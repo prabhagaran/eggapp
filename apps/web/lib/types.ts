@@ -1,5 +1,14 @@
 // Lightweight response shapes for the web client (per docs/api/openapi.yaml).
-import type { AlertSeverity, AlertState, BatchStatus, DeviceStatus, FlockPurpose, FlockStage, MortalityCause } from "@eggapp/shared-types";
+import type {
+  AlertSeverity,
+  AlertState,
+  BatchStatus,
+  DeviceStatus,
+  FlockPurpose,
+  FlockStage,
+  InventoryItemKind,
+  MortalityCause,
+} from "@eggapp/shared-types";
 
 export interface Farm {
   id: string;
@@ -7,6 +16,13 @@ export interface Farm {
   timezone: string;
   location: string | null;
   role: "owner" | "manager" | "worker";
+}
+
+export interface Me {
+  id: string;
+  email: string;
+  name: string | null;
+  farms: Farm[];
 }
 
 export interface Species {
@@ -233,4 +249,110 @@ export interface FlockDetail extends Flock {
   vaccinationRecords: VaccinationRecord[];
   recentFeed: FeedLog[];
   recentWater: WaterLog[];
+}
+
+// ── Inventory (Phase 3) ──────────────────────────────────────────
+
+export interface InventoryItem {
+  id: string;
+  farmId: string;
+  kind: InventoryItemKind;
+  name: string;
+  unit: string;
+  quantity: number;
+  lotNumber: string | null;
+  expiry: string | null;
+  lowStockThreshold: number | null;
+  createdAt: string;
+}
+
+export interface StockTransaction {
+  id: string;
+  itemId: string;
+  delta: number;
+  cause: "feed_log" | "vaccination" | "manual";
+  refId: string | null;
+  note: string | null;
+  createdAt: string;
+}
+
+export interface InventoryItemDetail extends InventoryItem {
+  transactions: StockTransaction[];
+}
+
+// ── Reports (Phase 2/3) ──────────────────────────────────────────
+
+export interface HatchPerformanceRow {
+  batchId: string;
+  speciesId: string;
+  speciesName: string;
+  incubatorId: string;
+  incubatorName: string;
+  setAt: string | null;
+  hatchedAt: string | null;
+  viableCount: number;
+  fertilityPct: number | null;
+  hatchOfSetPct: number | null;
+  hatchOfFertilePct: number | null;
+}
+
+export interface HatchPerformanceReport {
+  batches: HatchPerformanceRow[];
+  trend: { avgFertilityPct: number | null; avgHatchOfSetPct: number | null; avgHatchOfFertilePct: number | null };
+}
+
+export interface Excursion {
+  severity: "warning" | "critical";
+  message: string;
+  triggeredAt: string;
+  resolvedAt: string | null;
+  durationMinutes: number | null;
+}
+
+export interface BatchEnvironmentReport {
+  batchId: string;
+  speciesName: string;
+  incubatorName: string;
+  range: string;
+  from: string | null;
+  to: string | null;
+  summary: {
+    temp: { min: number | null; max: number | null; avg: number | null };
+    humidity: { min: number | null; max: number | null; avg: number | null };
+  };
+  points: { ts: string; tempC: number | null; humidityPct: number | null }[];
+  excursions: Excursion[];
+}
+
+export interface VaccinationComplianceReport {
+  flocks: { flockId: string; flockName: string; items: ComplianceItem[] }[];
+  totals: { administered: number; overdue: number; due: number; upcoming: number };
+}
+
+export type MortalityNormStatus = "within_norm" | "elevated" | "unknown";
+
+export interface MortalityTrendRow {
+  flockId: string;
+  flockName: string;
+  stage: FlockStage | null;
+  placedCount: number;
+  currentCount: number;
+  byCause: { death: number; cull: number; sale: number };
+  byMonth: { month: string; death: number; cull: number; sale: number }[];
+  earlyMortality: { deaths: number; status: MortalityNormStatus };
+  recentMonthlyMortality: { deaths: number; status: MortalityNormStatus };
+}
+
+// ── Team / multi-farm (Phase 3) ──────────────────────────────────
+
+export interface Member {
+  userId: string;
+  email: string;
+  name: string | null;
+  role: "owner" | "manager" | "worker";
+  memberSince: string;
+}
+
+export interface InviteResult extends Member {
+  temporaryPassword?: string;
 }
