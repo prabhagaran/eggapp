@@ -25,6 +25,7 @@ tags:
   - name: devices
   - name: incubation
   - name: alerting
+  - name: flocks
 
 paths:
   /health:
@@ -681,6 +682,291 @@ paths:
               schema: { $ref: "#/components/schemas/Alert" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /v1/farms/{farmId}/flocks:
+    parameters: [{ $ref: "#/components/parameters/farmId" }]
+    post:
+      tags: [flocks]
+      summary: Create a flock (US-FLK-001) — manager+
+      description: >
+        Exactly one origin is required: `hatchEventId` (must belong to a
+        completed hatch not already linked to a flock), or
+        `acquisitionDate` + `acquisitionAgeDays` for a manually-acquired
+        flock (BR-009 traceability). `placedCount` is immutable after
+        creation — see MortalityRecord for the only way counts change.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, speciesId, purpose, placedCount]
+              properties:
+                name: { type: string, maxLength: 120 }
+                speciesId: { type: string, example: chicken }
+                purpose: { type: string, enum: [layer, broiler, breeder] }
+                placedCount: { type: integer, minimum: 1 }
+                hatchEventId: { type: string, format: uuid }
+                acquisitionDate: { type: string, format: date-time }
+                acquisitionAgeDays: { type: integer, minimum: 0 }
+                acquisitionNote: { type: string, maxLength: 300 }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Flock" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "Hatch event already linked to a flock", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+    get:
+      tags: [flocks]
+      summary: List flocks — includes derived age/stage/currentCount
+      responses:
+        "200":
+          description: Flocks
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Flock" }
+
+  /v1/farms/{farmId}/flocks/{id}:
+    parameters:
+      - { $ref: "#/components/parameters/farmId" }
+      - { $ref: "#/components/parameters/id" }
+    get:
+      tags: [flocks]
+      summary: Flock detail — mortality history, vaccination records, recent feed/water
+      responses:
+        "200": { description: Flock with relations, content: { application/json: { schema: { $ref: "#/components/schemas/FlockDetail" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/farms/{farmId}/flocks/{id}/mortality:
+    parameters:
+      - { $ref: "#/components/parameters/farmId" }
+      - { $ref: "#/components/parameters/id" }
+    post:
+      tags: [flocks]
+      summary: Record mortality/cull/sale (US-FLK-003) — field record, worker+
+      description: >
+        BR-009: `currentCount` is always derived as `placedCount - sum(mortalityRecords.count)`,
+        never edited directly. Rejects with 409 if `count` exceeds the
+        flock's current remaining count. Offline-capable — supply a
+        client-generated `clientId`; replaying it returns the original
+        record with 200 instead of duplicating.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [date, count, cause]
+              properties:
+                date: { type: string, format: date-time }
+                count: { type: integer, minimum: 1 }
+                cause: { type: string, enum: [death, cull, sale] }
+                notes: { type: string, maxLength: 300 }
+                clientId: { type: string, format: uuid }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/MortalityRecord" } } } }
+        "200": { description: Idempotent replay — original record }
+        "409": { description: "count exceeds the flock's current remaining count", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+
+  /v1/farms/{farmId}/vaccination-templates:
+    parameters: [{ $ref: "#/components/parameters/farmId" }]
+    post:
+      tags: [flocks]
+      summary: Add a vaccination schedule template item (US-VAC-001) — manager+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [speciesId, purpose, ageDaysFrom, ageDaysTo, vaccine, disease, route]
+              properties:
+                speciesId: { type: string, example: chicken }
+                purpose: { type: string, enum: [layer, broiler, breeder] }
+                ageDaysFrom: { type: integer, minimum: 0 }
+                ageDaysTo: { type: integer, minimum: 0 }
+                vaccine: { type: string, maxLength: 120 }
+                disease: { type: string, maxLength: 120 }
+                route: { type: string, maxLength: 60 }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/VaccinationTemplateItem" } } } }
+    get:
+      tags: [flocks]
+      summary: List a farm's vaccination schedule templates
+      responses:
+        "200":
+          description: Template items
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/VaccinationTemplateItem" }
+
+  /v1/farms/{farmId}/vaccination-templates/seed-defaults:
+    parameters: [{ $ref: "#/components/parameters/farmId" }]
+    post:
+      tags: [flocks]
+      summary: Seed chicken layer/broiler templates from domain-knowledge §6 — manager+
+      description: >
+        No-op if the farm already has any chicken template item — never
+        overwrites existing edits. Also called automatically once during
+        first-run farm setup.
+      responses:
+        "204": { description: Seeded (or already present) }
+
+  /v1/farms/{farmId}/vaccination-templates/{id}:
+    parameters:
+      - { $ref: "#/components/parameters/farmId" }
+      - { $ref: "#/components/parameters/id" }
+    delete:
+      tags: [flocks]
+      summary: Delete a vaccination schedule template item — manager+
+      responses:
+        "204": { description: Deleted }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/farms/{farmId}/flocks/{flockId}/vaccination/compliance:
+    parameters:
+      - { $ref: "#/components/parameters/farmId" }
+      - { $ref: "#/components/parameters/flockId" }
+    get:
+      tags: [flocks]
+      summary: Vaccination compliance for a flock (US-VAC-002)
+      description: >
+        For each matching template item (by species/purpose/age range),
+        computes `dueDate = birth + ageDaysFrom days` and a status:
+        `administered` (a record references this template item),
+        `overdue` (due date passed), `due` (within 24h of due), or
+        `upcoming`. Drives the vaccination-due push reminder sweep.
+      responses:
+        "200":
+          description: Compliance items
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ComplianceItem" }
+
+  /v1/farms/{farmId}/flocks/{flockId}/vaccination:
+    parameters:
+      - { $ref: "#/components/parameters/farmId" }
+      - { $ref: "#/components/parameters/flockId" }
+    post:
+      tags: [flocks]
+      summary: Record a vaccination (US-VAC-003/004) — field record, worker+
+      description: >
+        BR-005: records are immutable. To correct one, submit a new
+        record with `amendsRecordId` set to the record being corrected —
+        the server resolves this to the true original if the referenced
+        record is itself already an amendment, so a chain of corrections
+        always stays one hop from the source. Offline-capable via
+        `clientId` (idempotent replay, same as mortality).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [date, vaccine, disease, route, count, administeredBy]
+              properties:
+                templateItemId: { type: string, format: uuid, description: Links this record to a schedule item for compliance tracking }
+                date: { type: string, format: date-time }
+                vaccine: { type: string, maxLength: 120 }
+                disease: { type: string, maxLength: 120 }
+                manufacturer: { type: string, maxLength: 120 }
+                lotNumber: { type: string, maxLength: 60 }
+                expiry: { type: string, format: date-time }
+                route: { type: string, maxLength: 60 }
+                dose: { type: string, maxLength: 60 }
+                count: { type: integer, minimum: 1 }
+                administeredBy: { type: string, maxLength: 120 }
+                reactions: { type: string, maxLength: 300 }
+                nextDueDate: { type: string, format: date-time }
+                amendsRecordId: { type: string, format: uuid }
+                clientId: { type: string, format: uuid }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/VaccinationRecord" } } } }
+        "200": { description: Idempotent replay — original record }
+
+  /v1/farms/{farmId}/flocks/{flockId}/feed-logs:
+    parameters:
+      - { $ref: "#/components/parameters/farmId" }
+      - { $ref: "#/components/parameters/flockId" }
+    post:
+      tags: [flocks]
+      summary: Log a feed check (US-FED-001/002) — field record, worker+
+      description: >
+        `stageMismatch` is computed server-side: a case-insensitive
+        substring match between `feedType` and the flock's current
+        stage's expected keyword (domain-knowledge §7) — non-blocking,
+        surfaced as a warning badge only. Offline-capable via `clientId`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [loggedAt, feedType, quantityKg]
+              properties:
+                loggedAt: { type: string, format: date-time }
+                feedType: { type: string, maxLength: 120 }
+                quantityKg: { type: number, exclusiveMinimum: 0 }
+                clientId: { type: string, format: uuid }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/FeedLog" } } } }
+        "200": { description: Idempotent replay — original record }
+    get:
+      tags: [flocks]
+      summary: List feed logs for a flock, newest first
+      responses:
+        "200":
+          description: Feed logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/FeedLog" }
+
+  /v1/farms/{farmId}/flocks/{flockId}/water-logs:
+    parameters:
+      - { $ref: "#/components/parameters/farmId" }
+      - { $ref: "#/components/parameters/flockId" }
+    post:
+      tags: [flocks]
+      summary: Log a water check (US-WTR-001) — field record, worker+
+      description: >
+        Feeds the consumption-anomaly sweep (US-FED-003/US-WTR-002): a
+        >20% drop vs. the 7-day trailing average, sustained across the 2
+        most recent logs, raises a deduped Alert. Offline-capable via
+        `clientId`. Note: the "spike alongside falling feed in hot
+        weather" half of US-WTR-002 is out of scope — no ambient weather
+        data source in this system.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [loggedAt, quantityLiters]
+              properties:
+                loggedAt: { type: string, format: date-time }
+                quantityLiters: { type: number, exclusiveMinimum: 0 }
+                clientId: { type: string, format: uuid }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/WaterLog" } } } }
+        "200": { description: Idempotent replay — original record }
+    get:
+      tags: [flocks]
+      summary: List water logs for a flock, newest first
+      responses:
+        "200":
+          description: Water logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/WaterLog" }
+
 security:
   - bearerAuth: []
 
@@ -699,6 +985,11 @@ components:
       schema: { type: string, format: uuid }
     id:
       name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    flockId:
+      name: flockId
       in: path
       required: true
       schema: { type: string, format: uuid }
@@ -897,3 +1188,107 @@ components:
         hatchOfFertilePct: { type: number, nullable: true }
         abortReason: { type: string, nullable: true }
         storageOverrideNote: { type: string, nullable: true }
+
+    Flock:
+      type: object
+      description: Phase 2 — see docs/architecture/domain-model.md "Flock Operations".
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        speciesId: { type: string, example: chicken }
+        purpose: { type: string, enum: [layer, broiler, breeder] }
+        placedCount: { type: integer, description: Immutable at creation (BR-009) }
+        currentCount: { type: integer, description: "Derived: placedCount − sum(mortalityRecords.count). Never stored/edited directly." }
+        acquisitionDate: { type: string, format: date-time, nullable: true }
+        acquisitionAgeDays: { type: integer, nullable: true }
+        acquisitionNote: { type: string, nullable: true }
+        hatchEventId: { type: string, format: uuid, nullable: true }
+        ageDays: { type: integer, nullable: true, description: Derived from hatch date or acquisition date − acquisitionAgeDays }
+        stage:
+          type: string
+          nullable: true
+          enum: [brooding, grower, pre_lay, layer, broiler_starter, broiler_grower, broiler_finisher]
+          description: Derived from purpose + ageDays (US-FLK-002, domain-knowledge §5)
+
+    FlockDetail:
+      allOf:
+        - $ref: "#/components/schemas/Flock"
+        - type: object
+          properties:
+            mortalityRecords: { type: array, items: { $ref: "#/components/schemas/MortalityRecord" } }
+            vaccinationRecords: { type: array, items: { $ref: "#/components/schemas/VaccinationRecord" } }
+            recentFeed: { type: array, items: { $ref: "#/components/schemas/FeedLog" }, description: Most recent 10 }
+            recentWater: { type: array, items: { $ref: "#/components/schemas/WaterLog" }, description: Most recent 10 }
+
+    MortalityRecord:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        flockId: { type: string, format: uuid }
+        date: { type: string, format: date-time }
+        count: { type: integer }
+        cause: { type: string, enum: [death, cull, sale] }
+        notes: { type: string, nullable: true }
+
+    VaccinationTemplateItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        speciesId: { type: string, example: chicken }
+        purpose: { type: string, enum: [layer, broiler, breeder] }
+        ageDaysFrom: { type: integer }
+        ageDaysTo: { type: integer }
+        vaccine: { type: string }
+        disease: { type: string }
+        route: { type: string }
+
+    VaccinationRecord:
+      type: object
+      description: Immutable (BR-005) — corrections are new records with amendsRecordId set.
+      properties:
+        id: { type: string, format: uuid }
+        flockId: { type: string, format: uuid }
+        templateItemId: { type: string, format: uuid, nullable: true }
+        date: { type: string, format: date-time }
+        vaccine: { type: string }
+        disease: { type: string }
+        manufacturer: { type: string, nullable: true }
+        lotNumber: { type: string, nullable: true }
+        expiry: { type: string, format: date-time, nullable: true }
+        route: { type: string }
+        dose: { type: string, nullable: true }
+        count: { type: integer }
+        administeredBy: { type: string }
+        reactions: { type: string, nullable: true }
+        nextDueDate: { type: string, format: date-time, nullable: true }
+        amendsRecordId: { type: string, format: uuid, nullable: true, description: Always resolves to the true original record, one hop from the source }
+
+    ComplianceItem:
+      type: object
+      description: One entry per matching VaccinationTemplateItem (US-VAC-002).
+      properties:
+        templateItemId: { type: string, format: uuid }
+        vaccine: { type: string }
+        disease: { type: string }
+        route: { type: string }
+        dueDate: { type: string, format: date-time }
+        status: { type: string, enum: [administered, overdue, due, upcoming] }
+        record: { $ref: "#/components/schemas/VaccinationRecord", description: Present when status is administered }
+
+    FeedLog:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        flockId: { type: string, format: uuid }
+        loggedAt: { type: string, format: date-time }
+        feedType: { type: string }
+        quantityKg: { type: number }
+        stageMismatch: { type: boolean, description: "Non-blocking warning: feedType doesn't match the flock's current stage (US-FED-002)" }
+
+    WaterLog:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        flockId: { type: string, format: uuid }
+        loggedAt: { type: string, format: date-time }
+        quantityLiters: { type: number }

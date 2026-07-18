@@ -45,9 +45,11 @@ to prevent overlapping ownership between agents that cover related ground.
 - ADRs: [0001 Supabase hosting](architecture/adr/0001-database-hosting-supabase.md) · [0002 BLE supplementary channel](architecture/adr/0002-ble-supplementary-device-channel.md) · [0003 Tenancy](architecture/adr/0003-tenancy-model.md) · [0004 Mosquitto broker](architecture/adr/0004-mqtt-broker-mosquitto.md) · [0005 Interim web field entry](architecture/adr/0005-interim-web-field-entry.md) · [0006 Radxa always-on host](architecture/adr/0006-radxa-always-on-host.md) · [0007 API via systemd](architecture/adr/0007-api-deployment-systemd.md)
 
 **API** (`docs/api/`)
-- [OpenAPI contract](api/openapi.yaml) — grows per Phase 1 increment;
-  currently setup/auth/species/farms/incubators/devices + collections/
-  batches/candling/hatch + alerts + environmental history + setpoint config
+- [OpenAPI contract](api/openapi.yaml) — grows per increment; currently
+  setup/auth/species/farms/incubators/devices + collections/batches/
+  candling/hatch + alerts + environmental history + setpoint config +
+  Phase 2 flocks/mortality + vaccination templates/compliance/records +
+  feed/water logs
 - [Sync & Conflict Strategy](api/sync-conflict-strategy.md) — BR-010
   server-side rules (clientId idempotency, explicit conflicts);
   android-architect builds the client against this
@@ -70,14 +72,24 @@ to prevent overlapping ownership between agents that cover related ground.
 `src/domain/alerting.ts` + `src/services/alert.service.ts` (BR-006,
 plus US-ENV-004 device-silence detection), setpoint config dispatch
 `src/services/deviceConfig.service.ts` (US-INC-003), environmental
-history `src/services/telemetry.service.ts` (US-ENV-002), and FCM push
-dispatch `src/infra/fcm/client.ts` (US-NOT-002)), `apps/web` (Next.js —
-live incubator telemetry, per-incubator history charts + setpoint
-control, and an Alerts page with ack), `apps/android` (Kotlin +
-Compose — login, live incubator status, offline-first candling/hatch/
-egg-collection recording via Room + WorkManager, and FCM push
-notifications (`push/EggAppMessagingService.kt`), all built and
-verified for real on-emulator against the deployed API, including
+history `src/services/telemetry.service.ts` (US-ENV-002), FCM push
+dispatch `src/infra/fcm/client.ts` (US-NOT-002), and Phase 2 Flock
+Operations — `src/domain/flock.ts` + `src/domain/vaccination.ts` (pure
+stage/compliance derivation), `src/services/flock.service.ts` (US-FLK,
+BR-009 ledger), `src/services/vaccination.service.ts` (US-VAC, BR-005
+immutable amendments, default template seeding, due-reminder sweep),
+`src/services/feedwater.service.ts` (US-FED/US-WTR, stage-mismatch,
+consumption-anomaly sweep) — both new sweeps run every 15 minutes
+alongside the existing device-silence/unconfirmed-config checks),
+`apps/web` (Next.js — live incubator telemetry, per-incubator history
+charts + setpoint control, an Alerts page with ack, and Phase 2
+`/flocks`, `/flocks/[id]`, `/vaccination-templates` pages), `apps/android`
+(Kotlin + Compose — login, live incubator status, offline-first
+candling/hatch/egg-collection recording via Room + WorkManager, FCM
+push notifications (`push/EggAppMessagingService.kt`), and Phase 2
+flock list/detail screens with offline-first mortality/vaccination/
+feed/water recording (same Room + WorkManager sync pattern), all built
+and verified for real on-emulator against the deployed API, including
 genuine offline/reconnect testing and a full MQTT→Alert→push chain;
 BLE not yet — the only remaining P1 Android gap, blocked on firmware),
 `packages/db` (Prisma + Species seed,

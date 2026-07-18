@@ -22,5 +22,9 @@ its MQTT/BLE contract.
 
 ## Status
 
-Docs phase complete (requirements, product, architecture). Implementation
-scaffolding is the next step — see [docs/product/roadmap.md](docs/product/roadmap.md).
+Phase 1 (incubation core: incubators/devices/collections/batches/candling/
+hatch/alerts/setpoints) and Phase 2 (flocks, vaccination, feed/water) are
+built, deployed to the always-on Radxa host, and verified end-to-end across
+backend/web/Android — see [docs/README.md](docs/README.md) "Code & infra"
+and each app's README for what's been verified and how. See
+[docs/product/roadmap.md](docs/product/roadmap.md) for what's next.
