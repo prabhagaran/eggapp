@@ -164,18 +164,31 @@ async function handleCmdAck(log: FastifyBaseLogger, deviceId: string, raw: Buffe
   }
 
   const now = new Date();
-  await prisma.$transaction([
-    prisma.deviceConfig.update({
-      where: { id: deviceConfig.id },
-      data:
-        parsed.data.state === "applied"
-          ? { state: "applied", appliedAt: now, receivedAt: deviceConfig.receivedAt ?? now }
-          : { state: "received", receivedAt: now },
-    }),
-    prisma.deviceEvent.create({
-      data: { deviceId: device.id, type: parsed.data.state === "applied" ? "config_applied" : "config_received" },
-    }),
-  ]);
+  // The "received" and "applied" acks for one command typically arrive
+  // milliseconds apart, and the message handler below doesn't await —
+  // two handleCmdAck calls for the same version can run concurrently.
+  // Without a guard, a "received" ack whose write commits after
+  // "applied" would silently downgrade a config that's already in its
+  // terminal state. The WHERE clause makes the guard atomic at the SQL
+  // level (Postgres row-level locking during the UPDATE), so it holds
+  // regardless of how the two async handlers happen to interleave.
+  if (parsed.data.state === "applied") {
+    await prisma.$transaction([
+      prisma.deviceConfig.updateMany({
+        where: { id: deviceConfig.id },
+        data: { state: "applied", appliedAt: now, receivedAt: deviceConfig.receivedAt ?? now },
+      }),
+      prisma.deviceEvent.create({ data: { deviceId: device.id, type: "config_applied" } }),
+    ]);
+  } else {
+    const result = await prisma.deviceConfig.updateMany({
+      where: { id: deviceConfig.id, state: { not: "applied" } },
+      data: { state: "received", receivedAt: now },
+    });
+    if (result.count > 0) {
+      await prisma.deviceEvent.create({ data: { deviceId: device.id, type: "config_received" } });
+    }
+  }
   log.info({ deviceId, version: parsed.data.version, state: parsed.data.state }, "[mqtt] config ack");
 }
 
