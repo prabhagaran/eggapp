@@ -13,8 +13,8 @@
 | **Device & Telemetry** | Device, TelemetryReading, DeviceEvent, DeviceConfig | Adapts to firmware contract (ADR 0002) |
 | **Flock Operations** | Flock, VaccinationTemplate, VaccinationRecord, FeedLog, WaterLog, MortalityRecord | |
 | **Alerting** | AlertRule, Alert, Notification | Consumes events from all contexts |
-| **Inventory** | InventoryItem, StockTransaction | P3 |
-| **Reporting** | (read models only) | No entities of its own — views over the others |
+| **Inventory** | InventoryItem, StockTransaction | Phase 3 |
+| **Reporting** | (read models only) | No entities of its own — views over the others (Phase 2/3) |
 
 Modules from the brief map 1:1 onto these contexts; "egg management,
 candling, hatching, batches, incubators" are all facets of **Incubation**
@@ -86,11 +86,17 @@ scope through their root's foreign key. Cross-context references
 - **Notification** — user, alert?/reminder type, channel ∈ {fcm, web},
   sent_at, read_at, deep_link.
 
-### Inventory (P3)
-- **InventoryItem** — kind ∈ {feed, vaccine, consumable}, name, unit,
-  quantity, lot?, expiry?, low_stock_threshold.
-- **StockTransaction** — item, delta, cause (feed log / vaccination /
-  manual), ts.
+### Inventory (Phase 3)
+- **InventoryItem** — farm, kind ∈ {feed, vaccine, consumable}, name, unit,
+  quantity (stored, updated transactionally — not derived like Flock's
+  count ledger), lot?, expiry?, low_stock_threshold. Vaccine items require
+  lot + expiry (US-INV-001).
+- **StockTransaction** — item, delta, cause (feed_log / vaccination /
+  manual), ref_id (the FeedLog/VaccinationRecord that triggered it), ts.
+  Append-only audit ledger behind InventoryItem.quantity. FeedLog and
+  VaccinationRecord each carry an optional inventory_item_id — when set,
+  recording the log/record and deducting stock happen in one transaction
+  (US-INV-002), so a log never exists without its deduction landing too.
 
 ## Traceability chain (the load-bearing relationship)
 

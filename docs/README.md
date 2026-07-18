@@ -49,7 +49,9 @@ to prevent overlapping ownership between agents that cover related ground.
   setup/auth/species/farms/incubators/devices + collections/batches/
   candling/hatch + alerts + environmental history + setpoint config +
   Phase 2 flocks/mortality + vaccination templates/compliance/records +
-  feed/water logs
+  feed/water logs + Phase 3 inventory/stock, reports (hatch performance,
+  environmental, vaccination compliance, mortality trends) + CSV export,
+  farm members/invites, additional farms
 - [Sync & Conflict Strategy](api/sync-conflict-strategy.md) — BR-010
   server-side rules (clientId idempotency, explicit conflicts);
   android-architect builds the client against this
@@ -79,11 +81,23 @@ stage/compliance derivation), `src/services/flock.service.ts` (US-FLK,
 BR-009 ledger), `src/services/vaccination.service.ts` (US-VAC, BR-005
 immutable amendments, default template seeding, due-reminder sweep),
 `src/services/feedwater.service.ts` (US-FED/US-WTR, stage-mismatch,
-consumption-anomaly sweep) — both new sweeps run every 15 minutes
-alongside the existing device-silence/unconfirmed-config checks),
+consumption-anomaly sweep) — these two sweeps run every 15 minutes
+alongside the existing device-silence/unconfirmed-config checks, joined
+in Phase 3 by a third 15-min sweep, `inventory.service.ts`'s
+`checkStockAlerts` (US-INV-003 low-stock/expiry warnings), plus Phase 3
+`src/services/inventory.service.ts` (US-INV, stock CRUD + auto-deduction
+transactionally alongside FeedLog/VaccinationRecord creation),
+`src/services/reports.service.ts` + `src/domain/reports.ts` (US-RPT,
+hatch performance/environmental/vaccination-compliance/mortality-trends,
+the last benchmarked against domain-knowledge §5 norms, all with CSV
+export), and `src/services/members.service.ts` + farms.ts's additional-farm
+route (US-USR-002/US-FRM-002, invite-by-email with a one-time temporary
+password for brand-new accounts — no email infra at this scale),
 `apps/web` (Next.js — live incubator telemetry, per-incubator history
-charts + setpoint control, an Alerts page with ack, and Phase 2
-`/flocks`, `/flocks/[id]`, `/vaccination-templates` pages), `apps/android`
+charts + setpoint control, an Alerts page with ack, Phase 2 `/flocks`,
+`/flocks/[id]`, `/vaccination-templates` pages, and Phase 3 `/inventory`,
+`/reports` (tabbed, 4 report views + CSV export), `/team` (invite/remove
+members) pages plus a farm switcher/creator in the top bar), `apps/android`
 (Kotlin + Compose — login, live incubator status, offline-first
 candling/hatch/egg-collection recording via Room + WorkManager, FCM
 push notifications (`push/EggAppMessagingService.kt`), and Phase 2

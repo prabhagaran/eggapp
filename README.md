@@ -23,8 +23,11 @@ its MQTT/BLE contract.
 ## Status
 
 Phase 1 (incubation core: incubators/devices/collections/batches/candling/
-hatch/alerts/setpoints) and Phase 2 (flocks, vaccination, feed/water) are
-built, deployed to the always-on Radxa host, and verified end-to-end across
-backend/web/Android — see [docs/README.md](docs/README.md) "Code & infra"
-and each app's README for what's been verified and how. See
+hatch/alerts/setpoints), Phase 2 (flocks, vaccination, feed/water), and
+Phase 3 (inventory, reports + CSV export, multi-user invites, multi-farm)
+are built, deployed to the always-on Radxa host, and verified end-to-end —
+see [docs/README.md](docs/README.md) "Code & infra" and each app's README
+for what's been verified and how. Reports/Inventory/Team/multi-farm are
+web-only by design (admin/oversight surface, per CLAUDE.md's client-surface
+split) — Android stays field-worker-focused. See
 [docs/product/roadmap.md](docs/product/roadmap.md) for what's next.

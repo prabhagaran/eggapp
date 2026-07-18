@@ -26,6 +26,9 @@ tags:
   - name: incubation
   - name: alerting
   - name: flocks
+  - name: inventory
+  - name: reports
+  - name: members
 
 paths:
   /health:
@@ -197,6 +200,23 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/FarmWithRole" }
+    post:
+      tags: [farms]
+      summary: Create an additional farm (US-FRM-002)
+      description: The caller becomes Owner of the new farm; existing farms/memberships are untouched. Default vaccination templates are seeded automatically, same as first-run setup.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, timezone]
+              properties:
+                name: { type: string, maxLength: 120 }
+                timezone: { type: string }
+                location: { type: string, maxLength: 200 }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/FarmWithRole" } } } }
 
   /v1/farms/{farmId}/incubators:
     parameters: [{ $ref: "#/components/parameters/farmId" }]
@@ -967,6 +987,197 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/WaterLog" }
 
+  /v1/farms/{farmId}/inventory:
+    parameters: [{ $ref: "#/components/parameters/farmId" }]
+    post:
+      tags: [inventory]
+      summary: Add a stock item (US-INV-001) — manager+
+      description: Vaccine items require lotNumber + expiry — they feed vaccination records, where that provenance matters.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind, name, unit, quantity]
+              properties:
+                kind: { type: string, enum: [feed, vaccine, consumable] }
+                name: { type: string, maxLength: 120 }
+                unit: { type: string, maxLength: 20, example: kg }
+                quantity: { type: number, minimum: 0, description: Initial stock, recorded as a manual StockTransaction }
+                lotNumber: { type: string, maxLength: 60 }
+                expiry: { type: string, format: date-time }
+                lowStockThreshold: { type: number, minimum: 0 }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/InventoryItem" } } } }
+        "400": { description: "Vaccine item missing lotNumber/expiry", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+    get:
+      tags: [inventory]
+      summary: List stock items
+      responses:
+        "200":
+          description: Items
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/InventoryItem" }
+
+  /v1/farms/{farmId}/inventory/{id}:
+    parameters:
+      - { $ref: "#/components/parameters/farmId" }
+      - { $ref: "#/components/parameters/id" }
+    get:
+      tags: [inventory]
+      summary: Item detail — includes the last 50 stock transactions
+      responses:
+        "200": { description: Item with transaction history, content: { application/json: { schema: { $ref: "#/components/schemas/InventoryItemDetail" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [inventory]
+      summary: Delete a stock item — manager+
+      responses:
+        "204": { description: Deleted }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/farms/{farmId}/inventory/{id}/adjust:
+    parameters:
+      - { $ref: "#/components/parameters/farmId" }
+      - { $ref: "#/components/parameters/id" }
+    post:
+      tags: [inventory]
+      summary: Manual restock/correction — manager+
+      description: >
+        Auto-deductions (US-INV-002) happen instead through FeedLog/
+        VaccinationRecord's optional inventoryItemId, inside the same
+        transaction as that record — this endpoint is for manual
+        adjustments only (restocking, corrections).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [delta]
+              properties:
+                delta: { type: number, description: "Positive to restock, negative to correct down. Never zero." }
+                note: { type: string, maxLength: 300 }
+      responses:
+        "200": { description: Updated item, content: { application/json: { schema: { $ref: "#/components/schemas/InventoryItem" } } } }
+
+  /v1/farms/{farmId}/reports/hatch-performance:
+    parameters: [{ $ref: "#/components/parameters/farmId" }]
+    get:
+      tags: [reports]
+      summary: Hatch performance across completed batches (US-RPT-001)
+      description: >
+        Per-batch metrics are read as stored at completion (BR-015 — never
+        recomputed), plus the farm-wide average trend across the filtered
+        set. Pass `format=csv` for a CSV download instead of JSON.
+      parameters:
+        - { name: speciesId, in: query, schema: { type: string } }
+        - { name: incubatorId, in: query, schema: { type: string, format: uuid } }
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+        - { name: to, in: query, schema: { type: string, format: date-time } }
+        - { name: format, in: query, schema: { type: string, enum: [csv] } }
+      responses:
+        "200": { description: Report, content: { application/json: { schema: { $ref: "#/components/schemas/HatchPerformanceReport" } }, text/csv: {} } }
+
+  /v1/farms/{farmId}/reports/environmental/{batchId}:
+    parameters:
+      - { $ref: "#/components/parameters/farmId" }
+      - { name: batchId, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [reports]
+      summary: Environmental history + excursions for one batch (US-RPT-002)
+      description: >
+        Reuses the same per-batch telemetry window as the incubator
+        history chart (range=batch), plus an excursion list derived from
+        Alert (which already represents bound violations for that
+        incubator — no separate excursion tracking needed). `format=csv`
+        exports the excursions list.
+      parameters:
+        - { name: format, in: query, schema: { type: string, enum: [csv] } }
+      responses:
+        "200": { description: Report, content: { application/json: { schema: { $ref: "#/components/schemas/BatchEnvironmentReport" } }, text/csv: {} } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/farms/{farmId}/reports/vaccination-compliance:
+    parameters: [{ $ref: "#/components/parameters/farmId" }]
+    get:
+      tags: [reports]
+      summary: Farm-wide vaccination compliance (US-RPT-003)
+      description: Aggregates the same per-flock computeCompliance() the flock detail page and due-reminder sweep use, across every flock in the farm.
+      parameters:
+        - { name: format, in: query, schema: { type: string, enum: [csv] } }
+      responses:
+        "200": { description: Report, content: { application/json: { schema: { $ref: "#/components/schemas/VaccinationComplianceReport" } }, text/csv: {} } }
+
+  /v1/farms/{farmId}/reports/mortality-trends:
+    parameters: [{ $ref: "#/components/parameters/farmId" }]
+    get:
+      tags: [reports]
+      summary: Mortality by flock/stage/cause, benchmarked against domain-knowledge §5 norms (US-RPT-004)
+      description: >
+        Early-brooding cumulative mortality (≤14 days old) is flagged
+        `elevated` past 5% of placedCount; ongoing mortality in the
+        trailing 30 days is flagged `elevated` past 1% of the count at
+        the start of that window — both per domain-knowledge.md §5.
+      parameters:
+        - { name: format, in: query, schema: { type: string, enum: [csv] } }
+      responses:
+        "200":
+          description: Report
+          content:
+            application/json: { schema: { type: array, items: { $ref: "#/components/schemas/MortalityTrendRow" } } }
+            text/csv: {}
+
+  /v1/farms/{farmId}/members:
+    parameters: [{ $ref: "#/components/parameters/farmId" }]
+    get:
+      tags: [members]
+      summary: List a farm's members — manager+
+      responses:
+        "200": { description: Members, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Member" } } } } }
+    post:
+      tags: [members]
+      summary: Invite a member to the farm (US-USR-002) — owner only
+      description: >
+        No email infrastructure exists in this system (personal-scale
+        deployment, per nfr.md). An existing user is granted membership
+        immediately; a brand-new user gets an account with a system-
+        generated temporary password, returned once in this response —
+        deliberately simple rather than token-based invite emails at
+        this scale. The Owner shares it out-of-band.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, role]
+              properties:
+                email: { type: string, format: email }
+                role: { type: string, enum: [manager, worker] }
+                name: { type: string, maxLength: 120, description: Only used if this creates a brand-new account }
+      responses:
+        "201": { description: Added, content: { application/json: { schema: { $ref: "#/components/schemas/InviteResult" } } } }
+        "409": { description: Already a member, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+
+  /v1/farms/{farmId}/members/{userId}:
+    parameters:
+      - { $ref: "#/components/parameters/farmId" }
+      - { name: userId, in: path, required: true, schema: { type: string, format: uuid } }
+    delete:
+      tags: [members]
+      summary: Remove a member — owner only
+      description: An owner cannot remove themself, and a farm's only owner cannot be removed (would orphan the farm).
+      responses:
+        "204": { description: Removed }
+        "400": { description: Cannot remove self, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: Last owner, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+
 security:
   - bearerAuth: []
 
@@ -1292,3 +1503,148 @@ components:
         flockId: { type: string, format: uuid }
         loggedAt: { type: string, format: date-time }
         quantityLiters: { type: number }
+
+    InventoryItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        farmId: { type: string, format: uuid }
+        kind: { type: string, enum: [feed, vaccine, consumable] }
+        name: { type: string }
+        unit: { type: string }
+        quantity: { type: number, description: Current stock — updated transactionally alongside each StockTransaction }
+        lotNumber: { type: string, nullable: true }
+        expiry: { type: string, format: date-time, nullable: true }
+        lowStockThreshold: { type: number, nullable: true }
+
+    StockTransaction:
+      type: object
+      description: Audit ledger entry behind InventoryItem.quantity.
+      properties:
+        id: { type: string, format: uuid }
+        itemId: { type: string, format: uuid }
+        delta: { type: number, description: Negative = deduction, positive = restock/correction }
+        cause: { type: string, enum: [feed_log, vaccination, manual] }
+        refId: { type: string, nullable: true, description: FeedLog/VaccinationRecord id that triggered this, null for manual }
+        note: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    InventoryItemDetail:
+      allOf:
+        - $ref: "#/components/schemas/InventoryItem"
+        - type: object
+          properties:
+            transactions: { type: array, items: { $ref: "#/components/schemas/StockTransaction" }, description: Most recent 50 }
+
+    HatchPerformanceReport:
+      type: object
+      properties:
+        batches:
+          type: array
+          items:
+            type: object
+            properties:
+              batchId: { type: string, format: uuid }
+              speciesName: { type: string }
+              incubatorName: { type: string }
+              setAt: { type: string, format: date-time, nullable: true }
+              hatchedAt: { type: string, format: date-time, nullable: true }
+              viableCount: { type: integer }
+              fertilityPct: { type: number, nullable: true }
+              hatchOfSetPct: { type: number, nullable: true }
+              hatchOfFertilePct: { type: number, nullable: true }
+        trend:
+          type: object
+          properties:
+            avgFertilityPct: { type: number, nullable: true }
+            avgHatchOfSetPct: { type: number, nullable: true }
+            avgHatchOfFertilePct: { type: number, nullable: true }
+
+    BatchEnvironmentReport:
+      type: object
+      properties:
+        batchId: { type: string, format: uuid }
+        speciesName: { type: string }
+        incubatorName: { type: string }
+        range: { type: string }
+        from: { type: string, format: date-time, nullable: true }
+        to: { type: string, format: date-time, nullable: true }
+        summary:
+          type: object
+          properties:
+            temp: { type: object, properties: { min: { type: number, nullable: true }, max: { type: number, nullable: true }, avg: { type: number, nullable: true } } }
+            humidity: { type: object, properties: { min: { type: number, nullable: true }, max: { type: number, nullable: true }, avg: { type: number, nullable: true } } }
+        points:
+          type: array
+          items: { type: object, properties: { ts: { type: string, format: date-time }, tempC: { type: number, nullable: true }, humidityPct: { type: number, nullable: true } } }
+        excursions:
+          type: array
+          items:
+            type: object
+            description: Derived from Alert rows for the batch's incubator within its set→hatch window.
+            properties:
+              severity: { type: string, enum: [warning, critical] }
+              message: { type: string }
+              triggeredAt: { type: string, format: date-time }
+              resolvedAt: { type: string, format: date-time, nullable: true }
+              durationMinutes: { type: integer, nullable: true }
+
+    VaccinationComplianceReport:
+      type: object
+      properties:
+        flocks:
+          type: array
+          items:
+            type: object
+            properties:
+              flockId: { type: string, format: uuid }
+              flockName: { type: string }
+              items: { type: array, items: { $ref: "#/components/schemas/ComplianceItem" } }
+        totals:
+          type: object
+          properties:
+            administered: { type: integer }
+            overdue: { type: integer }
+            due: { type: integer }
+            upcoming: { type: integer }
+
+    MortalityTrendRow:
+      type: object
+      properties:
+        flockId: { type: string, format: uuid }
+        flockName: { type: string }
+        stage: { type: string, nullable: true }
+        placedCount: { type: integer }
+        currentCount: { type: integer }
+        byCause: { type: object, properties: { death: { type: integer }, cull: { type: integer }, sale: { type: integer } } }
+        byMonth:
+          type: array
+          items: { type: object, properties: { month: { type: string, example: "2026-07" }, death: { type: integer }, cull: { type: integer }, sale: { type: integer } } }
+        earlyMortality:
+          type: object
+          description: "Cumulative deaths by age ≤14 days (domain-knowledge §5) — status is elevated past 5% of placedCount."
+          properties:
+            deaths: { type: integer }
+            status: { type: string, enum: [within_norm, elevated, unknown] }
+        recentMonthlyMortality:
+          type: object
+          description: "Deaths in the trailing 30 days — status is elevated past 1% of the count at that window's start."
+          properties:
+            deaths: { type: integer }
+            status: { type: string, enum: [within_norm, elevated, unknown] }
+
+    Member:
+      type: object
+      properties:
+        userId: { type: string, format: uuid }
+        email: { type: string, format: email }
+        name: { type: string, nullable: true }
+        role: { type: string, enum: [owner, manager, worker] }
+        memberSince: { type: string, format: date-time }
+
+    InviteResult:
+      allOf:
+        - $ref: "#/components/schemas/Member"
+        - type: object
+          properties:
+            temporaryPassword: { type: string, description: Present only when this invite created a brand-new user account — shown once, never stored in retrievable form beyond the hash }
