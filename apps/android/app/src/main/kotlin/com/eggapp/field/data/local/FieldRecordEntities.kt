@@ -52,3 +52,65 @@ data class CollectionEntity(
     val errorMessage: String? = null,
     val createdAtMillis: Long,
 )
+
+// ── Flock operations (Phase 2) ──────────────────────────────────
+
+@Entity(tableName = "pending_mortality")
+data class MortalityEntity(
+    @PrimaryKey val clientId: String,
+    val farmId: String,
+    val flockId: String,
+    val date: String,
+    val count: Int,
+    val cause: String, // "death" | "cull" | "sale"
+    val notes: String?,
+    val status: String,
+    val errorMessage: String? = null,
+    val createdAtMillis: Long,
+)
+
+@Entity(tableName = "pending_vaccination")
+data class VaccinationEntity(
+    @PrimaryKey val clientId: String,
+    val farmId: String,
+    val flockId: String,
+    val templateItemId: String?,
+    val date: String,
+    val vaccine: String,
+    val disease: String,
+    val route: String,
+    val count: Int,
+    val administeredBy: String,
+    val manufacturer: String?,
+    val lotNumber: String?,
+    val dose: String?,
+    val reactions: String?,
+    val status: String,
+    val errorMessage: String? = null,
+    val createdAtMillis: Long,
+)
+
+@Entity(tableName = "pending_feed_log")
+data class FeedLogEntity(
+    @PrimaryKey val clientId: String,
+    val farmId: String,
+    val flockId: String,
+    val loggedAt: String,
+    val feedType: String,
+    val quantityKg: Double,
+    val status: String,
+    val errorMessage: String? = null,
+    val createdAtMillis: Long,
+)
+
+@Entity(tableName = "pending_water_log")
+data class WaterLogEntity(
+    @PrimaryKey val clientId: String,
+    val farmId: String,
+    val flockId: String,
+    val loggedAt: String,
+    val quantityLiters: Double,
+    val status: String,
+    val errorMessage: String? = null,
+    val createdAtMillis: Long,
+)

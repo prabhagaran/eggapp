@@ -6,8 +6,11 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [CandlingEntity::class, HatchEntity::class, CollectionEntity::class],
-    version = 2,
+    entities = [
+        CandlingEntity::class, HatchEntity::class, CollectionEntity::class,
+        MortalityEntity::class, VaccinationEntity::class, FeedLogEntity::class, WaterLogEntity::class,
+    ],
+    version = 3,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {

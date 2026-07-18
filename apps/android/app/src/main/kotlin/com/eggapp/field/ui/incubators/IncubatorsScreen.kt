@@ -45,6 +45,7 @@ fun IncubatorsScreen(
     onOpenBatches: () -> Unit,
     onOpenCollections: () -> Unit,
     onOpenSetpoints: (String) -> Unit,
+    onOpenFlocks: () -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
 
@@ -64,6 +65,7 @@ fun IncubatorsScreen(
                 actions = {
                     TextButton(onClick = onOpenBatches) { Text("Batches") }
                     TextButton(onClick = onOpenCollections) { Text("Collections") }
+                    TextButton(onClick = onOpenFlocks) { Text("Flocks") }
                     TextButton(onClick = { viewModel.logout(); onLogout() }) { Text("Log out") }
                 },
             )

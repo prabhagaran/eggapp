@@ -150,3 +150,124 @@ data class DeviceConfig(
     val receivedAt: String?,
     val appliedAt: String?,
 )
+
+// ── Flock operations (Phase 2) ──────────────────────────────────
+
+data class FlockSpeciesRef(val id: String, val name: String)
+
+// Server derives ageDays/stage/currentCount — never sent by the client (US-FLK-002/BR-009).
+data class Flock(
+    val id: String,
+    val name: String,
+    val speciesId: String,
+    val purpose: String, // "layer" | "broiler" | "breeder"
+    val hatchEventId: String?,
+    val acquisitionDate: String?,
+    val acquisitionAgeDays: Int?,
+    val acquisitionNote: String?,
+    val placedCount: Int,
+    val species: FlockSpeciesRef?,
+    val ageDays: Int?,
+    val stage: String?,
+    val currentCount: Int,
+)
+
+data class MortalityRecordDto(
+    val id: String,
+    val date: String,
+    val count: Int,
+    val cause: String,
+    val notes: String?,
+)
+
+// BR-010: clientId makes this create idempotent, same as candling/hatch.
+data class MortalityRequest(
+    val date: String,
+    val count: Int,
+    val cause: String,
+    val notes: String?,
+    val clientId: String,
+)
+
+data class ComplianceItem(
+    val id: String, // templateItemId
+    val ageDaysFrom: Int,
+    val ageDaysTo: Int,
+    val vaccine: String,
+    val disease: String,
+    val route: String,
+    val dueDate: String,
+    val status: String, // "administered" | "overdue" | "due" | "upcoming"
+    val record: ComplianceRecordRef?,
+)
+
+data class ComplianceRecordRef(val id: String, val date: String)
+
+data class VaccinationRecordDto(
+    val id: String,
+    val templateItemId: String?,
+    val date: String,
+    val vaccine: String,
+    val disease: String,
+    val route: String,
+    val count: Int,
+    val administeredBy: String,
+)
+
+// BR-005: immutable; BR-010: clientId idempotent.
+data class VaccinationRequest(
+    val templateItemId: String?,
+    val date: String,
+    val vaccine: String,
+    val disease: String,
+    val route: String,
+    val count: Int,
+    val administeredBy: String,
+    val manufacturer: String?,
+    val lotNumber: String?,
+    val dose: String?,
+    val reactions: String?,
+    val clientId: String,
+)
+
+data class FeedLogDto(
+    val id: String,
+    val loggedAt: String,
+    val feedType: String,
+    val quantityKg: Double,
+    val stageMismatch: Boolean,
+)
+
+data class FeedLogRequest(
+    val loggedAt: String,
+    val feedType: String,
+    val quantityKg: Double,
+    val clientId: String,
+)
+
+data class WaterLogDto(
+    val id: String,
+    val loggedAt: String,
+    val quantityLiters: Double,
+)
+
+data class WaterLogRequest(
+    val loggedAt: String,
+    val quantityLiters: Double,
+    val clientId: String,
+)
+
+data class FlockDetail(
+    val id: String,
+    val name: String,
+    val speciesId: String,
+    val purpose: String,
+    val placedCount: Int,
+    val ageDays: Int?,
+    val stage: String?,
+    val currentCount: Int,
+    val mortalityRecords: List<MortalityRecordDto>,
+    val vaccinationRecords: List<VaccinationRecordDto>,
+    val recentFeed: List<FeedLogDto>,
+    val recentWater: List<WaterLogDto>,
+)

@@ -6,8 +6,12 @@ import androidx.work.WorkerParameters
 import com.eggapp.field.data.ApiClient
 import com.eggapp.field.data.CandlingRequest
 import com.eggapp.field.data.CollectionRequest
+import com.eggapp.field.data.FeedLogRequest
 import com.eggapp.field.data.HatchRequest
+import com.eggapp.field.data.MortalityRequest
 import com.eggapp.field.data.TokenStore
+import com.eggapp.field.data.VaccinationRequest
+import com.eggapp.field.data.WaterLogRequest
 import com.eggapp.field.data.local.AppDatabase
 import retrofit2.Response
 
@@ -91,6 +95,94 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
             when (val classification = classify(outcome)) {
                 is SyncOutcome.Success -> dao.updateCollectionStatus(record.clientId, "synced", null)
                 is SyncOutcome.Rejected -> dao.updateCollectionStatus(record.clientId, "conflict", classification.message)
+                is SyncOutcome.NetworkFailure -> hadNetworkFailure = true
+            }
+        }
+
+        for (record in dao.pendingMortality()) {
+            val outcome = runCatching {
+                api.recordMortality(
+                    record.farmId,
+                    record.flockId,
+                    MortalityRequest(
+                        date = record.date,
+                        count = record.count,
+                        cause = record.cause,
+                        notes = record.notes,
+                        clientId = record.clientId,
+                    ),
+                )
+            }
+            when (val classification = classify(outcome)) {
+                is SyncOutcome.Success -> dao.updateMortalityStatus(record.clientId, "synced", null)
+                is SyncOutcome.Rejected -> dao.updateMortalityStatus(record.clientId, "conflict", classification.message)
+                is SyncOutcome.NetworkFailure -> hadNetworkFailure = true
+            }
+        }
+
+        for (record in dao.pendingVaccination()) {
+            val outcome = runCatching {
+                api.recordVaccination(
+                    record.farmId,
+                    record.flockId,
+                    VaccinationRequest(
+                        templateItemId = record.templateItemId,
+                        date = record.date,
+                        vaccine = record.vaccine,
+                        disease = record.disease,
+                        route = record.route,
+                        count = record.count,
+                        administeredBy = record.administeredBy,
+                        manufacturer = record.manufacturer,
+                        lotNumber = record.lotNumber,
+                        dose = record.dose,
+                        reactions = record.reactions,
+                        clientId = record.clientId,
+                    ),
+                )
+            }
+            when (val classification = classify(outcome)) {
+                is SyncOutcome.Success -> dao.updateVaccinationStatus(record.clientId, "synced", null)
+                is SyncOutcome.Rejected -> dao.updateVaccinationStatus(record.clientId, "conflict", classification.message)
+                is SyncOutcome.NetworkFailure -> hadNetworkFailure = true
+            }
+        }
+
+        for (record in dao.pendingFeedLogs()) {
+            val outcome = runCatching {
+                api.recordFeedLog(
+                    record.farmId,
+                    record.flockId,
+                    FeedLogRequest(
+                        loggedAt = record.loggedAt,
+                        feedType = record.feedType,
+                        quantityKg = record.quantityKg,
+                        clientId = record.clientId,
+                    ),
+                )
+            }
+            when (val classification = classify(outcome)) {
+                is SyncOutcome.Success -> dao.updateFeedLogStatus(record.clientId, "synced", null)
+                is SyncOutcome.Rejected -> dao.updateFeedLogStatus(record.clientId, "conflict", classification.message)
+                is SyncOutcome.NetworkFailure -> hadNetworkFailure = true
+            }
+        }
+
+        for (record in dao.pendingWaterLogs()) {
+            val outcome = runCatching {
+                api.recordWaterLog(
+                    record.farmId,
+                    record.flockId,
+                    WaterLogRequest(
+                        loggedAt = record.loggedAt,
+                        quantityLiters = record.quantityLiters,
+                        clientId = record.clientId,
+                    ),
+                )
+            }
+            when (val classification = classify(outcome)) {
+                is SyncOutcome.Success -> dao.updateWaterLogStatus(record.clientId, "synced", null)
+                is SyncOutcome.Rejected -> dao.updateWaterLogStatus(record.clientId, "conflict", classification.message)
                 is SyncOutcome.NetworkFailure -> hadNetworkFailure = true
             }
         }

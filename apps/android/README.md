@@ -152,6 +152,45 @@ for device"** → **"v1: received by device — applying"** → **"v1:
 applied ✓"** with no manual refresh. Test farm/device cleaned up by
 exact ID afterward; real account confirmed untouched.
 
+## Status (sixth increment, 2026-07-18): Flock Operations — Phase 2 (US-FLK/US-VAC/US-FED/US-WTR)
+
+Extends the field app to the full Flock Operations domain: flock
+tracking, mortality/cull/sale, vaccination, and feed/water checks — all
+offline-first, same Room + WorkManager pattern as candling/hatch/
+collections.
+
+- **`ui/flocks/FlocksScreen.kt` + `FlocksViewModel.kt`**: farm-level
+  flock list (mirrors `BatchesScreen`) showing species/purpose/derived
+  stage/current count/age.
+- **`ui/flocks/FlockDetailScreen.kt` + `FlockDetailViewModel.kt`**: one
+  screen combining four offline-capable forms — mortality/cull/sale
+  (BR-009 ledger), vaccination (with a compliance hint for the next
+  due/overdue schedule item), and feed/water checks — each backed by
+  its own Room entity (`MortalityEntity`/`VaccinationEntity`/
+  `FeedLogEntity`/`WaterLogEntity`, `AppDatabase` bumped 2→3,
+  `fallbackToDestructiveMigration()`) and `SyncWorker` push loop.
+  Server data (flock detail + vaccination compliance) and the four
+  local Flow sources are combined with a small hand-rolled `Quad<A,B,C,D>`
+  (Kotlin has no built-in 4-tuple) so locally-queued records show up
+  immediately regardless of sync state, same as `BatchDetailViewModel`.
+
+**Verified for real, full chain, on the emulator**: logged into the
+isolated Phase 2 test farm/flock through the actual login UI, opened
+the flock list and detail screens and confirmed the server-computed
+metrics (`47 birds · 79 days old · Grower`), the mortality history
+table, the vaccination compliance table (5 items correctly `overdue`,
+1 `administered`, 1 `upcoming`), and the feed/water table with a
+`stage mismatch` badge — all rendered from real data, not fixtures.
+Disabled the emulator's wifi/data radios, recorded a feed check through
+the real form — it queued locally (`"queued"`, visible immediately in
+the "Not yet synced" section, zero connectivity). Re-enabled
+connectivity; `SyncWorker` synced it automatically within ~10s, no
+manual action or restart, confirmed both by the UI flipping to
+`"synced"` and independently via a direct API query against the live
+backend showing the exact `feedType`/`quantityKg` submitted offline.
+Test farm/user cleaned up by exact ID afterward; real account
+confirmed untouched.
+
 ## Toolchain used to build/verify this (none of it required a separate install)
 
 - **JDK**: Android Studio's bundled JBR (`Android Studio/jbr`, OpenJDK 21)
@@ -191,16 +230,18 @@ variant hitting a different host).
 
 ```
 com.eggapp.field/
-  MainActivity.kt        NavHost: login -> incubators -> batches/collections -> batch detail
+  MainActivity.kt        NavHost: login -> incubators -> batches/collections/flocks -> detail screens
   push/                  EggAppMessagingService (FCM receive + display)
   data/                  Retrofit API client, DTOs, TokenStore, BatchCache,
                          FieldRecordRepository (offline-first saves)
-  data/local/            Room: CandlingEntity/HatchEntity/CollectionEntity, DAO, Database
+  data/local/            Room: CandlingEntity/HatchEntity/CollectionEntity/
+                         MortalityEntity/VaccinationEntity/FeedLogEntity/WaterLogEntity, DAO, Database
   sync/                  SyncWorker (WorkManager)
   ui/login/               Login screen + ViewModel
   ui/incubators/          Incubator list + setpoint control screens/ViewModels
   ui/batch/               Batches list, batch detail + candling/hatch forms
   ui/collections/         Egg collection recording + discard
+  ui/flocks/              Flock list, flock detail + mortality/vaccination/feed/water forms
   ui/theme/               Compose theme (brand color matches apps/web)
 ```
 

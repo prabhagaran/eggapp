@@ -77,4 +77,47 @@ interface ApiService {
         @Path("farmId") farmId: String,
         @Path("id") id: String,
     ): Response<DeviceConfig?>
+
+    @GET("v1/farms/{farmId}/flocks")
+    suspend fun flocks(@Path("farmId") farmId: String): Response<List<Flock>>
+
+    @GET("v1/farms/{farmId}/flocks/{id}")
+    suspend fun flock(
+        @Path("farmId") farmId: String,
+        @Path("id") id: String,
+    ): Response<FlockDetail>
+
+    @POST("v1/farms/{farmId}/flocks/{id}/mortality")
+    suspend fun recordMortality(
+        @Path("farmId") farmId: String,
+        @Path("id") id: String,
+        @Body body: MortalityRequest,
+    ): Response<MortalityRecordDto>
+
+    @GET("v1/farms/{farmId}/flocks/{flockId}/vaccination/compliance")
+    suspend fun vaccinationCompliance(
+        @Path("farmId") farmId: String,
+        @Path("flockId") flockId: String,
+    ): Response<List<ComplianceItem>>
+
+    @POST("v1/farms/{farmId}/flocks/{flockId}/vaccination")
+    suspend fun recordVaccination(
+        @Path("farmId") farmId: String,
+        @Path("flockId") flockId: String,
+        @Body body: VaccinationRequest,
+    ): Response<VaccinationRecordDto>
+
+    @POST("v1/farms/{farmId}/flocks/{flockId}/feed-logs")
+    suspend fun recordFeedLog(
+        @Path("farmId") farmId: String,
+        @Path("flockId") flockId: String,
+        @Body body: FeedLogRequest,
+    ): Response<FeedLogDto>
+
+    @POST("v1/farms/{farmId}/flocks/{flockId}/water-logs")
+    suspend fun recordWaterLog(
+        @Path("farmId") farmId: String,
+        @Path("flockId") flockId: String,
+        @Body body: WaterLogRequest,
+    ): Response<WaterLogDto>
 }

@@ -21,6 +21,8 @@ import com.eggapp.field.data.TokenStore
 import com.eggapp.field.ui.batch.BatchDetailScreen
 import com.eggapp.field.ui.batch.BatchesScreen
 import com.eggapp.field.ui.collections.CollectionsScreen
+import com.eggapp.field.ui.flocks.FlockDetailScreen
+import com.eggapp.field.ui.flocks.FlocksScreen
 import com.eggapp.field.ui.incubators.IncubatorsScreen
 import com.eggapp.field.ui.incubators.SetpointsScreen
 import com.eggapp.field.ui.login.LoginScreen
@@ -32,6 +34,8 @@ private const val ROUTE_BATCHES = "batches"
 private const val ROUTE_BATCH_DETAIL = "batch/{batchId}"
 private const val ROUTE_COLLECTIONS = "collections"
 private const val ROUTE_SETPOINTS = "incubator/{incubatorId}/setpoints"
+private const val ROUTE_FLOCKS = "flocks"
+private const val ROUTE_FLOCK_DETAIL = "flock/{flockId}"
 
 class MainActivity : ComponentActivity() {
 
@@ -69,6 +73,7 @@ class MainActivity : ComponentActivity() {
                                 onOpenBatches = { navController.navigate(ROUTE_BATCHES) },
                                 onOpenCollections = { navController.navigate(ROUTE_COLLECTIONS) },
                                 onOpenSetpoints = { incubatorId -> navController.navigate("incubator/$incubatorId/setpoints") },
+                                onOpenFlocks = { navController.navigate(ROUTE_FLOCKS) },
                             )
                         }
                         composable(ROUTE_BATCHES) {
@@ -76,6 +81,16 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(ROUTE_COLLECTIONS) {
                             CollectionsScreen(onBack = { navController.popBackStack() })
+                        }
+                        composable(ROUTE_FLOCKS) {
+                            FlocksScreen(onOpenFlock = { flock -> navController.navigate("flock/${flock.id}") })
+                        }
+                        composable(
+                            ROUTE_FLOCK_DETAIL,
+                            arguments = listOf(navArgument("flockId") { type = NavType.StringType }),
+                        ) { backStackEntry ->
+                            val flockId = backStackEntry.arguments?.getString("flockId")!!
+                            FlockDetailScreen(flockId = flockId, onBack = { navController.popBackStack() })
                         }
                         composable(
                             ROUTE_SETPOINTS,
