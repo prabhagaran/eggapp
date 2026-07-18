@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { NavBar } from "../components/NavBar";
+import { AppShell } from "../components/AppShell";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -12,8 +12,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body>
-        <NavBar />
-        <main>{children}</main>
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

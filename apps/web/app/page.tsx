@@ -1,8 +1,9 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { Egg, Bird, Thermometer, BellRing } from "lucide-react";
 import { api } from "../lib/api";
-import type { Batch, Incubator } from "../lib/types";
+import type { Alert, Batch, Flock, Incubator } from "../lib/types";
 import { dayOf, fmtAge, isFresh, useAuthedFarm } from "../lib/useAuthedFarm";
 
 const ACTIVE: Batch["status"][] = ["planned", "setting", "incubating", "lockdown", "hatching"];
@@ -11,12 +12,16 @@ export default function Dashboard() {
   const farmId = useAuthedFarm();
   const [incubators, setIncubators] = useState<Incubator[] | null>(null);
   const [batches, setBatches] = useState<Batch[] | null>(null);
+  const [flocks, setFlocks] = useState<Flock[] | null>(null);
+  const [alerts, setAlerts] = useState<Alert[] | null>(null);
 
   useEffect(() => {
     if (!farmId) return;
     const reload = () => {
       api<Incubator[]>(`/v1/farms/${farmId}/incubators`).then(setIncubators);
       api<Batch[]>(`/v1/farms/${farmId}/batches`).then(setBatches);
+      api<Flock[]>(`/v1/farms/${farmId}/flocks`).then(setFlocks);
+      api<Alert[]>(`/v1/farms/${farmId}/alerts?state=open`).then(setAlerts);
     };
     reload();
     // Telemetry lands every ~60s; poll a bit faster so live readings
@@ -27,10 +32,50 @@ export default function Dashboard() {
 
   if (!farmId) return null;
   const active = (batches ?? []).filter((b) => ACTIVE.includes(b.status));
+  const birds = (flocks ?? []).reduce((sum, f) => sum + f.currentCount, 0);
+  const devicesOnline = (incubators ?? []).filter((i) => i.device?.status === "active").length;
 
   return (
     <>
       <h1>Dashboard</h1>
+      <p className="muted">Plan, monitor, and act on your farm with ease.</p>
+
+      <div className="stat-row">
+        <div className="card dark stat-card">
+          <div className="stat-top">
+            <span className="stat-label">Total Birds</span>
+            <span className="stat-icon"><Bird /></span>
+          </div>
+          <span className="stat-value">{flocks ? birds : "—"}</span>
+          <span className="muted">across {flocks?.length ?? 0} flocks</span>
+        </div>
+        <div className="card stat-card">
+          <div className="stat-top">
+            <span className="stat-label">Active Batches</span>
+            <span className="stat-icon"><Egg /></span>
+          </div>
+          <span className="stat-value">{batches ? active.length : "—"}</span>
+          <span className="muted">of {batches?.length ?? 0} total</span>
+        </div>
+        <div className="card stat-card">
+          <div className="stat-top">
+            <span className="stat-label">Incubators Online</span>
+            <span className="stat-icon"><Thermometer /></span>
+          </div>
+          <span className="stat-value">{incubators ? devicesOnline : "—"}</span>
+          <span className="muted">of {incubators?.length ?? 0} total</span>
+        </div>
+        <div className="card stat-card">
+          <div className="stat-top">
+            <span className="stat-label">Open Alerts</span>
+            <span className="stat-icon"><BellRing /></span>
+          </div>
+          <span className="stat-value">{alerts ? alerts.length : "—"}</span>
+          <span className="muted">
+            <Link href="/alerts">review →</Link>
+          </span>
+        </div>
+      </div>
 
       <h2>Active batches</h2>
       {batches && active.length === 0 && (
