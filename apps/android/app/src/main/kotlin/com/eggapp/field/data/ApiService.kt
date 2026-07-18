@@ -17,6 +17,9 @@ interface ApiService {
     @GET("v1/farms")
     suspend fun farms(): Response<List<Farm>>
 
+    @GET("v1/me")
+    suspend fun me(): Response<Me>
+
     @POST("v1/me/push-token")
     suspend fun registerPushToken(@Body body: PushTokenRequest): Response<Unit>
 

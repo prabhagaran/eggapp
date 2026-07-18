@@ -8,10 +8,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -29,6 +33,15 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.eggapp.field.data.local.CandlingEntity
+import com.eggapp.field.ui.components.MutedText
+import com.eggapp.field.ui.components.PillTone
+import com.eggapp.field.ui.components.StatusPill
+
+private fun batchTone(status: String) = when (status) {
+    "completed", "hatching" -> PillTone.Ok
+    "aborted", "closed" -> PillTone.Neutral
+    else -> PillTone.Accent
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,6 +54,9 @@ fun BatchDetailScreen(batchId: String, onBack: () -> Unit) {
         topBar = {
             TopAppBar(
                 title = { Text(state.batch?.let { "${it.species?.name ?: it.speciesId}" } ?: "Batch") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
+                },
             )
         },
     ) { padding ->
@@ -48,7 +64,10 @@ fun BatchDetailScreen(batchId: String, onBack: () -> Unit) {
             item {
                 if (state.loading) CircularProgressIndicator()
                 state.batch?.let { batch ->
-                    Text("Status: ${batch.status} · ${batch.viableCount} viable", style = MaterialTheme.typography.bodyLarge)
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        StatusPill(batch.status, batchTone(batch.status))
+                        MutedText("${batch.viableCount} viable", modifier = Modifier.padding(start = 8.dp))
+                    }
                 }
                 state.saveError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
@@ -151,9 +170,13 @@ private fun NumberField(label: String, value: String, modifier: Modifier = Modif
 
 @Composable
 private fun CandlingRow(session: CandlingEntity) {
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+    ) {
         Text("Day ${session.dayNo}")
-        Text("fertile ${session.fertile}, clear ${session.clear}")
-        Text(session.status, color = if (session.status == "synced") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
+        MutedText("fertile ${session.fertile}, clear ${session.clear}")
+        StatusPill(session.status, if (session.status == "synced") PillTone.Ok else if (session.status == "conflict") PillTone.Danger else PillTone.Neutral)
     }
 }

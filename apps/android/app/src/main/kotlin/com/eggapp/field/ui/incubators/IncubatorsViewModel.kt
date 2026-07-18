@@ -19,6 +19,7 @@ private const val POLL_INTERVAL_MS = 15_000L
 
 data class IncubatorsUiState(
     val incubators: List<Incubator> = emptyList(),
+    val farmName: String? = null,
     val loading: Boolean = true,
     val error: String? = null,
 )
@@ -37,11 +38,15 @@ class IncubatorsViewModel(application: Application) : AndroidViewModel(applicati
                 _state.value = IncubatorsUiState(loading = false, error = "No farm selected")
                 return@launch
             }
+            val farmName = runCatching { api.farms() }.getOrNull()
+                ?.takeIf { it.isSuccessful }?.body()
+                ?.firstOrNull { it.id == farmId }?.name
+            _state.value = _state.value.copy(farmName = farmName)
             while (isActive) {
                 val result = runCatching { api.incubators(farmId) }
                 val response = result.getOrNull()
                 _state.value = if (response != null && response.isSuccessful) {
-                    IncubatorsUiState(incubators = response.body().orEmpty(), loading = false)
+                    _state.value.copy(incubators = response.body().orEmpty(), loading = false, error = null)
                 } else {
                     _state.value.copy(
                         loading = false,

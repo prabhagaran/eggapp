@@ -19,6 +19,12 @@ data class Farm(
     val role: String,
 )
 
+data class Me(
+    val id: String,
+    val email: String,
+    val name: String?,
+)
+
 data class DeviceSummary(
     val id: String,
     val hardwareId: String,

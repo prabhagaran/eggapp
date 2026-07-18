@@ -8,11 +8,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -31,6 +35,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.eggapp.field.data.Collection
 import com.eggapp.field.data.local.CollectionEntity
+import com.eggapp.field.ui.components.MutedText
+import com.eggapp.field.ui.components.PillTone
+import com.eggapp.field.ui.components.StatusPill
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
@@ -42,7 +49,14 @@ fun CollectionsScreen(viewModel: CollectionsViewModel = viewModel(), onBack: () 
     val state by viewModel.state.collectAsState()
     var discardTarget by remember { mutableStateOf<Collection?>(null) }
 
-    Scaffold(topBar = { TopAppBar(title = { Text("Egg collections") }) }) { padding ->
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Egg collections") },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
+            )
+        },
+    ) { padding ->
         LazyColumn(modifier = Modifier.padding(padding).padding(16.dp)) {
             item {
                 if (state.loading) CircularProgressIndicator()
@@ -128,12 +142,13 @@ private fun CollectionForm(onSave: (String, Int, Double?, String?) -> Unit) {
 
 @Composable
 private fun LocalCollectionRow(entity: CollectionEntity) {
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+    ) {
         Text("${entity.collectedOn} · ${entity.count} eggs")
-        Text(
-            entity.status,
-            color = if (entity.status == "conflict") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        StatusPill(entity.status, if (entity.status == "conflict") PillTone.Danger else PillTone.Neutral)
     }
 }
 
@@ -142,17 +157,21 @@ private fun ServerCollectionRow(c: Collection, onDiscard: () -> Unit) {
     val ageDays = ChronoUnit.DAYS.between(LocalDate.parse(c.collectedOn.take(10)), LocalDate.now())
     val stale = ageDays > STALE_STORAGE_DAYS
 
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("${c.collectedOn.take(10)} · ${c.count} eggs")
-                Text(
-                    "${ageDays}d old",
-                    color = if (stale) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            ) {
+                Text("${c.collectedOn.take(10)} · ${c.count} eggs", style = MaterialTheme.typography.titleSmall)
+                StatusPill("${ageDays}d old", if (stale) PillTone.Warn else PillTone.Neutral)
             }
-            Text("available ${c.availableCount} · assigned ${c.assignedCount} · discarded ${c.discardedCount}")
-            c.sourceNote?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+            MutedText(
+                "available ${c.availableCount} · assigned ${c.assignedCount} · discarded ${c.discardedCount}",
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            c.sourceNote?.let { MutedText(it) }
             if (c.availableCount > 0) {
                 TextButton(onClick = onDiscard) { Text("Discard eggs") }
             }

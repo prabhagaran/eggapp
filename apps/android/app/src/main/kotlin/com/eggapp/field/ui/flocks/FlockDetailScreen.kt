@@ -8,10 +8,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -31,6 +35,9 @@ import com.eggapp.field.data.local.FeedLogEntity
 import com.eggapp.field.data.local.MortalityEntity
 import com.eggapp.field.data.local.VaccinationEntity
 import com.eggapp.field.data.local.WaterLogEntity
+import com.eggapp.field.ui.components.MutedText
+import com.eggapp.field.ui.components.PillTone
+import com.eggapp.field.ui.components.StatusPill
 import java.time.LocalDate
 
 private val STAGE_LABEL = mapOf(
@@ -50,7 +57,14 @@ fun FlockDetailScreen(flockId: String, onBack: () -> Unit) {
     val viewModel: FlockDetailViewModel = viewModel(factory = FlockDetailViewModel.Factory(application, flockId))
     val state by viewModel.state.collectAsState()
 
-    Scaffold(topBar = { TopAppBar(title = { Text(state.flock?.name ?: "Flock") }) }) { padding ->
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(state.flock?.name ?: "Flock") },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
+            )
+        },
+    ) { padding ->
         LazyColumn(modifier = Modifier.padding(padding).padding(16.dp)) {
             item {
                 if (state.loading) CircularProgressIndicator()
@@ -200,34 +214,52 @@ private fun FeedWaterForm(onSaveFeed: (String, Double) -> Unit, onSaveWater: (Do
     }
 }
 
+private fun rowTone(status: String) = if (status == "conflict") PillTone.Danger else if (status == "synced") PillTone.Ok else PillTone.Neutral
+
 @Composable
 private fun MortalityRow(r: MortalityEntity) {
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+    ) {
         Text("${r.date} · ${r.cause} ${r.count}")
-        Text(r.status, color = if (r.status == "conflict") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+        StatusPill(r.status, rowTone(r.status))
     }
 }
 
 @Composable
 private fun VaccinationRow(r: VaccinationEntity) {
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+    ) {
         Text("${r.date} · ${r.vaccine}")
-        Text(r.status, color = if (r.status == "conflict") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+        StatusPill(r.status, rowTone(r.status))
     }
 }
 
 @Composable
 private fun FeedRow(r: FeedLogEntity) {
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+    ) {
         Text("Feed: ${r.feedType} ${r.quantityKg}kg")
-        Text(r.status, color = if (r.status == "conflict") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+        StatusPill(r.status, rowTone(r.status))
     }
 }
 
 @Composable
 private fun WaterRow(r: WaterLogEntity) {
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+    ) {
         Text("Water: ${r.quantityLiters}L")
-        Text(r.status, color = if (r.status == "conflict") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+        StatusPill(r.status, rowTone(r.status))
     }
 }

@@ -1,6 +1,7 @@
 package com.eggapp.field.ui.flocks
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,6 +20,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.eggapp.field.data.Flock
+import com.eggapp.field.ui.components.MutedText
+import com.eggapp.field.ui.components.PillTone
+import com.eggapp.field.ui.components.StatusPill
 
 private val STAGE_LABEL = mapOf(
     "brooding" to "Brooding",
@@ -44,14 +48,17 @@ fun FlocksScreen(viewModel: FlocksViewModel = viewModel(), onOpenFlock: (Flock) 
             }
             LazyColumn {
                 items(state.flocks) { flock ->
-                    Card(modifier = Modifier.fillMaxWidth().padding(12.dp), onClick = { onOpenFlock(flock) }) {
+                    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), onClick = { onOpenFlock(flock) }) {
                         Column(modifier = Modifier.padding(16.dp)) {
-                            Text(flock.name, style = MaterialTheme.typography.titleMedium)
-                            Text(
-                                "${flock.species?.name ?: flock.speciesId} · ${flock.purpose} · ${STAGE_LABEL[flock.stage] ?: flock.stage ?: "—"}",
-                                style = MaterialTheme.typography.bodyMedium,
+                            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                                Text(flock.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                                StatusPill(STAGE_LABEL[flock.stage] ?: flock.stage ?: "—", PillTone.Accent)
+                            }
+                            MutedText(
+                                "${flock.species?.name ?: flock.speciesId} · ${flock.purpose}",
+                                modifier = Modifier.padding(top = 4.dp),
                             )
-                            Text("${flock.currentCount} birds · ${flock.ageDays ?: "—"} days old", style = MaterialTheme.typography.bodySmall)
+                            MutedText("${flock.currentCount} birds · ${flock.ageDays ?: "—"} days old")
                         }
                     }
                 }
