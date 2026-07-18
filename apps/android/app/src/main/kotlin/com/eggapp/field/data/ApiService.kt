@@ -23,6 +23,12 @@ interface ApiService {
     @GET("v1/farms/{farmId}/incubators")
     suspend fun incubators(@Path("farmId") farmId: String): Response<List<Incubator>>
 
+    @GET("v1/farms/{farmId}/incubators/{id}")
+    suspend fun incubator(
+        @Path("farmId") farmId: String,
+        @Path("id") id: String,
+    ): Response<Incubator>
+
     @GET("v1/farms/{farmId}/batches")
     suspend fun batches(
         @Path("farmId") farmId: String,
@@ -58,4 +64,17 @@ interface ApiService {
         @Path("id") id: String,
         @Body body: DiscardRequest,
     ): Response<Collection>
+
+    @POST("v1/farms/{farmId}/incubators/{id}/config")
+    suspend fun pushSetpoints(
+        @Path("farmId") farmId: String,
+        @Path("id") id: String,
+        @Body body: SetpointRequest,
+    ): Response<DeviceConfig>
+
+    @GET("v1/farms/{farmId}/incubators/{id}/config")
+    suspend fun latestConfig(
+        @Path("farmId") farmId: String,
+        @Path("id") id: String,
+    ): Response<DeviceConfig?>
 }

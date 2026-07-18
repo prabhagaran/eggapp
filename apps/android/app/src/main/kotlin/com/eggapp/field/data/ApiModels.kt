@@ -25,6 +25,12 @@ data class DeviceSummary(
     val name: String?,
     val status: String,
     val lastSeenAt: String?,
+    // Snapshot from the device's latest telemetry (US-INC-003) — what
+    // the setpoint form shows before the owner edits it.
+    val currentTempSetpoint: Double?,
+    val currentTempHysteresis: Double?,
+    val currentHumSetpoint: Double?,
+    val currentHumHysteresis: Double?,
 )
 
 data class LatestTelemetry(
@@ -117,4 +123,30 @@ data class Collection(
     val sourceNote: String?,
     val assignedCount: Int,
     val availableCount: Int,
+)
+
+// US-INC-003: at least one field required server-side; all optional here
+// since the form only sends what fits in a partial update.
+data class SetpointRequest(
+    val tempSetpoint: Double? = null,
+    val tempHysteresis: Double? = null,
+    val humSetpoint: Double? = null,
+    val humHysteresis: Double? = null,
+)
+
+data class DeviceConfigPayload(
+    val tempSetpoint: Double?,
+    val tempHysteresis: Double?,
+    val humSetpoint: Double?,
+    val humHysteresis: Double?,
+)
+
+data class DeviceConfig(
+    val id: String,
+    val version: Int,
+    val payload: DeviceConfigPayload,
+    val state: String, // "sent" | "received" | "applied" | "unconfirmed"
+    val sentAt: String,
+    val receivedAt: String?,
+    val appliedAt: String?,
 )

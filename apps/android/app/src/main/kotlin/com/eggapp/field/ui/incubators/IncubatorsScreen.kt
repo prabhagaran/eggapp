@@ -44,6 +44,7 @@ fun IncubatorsScreen(
     onLogout: () -> Unit,
     onOpenBatches: () -> Unit,
     onOpenCollections: () -> Unit,
+    onOpenSetpoints: (String) -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
 
@@ -82,14 +83,14 @@ fun IncubatorsScreen(
                 )
             }
             LazyColumn {
-                items(state.incubators) { inc -> IncubatorCard(inc, now) }
+                items(state.incubators) { inc -> IncubatorCard(inc, now, onOpenSetpoints) }
             }
         }
     }
 }
 
 @Composable
-private fun IncubatorCard(inc: Incubator, nowMillis: Long) {
+private fun IncubatorCard(inc: Incubator, nowMillis: Long, onOpenSetpoints: (String) -> Unit) {
     Card(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(inc.name, style = MaterialTheme.typography.titleMedium)
@@ -116,6 +117,11 @@ private fun IncubatorCard(inc: Incubator, nowMillis: Long) {
                         color = if (fresh) MaterialTheme.colorScheme.onSurfaceVariant
                         else MaterialTheme.colorScheme.error,
                     )
+                }
+            }
+            if (device != null) {
+                TextButton(onClick = { onOpenSetpoints(inc.id) }, modifier = Modifier.padding(top = 4.dp)) {
+                    Text("Setpoints")
                 }
             }
         }

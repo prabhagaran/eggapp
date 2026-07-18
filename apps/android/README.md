@@ -125,6 +125,33 @@ with a reason through the real dialog — confirmed via OkHttp (`200 OK`)
 and the UI updating to `available 37 · discarded 3`. Test farm/user
 cleaned up by exact ID afterward; real account confirmed untouched.
 
+## Status (fifth increment, 2026-07-18): remote setpoint control (US-INC-003, Android)
+
+Extends the web-only setpoint control (see the backend/web increment
+notes) to the field app — reuses the same `POST`/`GET
+.../incubators/:id/config` endpoints, no backend changes needed.
+
+- **`ui/incubators/SetpointsScreen.kt` + `SetpointsViewModel.kt`**:
+  reachable via a "Setpoints" button on each incubator card (only shown
+  when a device is bound). Fetches the incubator by id (same idiom as
+  `BatchDetailViewModel` — not passed the full object through nav args),
+  prefills temp/humidity setpoint + hysteresis from the device's latest
+  telemetry snapshot, and polls `GET .../config` every 3s while the ack
+  state is `sent` or `received`, stopping once it reaches `applied` or
+  `unconfirmed`.
+
+**Verified for real, full chain, on the emulator**: isolated test
+incubator/device, logged in through the real UI, confirmed the form
+prefilled with the device's actual current values (37.5/0.3/60.0/3.0),
+changed the temp setpoint and submitted — confirmed via OkHttp logs the
+real `POST .../config` call and the resulting `DeviceConfig` row.
+Published fake `received` then `applied` acks via `mosquitto_pub` (same
+technique used for the backend/web verification) and watched the
+screen's live polling correctly progress through **"v1: sent — waiting
+for device"** → **"v1: received by device — applying"** → **"v1:
+applied ✓"** with no manual refresh. Test farm/device cleaned up by
+exact ID afterward; real account confirmed untouched.
+
 ## Toolchain used to build/verify this (none of it required a separate install)
 
 - **JDK**: Android Studio's bundled JBR (`Android Studio/jbr`, OpenJDK 21)
@@ -153,10 +180,12 @@ in the repo and used afterward).
 ## Configuration
 
 `API_BASE_URL` is set in `app/build.gradle.kts` (`buildConfigField`) —
-currently hardcoded to the Radxa's LAN IP (`http://192.168.1.44:3001/`),
-matching how the firmware points at the broker. Revisit if this ever
-needs to be configurable per-build (e.g. a release variant hitting a
-different host).
+points at the Radxa's **Tailscale** address (`http://100.92.177.99:3001/`),
+not its LAN IP. A Tailscale address is reachable whether the phone is on
+home WiFi or anywhere else with internet, as long as Tailscale is
+connected on both ends (Radxa + phone) — no separate home/away config.
+Revisit if this ever needs to be configurable per-build (e.g. a release
+variant hitting a different host).
 
 ## Package structure
 
@@ -169,7 +198,7 @@ com.eggapp.field/
   data/local/            Room: CandlingEntity/HatchEntity/CollectionEntity, DAO, Database
   sync/                  SyncWorker (WorkManager)
   ui/login/               Login screen + ViewModel
-  ui/incubators/          Incubator list screen + ViewModel
+  ui/incubators/          Incubator list + setpoint control screens/ViewModels
   ui/batch/               Batches list, batch detail + candling/hatch forms
   ui/collections/         Egg collection recording + discard
   ui/theme/               Compose theme (brand color matches apps/web)
