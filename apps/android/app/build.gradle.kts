@@ -16,11 +16,14 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
-        // Overridden per build type below — points at the always-on API
-        // deployed to the Radxa (ADR 0006/0007), not localhost (the phone
-        // is a separate device on the network, same reasoning as the
-        // firmware's MQTT_BROKER_HOST).
-        buildConfigField("String", "API_BASE_URL", "\"http://192.168.1.44:3001/\"")
+        // Points at the always-on API deployed to the Radxa (ADR 0006/0007),
+        // not localhost (the phone is a separate device on the network,
+        // same reasoning as the firmware's MQTT_BROKER_HOST). Uses the
+        // Radxa's Tailscale address, not its LAN IP (192.168.1.44) — a
+        // Tailscale address is reachable whether the phone is on home
+        // WiFi or anywhere else, as long as Tailscale is connected on
+        // both ends, so there's no separate home/away configuration.
+        buildConfigField("String", "API_BASE_URL", "\"http://100.92.177.99:3001/\"")
     }
 
     buildTypes {
