@@ -6,6 +6,7 @@ import { checkDeviceSilence } from "./services/alert.service.js";
 import { checkUnconfirmedConfigs } from "./services/deviceConfig.service.js";
 import { checkVaccinationDue } from "./services/vaccination.service.js";
 import { checkConsumptionAnomalies } from "./services/feedwater.service.js";
+import { checkStockAlerts } from "./services/inventory.service.js";
 
 const app = buildApp();
 
@@ -59,5 +60,15 @@ const consumptionAnomalyInterval = setInterval(() => {
 }, 15 * 60_000);
 app.addHook("onClose", (_instance, done) => {
   clearInterval(consumptionAnomalyInterval);
+  done();
+});
+
+// US-INV-003: stock levels/expiry drift slowly — same 15-minute cadence
+// as the vaccination/consumption checks above.
+const stockAlertInterval = setInterval(() => {
+  checkStockAlerts(app.log).catch((err) => app.log.error({ err }, "[inventory] stock alert check failed"));
+}, 15 * 60_000);
+app.addHook("onClose", (_instance, done) => {
+  clearInterval(stockAlertInterval);
   done();
 });

@@ -10,6 +10,7 @@ const feedSchema = z.object({
   loggedAt: z.coerce.date(),
   feedType: z.string().min(1).max(120),
   quantityKg: z.number().positive(),
+  inventoryItemId: z.uuid().optional(),
   clientId: z.uuid().optional(),
 });
 

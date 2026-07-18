@@ -53,3 +53,9 @@ export const FLOCK_STAGES = [
   "broiler_finisher",
 ] as const;
 export type FlockStage = (typeof FLOCK_STAGES)[number];
+
+export const INVENTORY_ITEM_KINDS = ["feed", "vaccine", "consumable"] as const;
+export type InventoryItemKind = (typeof INVENTORY_ITEM_KINDS)[number];
+
+export const STOCK_TRANSACTION_CAUSES = ["feed_log", "vaccination", "manual"] as const;
+export type StockTransactionCause = (typeof STOCK_TRANSACTION_CAUSES)[number];

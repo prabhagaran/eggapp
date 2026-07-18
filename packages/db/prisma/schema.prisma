@@ -53,6 +53,7 @@ model Farm {
   alerts                   Alert[]
   flocks                   Flock[]
   vaccinationTemplateItems VaccinationTemplateItem[]
+  inventoryItems           InventoryItem[]
 }
 
 model FarmMembership {
@@ -338,20 +339,21 @@ model AlertRule {
 }
 
 model Alert {
-  id          String        @id @default(uuid())
-  farmId      String
-  ruleId      String?
-  incubatorId String?
-  deviceId    String?
-  flockId     String? // US-FED-003/US-WTR-002 consumption anomalies
-  severity    AlertSeverity
-  state       AlertState    @default(open)
-  message     String
-  triggeredAt DateTime      @default(now())
-  ackedAt     DateTime?
-  ackedById   String? // User id (cross-context, no FK)
-  resolvedAt  DateTime?
-  farm        Farm          @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  id              String        @id @default(uuid())
+  farmId          String
+  ruleId          String?
+  incubatorId     String?
+  deviceId        String?
+  flockId         String? // US-FED-003/US-WTR-002 consumption anomalies
+  inventoryItemId String? // US-INV-003 low-stock/expiry warnings
+  severity        AlertSeverity
+  state           AlertState    @default(open)
+  message         String
+  triggeredAt     DateTime      @default(now())
+  ackedAt         DateTime?
+  ackedById       String? // User id (cross-context, no FK)
+  resolvedAt      DateTime?
+  farm            Farm          @relation(fields: [farmId], references: [id], onDelete: Cascade)
 
   @@index([farmId, state, triggeredAt(sort: Desc)])
 }
@@ -456,45 +458,49 @@ model VaccinationTemplateItem {
 // amendsRecordId always points at the true original (not the previous
 // amendment), so every amendment in a chain is one hop from the source.
 model VaccinationRecord {
-  id             String                   @id @default(uuid())
-  flockId        String
-  templateItemId String?
-  date           DateTime
-  vaccine        String
-  disease        String
-  manufacturer   String?
-  lotNumber      String?
-  expiry         DateTime?
-  route          String
-  dose           String?
-  count          Int
-  administeredBy String
-  reactions      String?
-  nextDueDate    DateTime?
-  amendsRecordId String?
-  recordedById   String? // User id (cross-context, no FK)
-  clientId       String?                  @unique // offline-sync idempotency (BR-010)
-  createdAt      DateTime                 @default(now())
-  flock          Flock                    @relation(fields: [flockId], references: [id], onDelete: Cascade)
-  templateItem   VaccinationTemplateItem? @relation(fields: [templateItemId], references: [id])
-  amendsRecord   VaccinationRecord?       @relation("Amendment", fields: [amendsRecordId], references: [id])
-  amendments     VaccinationRecord[]      @relation("Amendment")
+  id              String                   @id @default(uuid())
+  flockId         String
+  templateItemId  String?
+  date            DateTime
+  vaccine         String
+  disease         String
+  manufacturer    String?
+  lotNumber       String?
+  expiry          DateTime?
+  route           String
+  dose            String?
+  count           Int
+  administeredBy  String
+  reactions       String?
+  nextDueDate     DateTime?
+  amendsRecordId  String?
+  inventoryItemId String? // US-INV-002 auto-deduction source
+  recordedById    String? // User id (cross-context, no FK)
+  clientId        String?                  @unique // offline-sync idempotency (BR-010)
+  createdAt       DateTime                 @default(now())
+  flock           Flock                    @relation(fields: [flockId], references: [id], onDelete: Cascade)
+  templateItem    VaccinationTemplateItem? @relation(fields: [templateItemId], references: [id])
+  amendsRecord    VaccinationRecord?       @relation("Amendment", fields: [amendsRecordId], references: [id])
+  amendments      VaccinationRecord[]      @relation("Amendment")
+  inventoryItem   InventoryItem?           @relation(fields: [inventoryItemId], references: [id])
 
   @@index([flockId, date(sort: Desc)])
 }
 
 // BR-012: one record per flock per check, standardized units.
 model FeedLog {
-  id            String   @id @default(uuid())
-  flockId       String
-  loggedAt      DateTime
-  feedType      String
-  quantityKg    Float
-  stageMismatch Boolean  @default(false) // US-FED-002, computed at write time
-  recordedById  String?
-  clientId      String?  @unique // offline-sync idempotency (BR-010)
-  createdAt     DateTime @default(now())
-  flock         Flock    @relation(fields: [flockId], references: [id], onDelete: Cascade)
+  id              String         @id @default(uuid())
+  flockId         String
+  loggedAt        DateTime
+  feedType        String
+  quantityKg      Float
+  stageMismatch   Boolean        @default(false) // US-FED-002, computed at write time
+  inventoryItemId String? // US-INV-002 auto-deduction source
+  recordedById    String?
+  clientId        String?        @unique // offline-sync idempotency (BR-010)
+  createdAt       DateTime       @default(now())
+  flock           Flock          @relation(fields: [flockId], references: [id], onDelete: Cascade)
+  inventoryItem   InventoryItem? @relation(fields: [inventoryItemId], references: [id])
 
   @@index([flockId, loggedAt(sort: Desc)])
 }
@@ -510,4 +516,52 @@ model WaterLog {
   flock          Flock    @relation(fields: [flockId], references: [id], onDelete: Cascade)
 
   @@index([flockId, loggedAt(sort: Desc)])
+}
+
+// ── Inventory (Phase 3) ──────────────────────────────────────────
+
+enum InventoryItemKind {
+  feed
+  vaccine
+  consumable
+}
+
+enum StockTransactionCause {
+  feed_log
+  vaccination
+  manual
+}
+
+model InventoryItem {
+  id                 String              @id @default(uuid())
+  farmId             String
+  kind               InventoryItemKind
+  name               String
+  unit               String // "kg" | "L" | "doses" | free text
+  quantity           Float               @default(0) // current stock — updated transactionally alongside each StockTransaction, not derived on read
+  lotNumber          String?
+  expiry             DateTime?
+  lowStockThreshold  Float?
+  createdAt          DateTime            @default(now())
+  farm               Farm                @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  transactions       StockTransaction[]
+  feedLogs           FeedLog[]
+  vaccinationRecords VaccinationRecord[]
+
+  @@index([farmId])
+}
+
+// Audit ledger for every quantity change — InventoryItem.quantity is the
+// fast-read current value, this is the append-only history behind it.
+model StockTransaction {
+  id        String                @id @default(uuid())
+  itemId    String
+  delta     Float // negative = deduction, positive = restock/correction
+  cause     StockTransactionCause
+  refId     String? // FeedLog.id / VaccinationRecord.id that triggered this, null for manual
+  note      String?
+  createdAt DateTime              @default(now())
+  item      InventoryItem         @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId, createdAt(sort: Desc)])
 }

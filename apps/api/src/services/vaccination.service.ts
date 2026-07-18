@@ -5,6 +5,7 @@ import { ageDaysFrom, birthDate } from "../domain/flock.js";
 import { getPrisma } from "../infra/db.js";
 import { sendPush } from "../infra/fcm/client.js";
 import { AppError } from "../lib/errors.js";
+import { deductStock } from "./inventory.service.js";
 
 export interface TemplateItemInput {
   speciesId: string;
@@ -113,6 +114,7 @@ export interface RecordVaccinationInput {
   reactions?: string;
   nextDueDate?: Date;
   amendsRecordId?: string; // BR-005: correcting an existing record
+  inventoryItemId?: string;
   clientId?: string;
   recordedById?: string;
 }
@@ -160,10 +162,16 @@ export async function recordVaccination(farmId: string, flockId: string, input: 
         reactions: input.reactions,
         nextDueDate: input.nextDueDate,
         amendsRecordId,
+        inventoryItemId: input.inventoryItemId,
         clientId: input.clientId,
         recordedById: input.recordedById,
       },
     });
+    // US-INV-002: dose count deducted from the referenced vaccine item,
+    // same transaction as the (immutable, BR-005) record it came from.
+    if (input.inventoryItemId) {
+      await deductStock(tx, farmId, input.inventoryItemId, -input.count, "vaccination", record.id);
+    }
     return { record, replay: false };
   });
 }

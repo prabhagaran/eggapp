@@ -33,6 +33,7 @@ const recordSchema = z.object({
   reactions: z.string().max(300).optional(),
   nextDueDate: z.coerce.date().optional(),
   amendsRecordId: z.uuid().optional(),
+  inventoryItemId: z.uuid().optional(),
   clientId: z.uuid().optional(),
 });
 

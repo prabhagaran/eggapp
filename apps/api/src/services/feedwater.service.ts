@@ -3,6 +3,7 @@ import { ageDaysFrom, birthDate, deriveStage, expectedFeedKeyword } from "../dom
 import { getPrisma } from "../infra/db.js";
 import { sendPush } from "../infra/fcm/client.js";
 import { AppError } from "../lib/errors.js";
+import { deductStock } from "./inventory.service.js";
 
 // US-FED-003/US-WTR-002: >20% drop vs the flock's 7-day trailing average,
 // sustained across 2 consecutive logs. The "spike alongside falling feed
@@ -23,6 +24,7 @@ export interface FeedLogInput {
   loggedAt: Date;
   feedType: string;
   quantityKg: number;
+  inventoryItemId?: string;
   clientId?: string;
   recordedById?: string;
 }
@@ -52,16 +54,24 @@ export async function recordFeedLog(farmId: string, flockId: string, input: Feed
     stageMismatch = !input.feedType.toLowerCase().includes(expected);
   }
 
-  const log = await prisma.feedLog.create({
-    data: {
-      flockId,
-      loggedAt: input.loggedAt,
-      feedType: input.feedType,
-      quantityKg: input.quantityKg,
-      stageMismatch,
-      clientId: input.clientId,
-      recordedById: input.recordedById,
-    },
+  const log = await prisma.$transaction(async (tx) => {
+    const log = await tx.feedLog.create({
+      data: {
+        flockId,
+        loggedAt: input.loggedAt,
+        feedType: input.feedType,
+        quantityKg: input.quantityKg,
+        stageMismatch,
+        inventoryItemId: input.inventoryItemId,
+        clientId: input.clientId,
+        recordedById: input.recordedById,
+      },
+    });
+    // US-INV-002: a log never exists without its stock deduction landing too.
+    if (input.inventoryItemId) {
+      await deductStock(tx, farmId, input.inventoryItemId, -input.quantityKg, "feed_log", log.id);
+    }
+    return log;
   });
   return { log, replay: false };
 }
