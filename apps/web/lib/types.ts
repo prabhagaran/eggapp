@@ -23,6 +23,27 @@ export interface DeviceSummary {
   name: string | null;
   status: DeviceStatus;
   lastSeenAt: string | null;
+  currentTempSetpoint: number | null;
+  currentTempHysteresis: number | null;
+  currentHumSetpoint: number | null;
+  currentHumHysteresis: number | null;
+}
+
+export type ConfigState = "sent" | "received" | "applied" | "unconfirmed";
+
+export interface DeviceConfig {
+  id: string;
+  version: number;
+  payload: {
+    tempSetpoint?: number;
+    tempHysteresis?: number;
+    humSetpoint?: number;
+    humHysteresis?: number;
+  };
+  state: ConfigState;
+  sentAt: string;
+  receivedAt: string | null;
+  appliedAt: string | null;
 }
 
 export interface LatestTelemetry {

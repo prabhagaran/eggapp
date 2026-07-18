@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import type { Incubator, Species } from "../../lib/types";
@@ -108,6 +109,9 @@ export default function IncubatorsPage() {
                 </span>
               </div>
             )}
+            <div style={{ marginTop: "0.5rem" }}>
+              <Link href={`/incubators/${inc.id}`}>History →</Link>
+            </div>
           </div>
         ))}
       </div>
