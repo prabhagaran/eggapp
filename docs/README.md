@@ -82,9 +82,12 @@ genuine offline/reconnect testing and a full MQTT→Alert→push chain;
 BLE not yet — the only remaining P1 Android gap, blocked on firmware),
 `packages/db` (Prisma + Species seed,
 [setup steps](../packages/db/README.md)), `packages/shared-types`
-(canonical enums), `infra/docker` (Mosquitto) + `infra/systemd`/`infra/deploy` (apps/api) —
-both deployed and running on the always-on Radxa host per ADR 0006/0007,
-not the dev machine — `.github/workflows/ci.yml`.
+(canonical enums), `infra/docker` (Mosquitto) + `infra/systemd`/`infra/deploy`
+(apps/api **and now apps/web**, both via systemd) — all deployed and
+running on the always-on Radxa host per ADR 0006/0007, not the dev
+machine — reachable on the LAN at `192.168.1.44:3001` (API) and
+`192.168.1.44:3000` (dashboard); not reachable outside the home network
+yet (Tailscale/tunnel — not started) — `.github/workflows/ci.yml`.
 
 **Firmware** (separate repo, `egg-incubator-esp32-rtos`): MQTT publish
 added alongside the pre-existing Google Sheets telemetry path (both run

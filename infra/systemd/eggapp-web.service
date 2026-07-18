@@ -1,0 +1,31 @@
+# Installed on the Radxa at /etc/systemd/system/eggapp-web.service.
+# Not symlinked from here — systemd needs it in that exact path, and this
+# copy exists so the unit definition is version-controlled. Re-copy +
+# `systemctl daemon-reload` after editing this file (see infra/deploy/README.md).
+[Unit]
+Description=eggAPP web dashboard (Next.js)
+After=network-online.target eggapp-api.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=radxa
+WorkingDirectory=/home/radxa/eggapp-app/apps/web
+# Calling next directly, not via `pnpm start` — pnpm's `--` arg
+# forwarding preserves a literal `--` in front of the flags, which
+# Next's CLI then treats as an end-of-options marker, making `-p` a
+# positional arg (interpreted as the project directory) instead of a
+# flag. Observed directly: `pnpm start -- -p 3000 -H 0.0.0.0` fails
+# with "Invalid project directory provided, no such directory: .../-p".
+# node_modules/.bin/next is pnpm's shell-script shim (#!/bin/sh), not a
+# JS file — it must be run as an executable itself, not passed to node
+# (which errors trying to parse the shell script as JavaScript).
+ExecStart=/home/radxa/eggapp-app/apps/web/node_modules/.bin/next start -p 3000 -H 0.0.0.0
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=eggapp-web
+
+[Install]
+WantedBy=multi-user.target
