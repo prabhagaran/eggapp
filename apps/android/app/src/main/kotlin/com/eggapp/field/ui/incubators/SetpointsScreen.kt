@@ -8,6 +8,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -28,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.eggapp.field.ui.components.DropdownField
 import com.eggapp.field.ui.components.MutedText
 import com.eggapp.field.ui.components.PillTone
 import com.eggapp.field.ui.components.StatusPill
@@ -73,6 +75,15 @@ fun SetpointsScreen(incubatorId: String, onBack: () -> Unit) {
         Column(modifier = Modifier.padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (state.loading) CircularProgressIndicator()
             state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+
+            state.incubator?.let { incubator ->
+                IncubatorEditCard(
+                    incubator = incubator,
+                    species = state.species,
+                    saving = state.savingIncubator,
+                    onSave = viewModel::updateIncubator,
+                )
+            }
 
             OutlinedTextField(
                 value = tempSetpoint,
@@ -128,6 +139,47 @@ fun SetpointsScreen(incubatorId: String, onBack: () -> Unit) {
                     },
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun IncubatorEditCard(
+    incubator: com.eggapp.field.data.Incubator,
+    species: List<com.eggapp.field.data.Species>,
+    saving: Boolean,
+    onSave: (String, Int, String?) -> Unit,
+) {
+    // Keyed on incubator.id so a fresh load re-seeds the form, but the
+    // user's in-progress edits survive unrelated recompositions (same
+    // idiom as apps/web's key={editing?.id} remount trick).
+    var name by remember(incubator.id) { mutableStateOf(incubator.name) }
+    var capacity by remember(incubator.id) { mutableStateOf(incubator.capacity.toString()) }
+    var speciesId by remember(incubator.id) { mutableStateOf(incubator.defaultSpeciesId ?: "") }
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Incubator settings", style = MaterialTheme.typography.titleMedium)
+            OutlinedTextField(name, { name = it }, label = { Text("Name") }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(
+                capacity, { capacity = it }, label = { Text("Capacity (eggs)") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            DropdownField(
+                label = "Default species",
+                selectedValue = speciesId,
+                options = listOf("" to "—") + species.map { it.id to it.name },
+                onSelect = { speciesId = it },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Button(
+                enabled = !saving,
+                onClick = {
+                    val cap = capacity.toIntOrNull()
+                    if (name.isNotBlank() && cap != null) onSave(name, cap, speciesId.ifBlank { null })
+                },
+            ) { Text(if (saving) "Saving…" else "Save incubator") }
         }
     }
 }

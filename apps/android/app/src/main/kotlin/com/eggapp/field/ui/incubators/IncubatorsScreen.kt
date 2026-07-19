@@ -136,9 +136,12 @@ private fun HeroStatCard(label: String, value: String, total: String, modifier: 
 
 @Composable
 private fun IncubatorCard(inc: Incubator, nowMillis: Long, onOpenSetpoints: (String) -> Unit) {
+    // Always navigable — that screen also holds incubator name/capacity/
+    // species editing (Phase 4), which applies whether or not a device
+    // is bound yet, not just to devices with live setpoints.
     Card(
         modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-        onClick = { if (inc.device != null) onOpenSetpoints(inc.id) },
+        onClick = { onOpenSetpoints(inc.id) },
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {

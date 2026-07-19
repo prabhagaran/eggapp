@@ -6,10 +6,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.eggapp.field.data.ApiClient
+import com.eggapp.field.data.CLEAR
 import com.eggapp.field.data.DeviceConfig
 import com.eggapp.field.data.Incubator
 import com.eggapp.field.data.SetpointRequest
+import com.eggapp.field.data.Species
 import com.eggapp.field.data.TokenStore
+import com.eggapp.field.data.jsonPatchBody
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,8 +22,10 @@ import kotlinx.coroutines.launch
 data class SetpointsUiState(
     val incubator: Incubator? = null,
     val config: DeviceConfig? = null,
+    val species: List<Species> = emptyList(),
     val loading: Boolean = true,
     val saving: Boolean = false,
+    val savingIncubator: Boolean = false,
     val error: String? = null,
 )
 
@@ -47,7 +52,33 @@ class SetpointsViewModel(application: Application, private val incubatorId: Stri
                 val incResponse = runCatching { api.incubator(farm, incubatorId) }.getOrNull()
                 _state.value = _state.value.copy(incubator = incResponse?.body(), loading = false)
             }
+            viewModelScope.launch {
+                val speciesList = runCatching { api.species() }.getOrNull()?.body().orEmpty()
+                _state.value = _state.value.copy(species = speciesList)
+            }
             reloadConfig()
+        }
+    }
+
+    fun updateIncubator(name: String, capacity: Int, defaultSpeciesId: String?) {
+        val farm = farmId ?: return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(savingIncubator = true, error = null)
+            val body = jsonPatchBody(
+                "name" to name,
+                "capacity" to capacity,
+                "defaultSpeciesId" to (defaultSpeciesId ?: CLEAR),
+            )
+            val result = runCatching { api.updateIncubator(farm, incubatorId, body) }
+            val response = result.getOrNull()
+            if (response != null && response.isSuccessful) {
+                _state.value = _state.value.copy(savingIncubator = false, incubator = response.body())
+            } else {
+                _state.value = _state.value.copy(
+                    savingIncubator = false,
+                    error = result.exceptionOrNull()?.message ?: "Failed to save incubator",
+                )
+            }
         }
     }
 
