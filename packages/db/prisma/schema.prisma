@@ -387,6 +387,16 @@ enum MortalityCause {
   sale
 }
 
+enum FlockStage {
+  brooding
+  grower
+  pre_lay
+  layer
+  broiler_starter
+  broiler_grower
+  broiler_finisher
+}
+
 model Flock {
   id                 String              @id @default(uuid())
   farmId             String
@@ -402,6 +412,10 @@ model Flock {
   acquisitionAgeDays Int?
   acquisitionNote    String?
   placedCount        Int // ledger base — current count is always derived, never edited directly (BR-009)
+  // Manual correction for when derived stage (purpose + age) doesn't match
+  // reality — age/origin data entered wrong at creation, etc. Null means
+  // "derive from age" (the default); set means "use this instead."
+  stageOverride      FlockStage?
   createdAt          DateTime            @default(now())
   farm               Farm                @relation(fields: [farmId], references: [id], onDelete: Cascade)
   species            Species             @relation(fields: [speciesId], references: [id])

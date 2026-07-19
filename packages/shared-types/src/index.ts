@@ -47,7 +47,6 @@ export const FLOCK_STAGES = [
   "grower",
   "pre_lay",
   "layer",
-  "spent",
   "broiler_starter",
   "broiler_grower",
   "broiler_finisher",
