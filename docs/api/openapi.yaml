@@ -270,6 +270,22 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Incubator" }
         "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [incubators]
+      summary: Edit name/capacity/default species — manager+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, maxLength: 120 }
+                capacity: { type: integer, minimum: 1 }
+                defaultSpeciesId: { type: string, nullable: true }
+      responses:
+        "200": { description: Updated incubator, content: { application/json: { schema: { $ref: "#/components/schemas/Incubator" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /v1/farms/{farmId}/incubators/{id}/history:
     parameters:
@@ -756,6 +772,24 @@ paths:
       responses:
         "200": { description: Flock with relations, content: { application/json: { schema: { $ref: "#/components/schemas/FlockDetail" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [flocks]
+      summary: Edit name/species/purpose/provenance note — manager+
+      description: Cosmetic/classification fields only — placedCount and origin (hatchEventId / acquisitionDate+acquisitionAgeDays) are immutable (BR-009 traceability).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, maxLength: 120 }
+                speciesId: { type: string }
+                purpose: { type: string, enum: [layer, broiler, breeder] }
+                acquisitionNote: { type: string, maxLength: 300 }
+      responses:
+        "200": { description: Updated flock, content: { application/json: { schema: { $ref: "#/components/schemas/FlockDetail" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /v1/farms/{farmId}/flocks/{id}/mortality:
     parameters:
@@ -838,6 +872,26 @@ paths:
     parameters:
       - { $ref: "#/components/parameters/farmId" }
       - { $ref: "#/components/parameters/id" }
+    patch:
+      tags: [flocks]
+      summary: Edit a vaccination schedule template item — manager+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                speciesId: { type: string }
+                purpose: { type: string, enum: [layer, broiler, breeder] }
+                ageDaysFrom: { type: integer, minimum: 0 }
+                ageDaysTo: { type: integer, minimum: 0 }
+                vaccine: { type: string, maxLength: 120 }
+                disease: { type: string, maxLength: 120 }
+                route: { type: string, maxLength: 60 }
+      responses:
+        "200": { description: Updated item, content: { application/json: { schema: { $ref: "#/components/schemas/VaccinationTemplateItem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
     delete:
       tags: [flocks]
       summary: Delete a vaccination schedule template item — manager+
@@ -1032,6 +1086,25 @@ paths:
       summary: Item detail — includes the last 50 stock transactions
       responses:
         "200": { description: Item with transaction history, content: { application/json: { schema: { $ref: "#/components/schemas/InventoryItemDetail" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [inventory]
+      summary: Edit name/unit/lot/expiry/threshold — manager+
+      description: kind and quantity aren't editable here — kind shouldn't change mid-life, and quantity only ever changes through the adjust endpoint or auto-deduction, so every change stays in the StockTransaction ledger.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, maxLength: 120 }
+                unit: { type: string, maxLength: 20 }
+                lotNumber: { type: string, maxLength: 60 }
+                expiry: { type: string, format: date-time }
+                lowStockThreshold: { type: number, minimum: 0 }
+      responses:
+        "200": { description: Updated item, content: { application/json: { schema: { $ref: "#/components/schemas/InventoryItem" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
     delete:
       tags: [inventory]
