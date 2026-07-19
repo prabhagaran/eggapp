@@ -44,7 +44,11 @@ export function buildApp() {
   // boundary here, so reflect any origin rather than maintaining an
   // allowlist for every place the dashboard might be opened from
   // (dev laptop, phone on the LAN, the Radxa itself later).
-  app.register(cors, { origin: true });
+  // @fastify/cors defaults `methods` to "GET,HEAD,POST" — PATCH/DELETE
+  // must be listed explicitly or every edit/delete request fails CORS
+  // preflight in the browser (curl-based testing never surfaces this,
+  // since curl doesn't send a preflight).
+  app.register(cors, { origin: true, methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"] });
   app.register(authPlugin);
   app.register(healthRoutes);
   app.register(v1Routes, { prefix: "/v1" });
