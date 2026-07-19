@@ -2,7 +2,7 @@
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../../../lib/api";
-import type { ComplianceItem, FlockDetail, InventoryItem } from "../../../lib/types";
+import type { ComplianceItem, FlockDetail, InventoryItem, Species } from "../../../lib/types";
 import { fmtDate, useAuthedFarm } from "../../../lib/useAuthedFarm";
 
 const STAGE_LABEL: Record<string, string> = {
@@ -28,6 +28,8 @@ export default function FlockDetailPage() {
   const [flock, setFlock] = useState<FlockDetail | null>(null);
   const [compliance, setCompliance] = useState<ComplianceItem[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [species, setSpecies] = useState<Species[]>([]);
+  const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(() => {
@@ -38,9 +40,31 @@ export default function FlockDetailPage() {
   useEffect(reload, [reload]);
   useEffect(() => {
     if (farmId) api<InventoryItem[]>(`/v1/farms/${farmId}/inventory`).then(setInventory);
+    api<Species[]>("/v1/species").then(setSpecies);
   }, [farmId]);
   const vaccineItems = inventory.filter((i) => i.kind === "vaccine");
   const feedItems = inventory.filter((i) => i.kind === "feed");
+
+  async function onSaveEdit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    setError(null);
+    try {
+      await api(`/v1/farms/${farmId}/flocks/${id}`, {
+        method: "PATCH",
+        body: {
+          name: f.get("name"),
+          speciesId: f.get("speciesId"),
+          purpose: f.get("purpose"),
+          acquisitionNote: f.get("acquisitionNote") || undefined,
+        },
+      });
+      setEditing(false);
+      reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed");
+    }
+  }
 
   async function post(path: string, body: unknown) {
     setError(null);
@@ -112,8 +136,47 @@ export default function FlockDetailPage() {
   if (!farmId || !flock) return null;
   return (
     <>
-      <h1>{flock.name}</h1>
+      <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+        <h1>{flock.name}</h1>
+        <button className="secondary" onClick={() => setEditing((v) => !v)}>
+          {editing ? "Cancel" : "Edit"}
+        </button>
+      </div>
       {error && <p className="alert-error">{error}</p>}
+
+      {editing && (
+        <div className="card">
+          <form className="row" onSubmit={onSaveEdit}>
+            <label>
+              Name
+              <input name="name" required defaultValue={flock.name} />
+            </label>
+            <label>
+              Species
+              <select name="speciesId" required defaultValue={flock.speciesId}>
+                {species.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Purpose
+              <select name="purpose" required defaultValue={flock.purpose}>
+                <option value="layer">Layer</option>
+                <option value="broiler">Broiler</option>
+                <option value="breeder">Breeder</option>
+              </select>
+            </label>
+            <label>
+              Provenance note
+              <input name="acquisitionNote" defaultValue={flock.acquisitionNote ?? ""} />
+            </label>
+            <button className="primary">Save changes</button>
+          </form>
+        </div>
+      )}
 
       <div className="metrics card">
         <span className="stat">

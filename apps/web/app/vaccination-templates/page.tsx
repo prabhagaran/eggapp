@@ -12,6 +12,7 @@ export default function VaccinationTemplatesPage() {
   const [rows, setRows] = useState<VaccinationTemplateItem[] | null>(null);
   const [species, setSpecies] = useState<Species[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState<VaccinationTemplateItem | null>(null);
 
   const reload = useCallback(() => {
     if (farmId) api<VaccinationTemplateItem[]>(`/v1/farms/${farmId}/vaccination-templates`).then(setRows);
@@ -31,25 +32,28 @@ export default function VaccinationTemplatesPage() {
     }
   }
 
-  async function onCreate(e: React.FormEvent<HTMLFormElement>) {
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = e.currentTarget;
     const f = new FormData(form);
     setError(null);
+    const body = {
+      speciesId: f.get("speciesId"),
+      purpose: f.get("purpose"),
+      ageDaysFrom: Number(f.get("ageDaysFrom")),
+      ageDaysTo: Number(f.get("ageDaysTo")),
+      vaccine: f.get("vaccine"),
+      disease: f.get("disease"),
+      route: f.get("route"),
+    };
     try {
-      await api(`/v1/farms/${farmId}/vaccination-templates`, {
-        method: "POST",
-        body: {
-          speciesId: f.get("speciesId"),
-          purpose: f.get("purpose"),
-          ageDaysFrom: Number(f.get("ageDaysFrom")),
-          ageDaysTo: Number(f.get("ageDaysTo")),
-          vaccine: f.get("vaccine"),
-          disease: f.get("disease"),
-          route: f.get("route"),
-        },
-      });
-      form.reset();
+      if (editing) {
+        await api(`/v1/farms/${farmId}/vaccination-templates/${editing.id}`, { method: "PATCH", body });
+        setEditing(null);
+      } else {
+        await api(`/v1/farms/${farmId}/vaccination-templates`, { method: "POST", body });
+        form.reset();
+      }
       reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
@@ -57,6 +61,7 @@ export default function VaccinationTemplatesPage() {
   }
 
   async function onDelete(id: string) {
+    if (!window.confirm("Delete this vaccination template item?")) return;
     setError(null);
     try {
       await api(`/v1/farms/${farmId}/vaccination-templates/${id}`, { method: "DELETE" });
@@ -82,10 +87,10 @@ export default function VaccinationTemplatesPage() {
       )}
 
       <div className="card">
-        <form className="row" onSubmit={onCreate}>
+        <form className="row" onSubmit={onSubmit} key={editing?.id ?? "create"}>
           <label>
             Species
-            <select name="speciesId" required defaultValue="">
+            <select name="speciesId" required defaultValue={editing?.speciesId ?? ""}>
               <option value="" disabled>
                 —
               </option>
@@ -98,7 +103,7 @@ export default function VaccinationTemplatesPage() {
           </label>
           <label>
             Purpose
-            <select name="purpose" required defaultValue="layer">
+            <select name="purpose" required defaultValue={editing?.purpose ?? "layer"}>
               <option value="layer">Layer</option>
               <option value="broiler">Broiler</option>
               <option value="breeder">Breeder</option>
@@ -106,25 +111,30 @@ export default function VaccinationTemplatesPage() {
           </label>
           <label>
             Age from (days)
-            <input name="ageDaysFrom" type="number" min={0} required />
+            <input name="ageDaysFrom" type="number" min={0} required defaultValue={editing?.ageDaysFrom} />
           </label>
           <label>
             Age to (days)
-            <input name="ageDaysTo" type="number" min={0} required />
+            <input name="ageDaysTo" type="number" min={0} required defaultValue={editing?.ageDaysTo} />
           </label>
           <label>
             Vaccine
-            <input name="vaccine" required />
+            <input name="vaccine" required defaultValue={editing?.vaccine} />
           </label>
           <label>
             Disease
-            <input name="disease" required />
+            <input name="disease" required defaultValue={editing?.disease} />
           </label>
           <label>
             Route
-            <input name="route" required />
+            <input name="route" required defaultValue={editing?.route} />
           </label>
-          <button className="primary">Add item</button>
+          <button className="primary">{editing ? "Save changes" : "Add item"}</button>
+          {editing && (
+            <button type="button" className="secondary" onClick={() => setEditing(null)}>
+              Cancel
+            </button>
+          )}
         </form>
       </div>
 
@@ -144,7 +154,7 @@ export default function VaccinationTemplatesPage() {
           <tbody>
             {(rows ?? []).map((t) => (
               <tr key={t.id}>
-                <td>{t.speciesId}</td>
+                <td>{species.find((s) => s.id === t.speciesId)?.name ?? t.speciesId}</td>
                 <td>{t.purpose}</td>
                 <td>
                   {t.ageDaysFrom}–{t.ageDaysTo}
@@ -153,7 +163,14 @@ export default function VaccinationTemplatesPage() {
                 <td>{t.disease}</td>
                 <td>{t.route}</td>
                 <td>
-                  <button onClick={() => onDelete(t.id)}>Delete</button>
+                  <div className="row">
+                    <button className="secondary" onClick={() => setEditing(t)}>
+                      Edit
+                    </button>
+                    <button className="danger" onClick={() => onDelete(t.id)}>
+                      Delete
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

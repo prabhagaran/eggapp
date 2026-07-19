@@ -53,3 +53,10 @@ export function fmtAge(ts: string): string {
   if (s < 60) return `${s}s ago`;
   return `${Math.floor(s / 60)}m ago`;
 }
+
+// Matches apps/android's batchTone() — same status, same meaning, both surfaces.
+export function batchBadgeClass(status: string): string {
+  if (status === "completed" || status === "hatching") return "badge ok";
+  if (status === "aborted" || status === "closed") return "badge";
+  return "badge accent";
+}

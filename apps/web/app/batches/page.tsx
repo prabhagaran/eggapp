@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import type { Batch, EggCollection, Incubator, Species } from "../../lib/types";
-import { dayOf, fmtDate, useAuthedFarm } from "../../lib/useAuthedFarm";
+import { batchBadgeClass, dayOf, fmtDate, useAuthedFarm } from "../../lib/useAuthedFarm";
 
 function ageDays(collectedOn: string) {
   return Math.floor((Date.now() - Date.parse(collectedOn)) / 86_400_000);
@@ -176,7 +176,7 @@ export default function BatchesPage() {
                     </Link>
                   </td>
                   <td>
-                    <span className="badge accent">{b.status}</span>
+                    <span className={batchBadgeClass(b.status)}>{b.status}</span>
                   </td>
                   <td>{day != null && b.species ? `${day}/${b.species.incubationDays}` : "—"}</td>
                   <td>{b.viableCount}</td>

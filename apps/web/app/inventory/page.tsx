@@ -11,6 +11,7 @@ export default function InventoryPage() {
   const [rows, setRows] = useState<InventoryItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [kind, setKind] = useState<"feed" | "vaccine" | "consumable">("feed");
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const reload = useCallback(() => {
     if (farmId) api<InventoryItem[]>(`/v1/farms/${farmId}/inventory`).then(setRows);
@@ -62,6 +63,28 @@ export default function InventoryPage() {
     if (!window.confirm("Delete this inventory item?")) return;
     try {
       await api(`/v1/farms/${farmId}/inventory/${id}`, { method: "DELETE" });
+      reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed");
+    }
+  }
+
+  async function onSaveEdit(e: React.FormEvent<HTMLFormElement>, itemId: string) {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    setError(null);
+    try {
+      await api(`/v1/farms/${farmId}/inventory/${itemId}`, {
+        method: "PATCH",
+        body: {
+          name: f.get("name"),
+          unit: f.get("unit"),
+          lotNumber: f.get("lotNumber") || undefined,
+          expiry: f.get("expiry") ? new Date(String(f.get("expiry"))).toISOString() : undefined,
+          lowStockThreshold: f.get("lowStockThreshold") ? Number(f.get("lowStockThreshold")) : undefined,
+        },
+      });
+      setEditingId(null);
       reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
@@ -124,7 +147,43 @@ export default function InventoryPage() {
       </div>
 
       <div className="grid">
-        {(rows ?? []).map((item) => (
+        {(rows ?? []).map((item) =>
+          editingId === item.id ? (
+            <div key={item.id} className="card">
+              <form className="stack" onSubmit={(e) => onSaveEdit(e, item.id)}>
+                <label>
+                  Name
+                  <input name="name" required defaultValue={item.name} />
+                </label>
+                <label>
+                  Unit
+                  <input name="unit" required defaultValue={item.unit} />
+                </label>
+                <label>
+                  Low-stock threshold (optional)
+                  <input name="lowStockThreshold" type="number" step="any" min={0} defaultValue={item.lowStockThreshold ?? ""} />
+                </label>
+                {item.kind === "vaccine" && (
+                  <>
+                    <label>
+                      Lot number
+                      <input name="lotNumber" required defaultValue={item.lotNumber ?? ""} />
+                    </label>
+                    <label>
+                      Expiry
+                      <input name="expiry" type="date" required defaultValue={item.expiry?.slice(0, 10) ?? ""} />
+                    </label>
+                  </>
+                )}
+                <div className="row">
+                  <button className="primary">Save</button>
+                  <button type="button" className="secondary" onClick={() => setEditingId(null)}>
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          ) : (
           <div key={item.id} className="card">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div>
@@ -154,12 +213,16 @@ export default function InventoryPage() {
               <button className="secondary" onClick={() => onAdjust(item.id, -1)}>
                 − Deduct
               </button>
+              <button className="secondary" onClick={() => setEditingId(item.id)}>
+                Edit
+              </button>
               <button className="danger" onClick={() => onDelete(item.id)}>
                 Delete
               </button>
             </div>
           </div>
-        ))}
+          ),
+        )}
       </div>
       {rows && rows.length === 0 && <p className="muted">No inventory items yet — add one above.</p>}
     </>

@@ -3,7 +3,7 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../../../lib/api";
 import type { BatchDetail } from "../../../lib/types";
-import { dayOf, fmtDate, useAuthedFarm } from "../../../lib/useAuthedFarm";
+import { batchBadgeClass, dayOf, fmtDate, useAuthedFarm } from "../../../lib/useAuthedFarm";
 
 export default function BatchDetailPage() {
   const farmId = useAuthedFarm();
@@ -62,7 +62,7 @@ export default function BatchDetailPage() {
     <>
       <h1>
         {batch.species.name} · {batch.incubator.name}{" "}
-        <span className="badge accent">{batch.status}</span>
+        <span className={batchBadgeClass(batch.status)}>{batch.status}</span>
       </h1>
       {error && <p className="alert-error">{error}</p>}
 
