@@ -37,6 +37,11 @@ const telemetrySchema = z.object({
   setHum: z.number().optional(),
   setTempHyst: z.number().optional(),
   setHumHyst: z.number().optional(),
+  // EGG profile only — the device's own incubation-day counter and
+  // expected-hatch clock, computed on-device independently of anything
+  // set via this app's /batches/:id/set.
+  day: z.number().int().optional(),
+  hatchEpoch: z.number().int().optional(),
 });
 
 function parseTopic(topic: string): { deviceId: string; kind: "telemetry" | "status" | "cmd_ack" } | null {
@@ -61,7 +66,10 @@ async function handleTelemetry(log: FastifyBaseLogger, deviceId: string, raw: Bu
   }
   const prisma = getPrisma();
   // BR-007: unmatched device id is logged and dropped, never auto-created.
-  const device = await prisma.device.findUnique({ where: { hardwareId: deviceId } });
+  const device = await prisma.device.findUnique({
+    where: { hardwareId: deviceId },
+    include: { incubator: { select: { id: true } } },
+  });
   if (!device) {
     log.warn({ deviceId }, "[mqtt] telemetry from unregistered device — dropped");
     return;
@@ -91,6 +99,19 @@ async function handleTelemetry(log: FastifyBaseLogger, deviceId: string, raw: Bu
         ...(parsed.data.setHumHyst != null ? { currentHumHysteresis: parsed.data.setHumHyst } : {}),
       },
     });
+    // Cross-check only — mirrors the device's own day/hatchEpoch onto
+    // whichever batch this incubator currently has running. Never
+    // touches setAt/expectedHatchAt: those stay the manual record from
+    // /set, this is purely "what the device itself thinks."
+    if (device.incubator && parsed.data.day != null && parsed.data.hatchEpoch != null) {
+      await tx.eggBatch.updateMany({
+        where: { incubatorId: device.incubator.id, status: "incubating" },
+        data: {
+          deviceDay: parsed.data.day,
+          deviceExpectedHatchAt: new Date(parsed.data.hatchEpoch * 1000),
+        },
+      });
+    }
     // Live telemetry is itself proof-of-life: promote status even if the
     // one-off retained `status` message was missed (e.g. it arrived
     // before this device was registered — observed in practice, not
