@@ -64,3 +64,13 @@ app (it currently isn't — see domain-model.md, no such entity).
   practice). This is one-directional: **offline is never inferred from a
   telemetry gap** — that transition comes only from the `status` topic
   (LWT), never from silence; see `device-lifecycle.md`.
+- `day`/`hatchEpoch` (EGG profile only) are mirrored onto
+  `EggBatch.deviceDay`/`deviceExpectedHatchAt` for whichever batch is
+  currently `incubating` on this device's incubator — a read-only
+  cross-check the app surfaces if it disagrees with the batch's own
+  `setAt`-derived schedule. **Never** written back to `setAt` or
+  `expectedHatchAt` themselves: there is no command in this contract for
+  the platform to set the device's day counter (only setpoints are
+  remotely settable — see "Commands" in `mqtt-topics.md`), so the
+  device's own clock and the app's manually-recorded one are
+  independent by construction, not just by choice.

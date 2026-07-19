@@ -1485,6 +1485,18 @@ components:
         candlingDays: { type: array, items: { type: integer } }
         lockdownAt: { type: string, format: date-time, nullable: true }
         expectedHatchAt: { type: string, format: date-time, nullable: true }
+        deviceDay:
+          type: integer
+          nullable: true
+          description: >
+            Mirrored from the bound device's own telemetry (`day` field, EGG profile only)
+            while this batch is the incubator's active one. A read-only cross-check —
+            never overwrites setAt/expectedHatchAt, which stay the manual record from /set.
+        deviceExpectedHatchAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Mirrored from the device's own `hatchEpoch`. Same cross-check-only caveat as deviceDay.
         viableCount: { type: integer }
         fertilityPct: { type: number, nullable: true }
         hatchOfSetPct: { type: number, nullable: true }
