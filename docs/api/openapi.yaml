@@ -774,8 +774,13 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
     patch:
       tags: [flocks]
-      summary: Edit name/species/purpose/provenance note — manager+
-      description: Cosmetic/classification fields only — placedCount and origin (hatchEventId / acquisitionDate+acquisitionAgeDays) are immutable (BR-009 traceability).
+      summary: Edit name/species/purpose/provenance note/stage override — manager+
+      description: >
+        Cosmetic/classification fields only — placedCount and origin (hatchEventId /
+        acquisitionDate+acquisitionAgeDays) are immutable (BR-009 traceability).
+        `stageOverride` is the one escape hatch for correcting a wrong age-derived
+        stage without reopening those immutable origin fields — set it to pin the
+        stage, or send `null` to clear it back to auto-derive.
       requestBody:
         required: true
         content:
@@ -787,8 +792,22 @@ paths:
                 speciesId: { type: string }
                 purpose: { type: string, enum: [layer, broiler, breeder] }
                 acquisitionNote: { type: string, maxLength: 300 }
+                stageOverride:
+                  type: string
+                  nullable: true
+                  enum: [brooding, grower, pre_lay, layer, broiler_starter, broiler_grower, broiler_finisher]
       responses:
         "200": { description: Updated flock, content: { application/json: { schema: { $ref: "#/components/schemas/FlockDetail" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [flocks]
+      summary: Delete a flock — manager+
+      description: >
+        Cascades to this flock's mortality/vaccination/feed/water records.
+        EggCollections referencing it are unlinked (flockId set null), not deleted,
+        and a linked HatchEvent becomes available to attach to a new flock again.
+      responses:
+        "204": { description: Deleted }
         "404": { $ref: "#/components/responses/NotFound" }
 
   /v1/farms/{farmId}/flocks/{id}/mortality:
@@ -1488,11 +1507,16 @@ components:
         acquisitionNote: { type: string, nullable: true }
         hatchEventId: { type: string, format: uuid, nullable: true }
         ageDays: { type: integer, nullable: true, description: Derived from hatch date or acquisition date − acquisitionAgeDays }
+        stageOverride:
+          type: string
+          nullable: true
+          enum: [brooding, grower, pre_lay, layer, broiler_starter, broiler_grower, broiler_finisher]
+          description: Manual correction set via PATCH; when present, wins over the age-derived stage below.
         stage:
           type: string
           nullable: true
           enum: [brooding, grower, pre_lay, layer, broiler_starter, broiler_grower, broiler_finisher]
-          description: Derived from purpose + ageDays (US-FLK-002, domain-knowledge §5)
+          description: stageOverride if set, else derived from purpose + ageDays (US-FLK-002, domain-knowledge §5)
 
     FlockDetail:
       allOf:
