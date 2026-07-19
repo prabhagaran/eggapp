@@ -1,5 +1,5 @@
 "use client";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../../../lib/api";
 import type { ComplianceItem, FlockDetail, InventoryItem, Species } from "../../../lib/types";
@@ -14,6 +14,7 @@ const STAGE_LABEL: Record<string, string> = {
   broiler_grower: "Broiler grower",
   broiler_finisher: "Broiler finisher",
 };
+const STAGE_OPTIONS = Object.entries(STAGE_LABEL);
 
 const COMPLIANCE_BADGE: Record<string, string> = {
   administered: "badge ok",
@@ -24,6 +25,7 @@ const COMPLIANCE_BADGE: Record<string, string> = {
 
 export default function FlockDetailPage() {
   const farmId = useAuthedFarm();
+  const router = useRouter();
   const { id } = useParams<{ id: string }>();
   const [flock, setFlock] = useState<FlockDetail | null>(null);
   const [compliance, setCompliance] = useState<ComplianceItem[]>([]);
@@ -57,10 +59,22 @@ export default function FlockDetailPage() {
           speciesId: f.get("speciesId"),
           purpose: f.get("purpose"),
           acquisitionNote: f.get("acquisitionNote") || undefined,
+          stageOverride: f.get("stageOverride") || null,
         },
       });
       setEditing(false);
       reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed");
+    }
+  }
+
+  async function onDelete() {
+    if (!window.confirm(`Delete "${flock?.name}"? Its mortality, vaccination, feed, and water records will be permanently deleted too. This can't be undone.`)) return;
+    setError(null);
+    try {
+      await api(`/v1/farms/${farmId}/flocks/${id}`, { method: "DELETE" });
+      router.push("/flocks");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
     }
@@ -138,9 +152,14 @@ export default function FlockDetailPage() {
     <>
       <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
         <h1>{flock.name}</h1>
-        <button className="secondary" onClick={() => setEditing((v) => !v)}>
-          {editing ? "Cancel" : "Edit"}
-        </button>
+        <div className="row">
+          <button className="secondary" onClick={() => setEditing((v) => !v)}>
+            {editing ? "Cancel" : "Edit"}
+          </button>
+          <button className="danger" onClick={onDelete}>
+            Delete
+          </button>
+        </div>
       </div>
       {error && <p className="alert-error">{error}</p>}
 
@@ -173,6 +192,17 @@ export default function FlockDetailPage() {
               Provenance note
               <input name="acquisitionNote" defaultValue={flock.acquisitionNote ?? ""} />
             </label>
+            <label>
+              Stage override
+              <select name="stageOverride" defaultValue={flock.stageOverride ?? ""}>
+                <option value="">— auto (derive from age) —</option>
+                {STAGE_OPTIONS.map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
             <button className="primary">Save changes</button>
           </form>
         </div>
@@ -189,7 +219,7 @@ export default function FlockDetailPage() {
         </span>
         <span className="stat">
           <b>{flock.stage ? STAGE_LABEL[flock.stage] ?? flock.stage : "—"}</b>
-          <span className="muted">stage</span>
+          <span className="muted">stage{flock.stageOverride ? " (manual)" : ""}</span>
         </span>
         <span className="stat">
           <b>{flock.placedCount}</b>

@@ -172,7 +172,9 @@ export interface Flock {
   placedCount: number;
   createdAt: string;
   species?: { id: string; name: string };
-  // Derived server-side, never stored (US-FLK-002).
+  // Manual correction — when set, wins over the age-derived stage below.
+  stageOverride: FlockStage | null;
+  // Derived server-side: stageOverride if set, else purpose+age (US-FLK-002).
   ageDays: number | null;
   stage: FlockStage | null;
   currentCount: number;
