@@ -27,6 +27,14 @@ const createSchema = z.object({
   defaultSpeciesId: z.string().min(1).optional(),
 });
 
+const updateSchema = z
+  .object({
+    name: z.string().min(1).max(120).optional(),
+    capacity: z.number().int().positive().optional(),
+    defaultSpeciesId: z.string().min(1).nullable().optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, { message: "At least one field is required" });
+
 export async function incubatorRoutes(app: FastifyInstance) {
   app.post("/farms/:farmId/incubators", { preHandler: [app.authenticate] }, async (req, reply) => {
     const { farmId } = farmParams.parse(req.params);
@@ -46,6 +54,13 @@ export async function incubatorRoutes(app: FastifyInstance) {
     const { farmId, id } = incubatorParams.parse(req.params);
     await requireMembership(req.user.sub, farmId);
     return incubators.getIncubator(farmId, id);
+  });
+
+  app.patch("/farms/:farmId/incubators/:id", { preHandler: [app.authenticate] }, async (req) => {
+    const { farmId, id } = incubatorParams.parse(req.params);
+    await requireMembership(req.user.sub, farmId, "manager");
+    const body = updateSchema.parse(req.body);
+    return incubators.updateIncubator(farmId, id, body);
   });
 
   // US-ENV-002

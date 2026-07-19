@@ -70,6 +70,19 @@ export async function deleteTemplateItem(farmId: string, id: string) {
   await getPrisma().vaccinationTemplateItem.delete({ where: { id } });
 }
 
+export type UpdateTemplateItemInput = Partial<TemplateItemInput>;
+
+export async function updateTemplateItem(farmId: string, id: string, input: UpdateTemplateItemInput) {
+  const prisma = getPrisma();
+  const existing = await prisma.vaccinationTemplateItem.findFirst({ where: { id, farmId } });
+  if (!existing) throw new AppError(404, "not_found", "Template item not found");
+  if (input.speciesId) {
+    const species = await prisma.species.findUnique({ where: { id: input.speciesId } });
+    if (!species) throw new AppError(400, "unknown_species", `No species '${input.speciesId}'`);
+  }
+  return prisma.vaccinationTemplateItem.update({ where: { id }, data: input });
+}
+
 async function getFlockForCompliance(farmId: string, flockId: string) {
   const flock = await getPrisma().flock.findFirst({
     where: { id: flockId, farmId },

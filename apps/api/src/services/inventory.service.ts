@@ -57,6 +57,36 @@ export async function getItem(farmId: string, id: string) {
   return item;
 }
 
+export interface UpdateItemInput {
+  name?: string;
+  unit?: string;
+  lotNumber?: string;
+  expiry?: Date;
+  lowStockThreshold?: number;
+}
+
+// Cosmetic/tracking fields only — kind and quantity aren't editable here:
+// kind shouldn't change mid-life, and quantity only ever changes through
+// adjustStock/deductStock so every change stays in the StockTransaction ledger.
+export async function updateItem(farmId: string, id: string, input: UpdateItemInput) {
+  const prisma = getPrisma();
+  const existing = await prisma.inventoryItem.findFirst({ where: { id, farmId } });
+  if (!existing) throw new AppError(404, "not_found", "Inventory item not found");
+  if (existing.kind === "vaccine" && (input.lotNumber === "" || input.expiry === null)) {
+    throw new AppError(400, "vaccine_requires_lot_expiry", "Vaccine items require lotNumber and expiry");
+  }
+  return prisma.inventoryItem.update({
+    where: { id },
+    data: {
+      name: input.name,
+      unit: input.unit,
+      lotNumber: input.lotNumber,
+      expiry: input.expiry,
+      lowStockThreshold: input.lowStockThreshold,
+    },
+  });
+}
+
 // Manual restock/correction (US-INV-001) — auto-deductions (US-INV-002) go
 // through deductStock below instead, inside the same transaction as the
 // feed log / vaccination record that triggered them.

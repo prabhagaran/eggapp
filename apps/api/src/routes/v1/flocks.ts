@@ -22,6 +22,15 @@ const createSchema = z
     message: "Provide exactly one of hatchEventId or acquisitionDate+acquisitionAgeDays",
   });
 
+const updateSchema = z
+  .object({
+    name: z.string().min(1).max(120).optional(),
+    speciesId: z.string().min(1).optional(),
+    purpose: z.enum(FLOCK_PURPOSES).optional(),
+    acquisitionNote: z.string().max(300).optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, { message: "At least one field is required" });
+
 const mortalitySchema = z.object({
   date: z.coerce.date(),
   count: z.number().int().positive(),
@@ -49,6 +58,13 @@ export async function flockRoutes(app: FastifyInstance) {
     const { farmId, id } = flockParams.parse(req.params);
     await requireMembership(req.user.sub, farmId);
     return flocks.getFlock(farmId, id);
+  });
+
+  app.patch("/farms/:farmId/flocks/:id", { preHandler: [app.authenticate] }, async (req) => {
+    const { farmId, id } = flockParams.parse(req.params);
+    await requireMembership(req.user.sub, farmId, "manager");
+    const body = updateSchema.parse(req.body);
+    return flocks.updateFlock(farmId, id, body);
   });
 
   // Field record (worker role suffices, same bar as candling/collections).

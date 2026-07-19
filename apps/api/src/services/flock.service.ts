@@ -107,6 +107,37 @@ export async function getFlock(farmId: string, id: string) {
   };
 }
 
+export interface UpdateFlockInput {
+  name?: string;
+  speciesId?: string;
+  purpose?: FlockPurpose;
+  acquisitionNote?: string;
+}
+
+// Cosmetic/classification fields only — placedCount and origin
+// (hatchEventId / acquisitionDate+acquisitionAgeDays) are immutable
+// (BR-009 traceability); fixing those would mean the flock was
+// mis-recorded at creation, not edited.
+export async function updateFlock(farmId: string, id: string, input: UpdateFlockInput) {
+  const prisma = getPrisma();
+  const existing = await prisma.flock.findFirst({ where: { id, farmId } });
+  if (!existing) throw new AppError(404, "not_found", "Flock not found");
+  if (input.speciesId) {
+    const species = await prisma.species.findUnique({ where: { id: input.speciesId } });
+    if (!species) throw new AppError(400, "unknown_species", `No species '${input.speciesId}'`);
+  }
+  await prisma.flock.update({
+    where: { id },
+    data: {
+      name: input.name,
+      speciesId: input.speciesId,
+      purpose: input.purpose,
+      acquisitionNote: input.acquisitionNote,
+    },
+  });
+  return getFlock(farmId, id);
+}
+
 export interface RecordMortalityInput {
   date: Date;
   count: number;

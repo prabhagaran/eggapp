@@ -18,6 +18,10 @@ const templateItemSchema = z.object({
   route: z.string().min(1).max(60),
 });
 
+const updateTemplateItemSchema = templateItemSchema
+  .partial()
+  .refine((v) => Object.keys(v).length > 0, { message: "At least one field is required" });
+
 const recordSchema = z.object({
   templateItemId: z.uuid().optional(),
   date: z.coerce.date(),
@@ -60,6 +64,13 @@ export async function vaccinationRoutes(app: FastifyInstance) {
     const { farmId } = farmParams.parse(req.params);
     await requireMembership(req.user.sub, farmId);
     return vaccination.listTemplates(farmId);
+  });
+
+  app.patch("/farms/:farmId/vaccination-templates/:id", { preHandler: [app.authenticate] }, async (req) => {
+    const { farmId, id } = templateParams.parse(req.params);
+    await requireMembership(req.user.sub, farmId, "manager");
+    const body = updateTemplateItemSchema.parse(req.body);
+    return vaccination.updateTemplateItem(farmId, id, body);
   });
 
   app.delete("/farms/:farmId/vaccination-templates/:id", { preHandler: [app.authenticate] }, async (req, reply) => {

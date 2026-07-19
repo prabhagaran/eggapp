@@ -30,6 +30,33 @@ export async function createIncubator(farmId: string, input: CreateIncubatorInpu
   return prisma.incubator.create({ data: { farmId, ...input } });
 }
 
+export interface UpdateIncubatorInput {
+  name?: string;
+  capacity?: number;
+  defaultSpeciesId?: string | null;
+}
+
+export async function updateIncubator(farmId: string, id: string, input: UpdateIncubatorInput) {
+  const prisma = getPrisma();
+  const existing = await prisma.incubator.findFirst({ where: { id, farmId } });
+  if (!existing) throw new AppError(404, "not_found", "Incubator not found");
+  if (input.defaultSpeciesId) {
+    const species = await prisma.species.findUnique({ where: { id: input.defaultSpeciesId } });
+    if (!species) throw new AppError(400, "unknown_species", `No species '${input.defaultSpeciesId}'`);
+  }
+  const updated = await prisma.incubator.update({
+    where: { id },
+    data: {
+      name: input.name,
+      capacity: input.capacity,
+      defaultSpeciesId: input.defaultSpeciesId,
+    },
+    include: { device: deviceSummary, defaultSpecies: true },
+  });
+  const [withTelemetry] = await attachLatestTelemetry([updated]);
+  return withTelemetry;
+}
+
 // US-INC-002/ENV-001: live status must be ≤60s old. Latest reading is
 // fetched per bound device — personal-scale incubator counts (1-3) make
 // N small queries perfectly fine; no need for a window-function query.

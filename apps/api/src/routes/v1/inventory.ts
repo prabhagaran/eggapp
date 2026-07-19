@@ -22,6 +22,16 @@ const adjustSchema = z.object({
   note: z.string().max(300).optional(),
 });
 
+const updateSchema = z
+  .object({
+    name: z.string().min(1).max(120).optional(),
+    unit: z.string().min(1).max(20).optional(),
+    lotNumber: z.string().max(60).optional(),
+    expiry: z.coerce.date().optional(),
+    lowStockThreshold: z.number().min(0).optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, { message: "At least one field is required" });
+
 export async function inventoryRoutes(app: FastifyInstance) {
   app.post("/farms/:farmId/inventory", { preHandler: [app.authenticate] }, async (req, reply) => {
     const { farmId } = farmParams.parse(req.params);
@@ -41,6 +51,13 @@ export async function inventoryRoutes(app: FastifyInstance) {
     const { farmId, id } = itemParams.parse(req.params);
     await requireMembership(req.user.sub, farmId);
     return inventory.getItem(farmId, id);
+  });
+
+  app.patch("/farms/:farmId/inventory/:id", { preHandler: [app.authenticate] }, async (req) => {
+    const { farmId, id } = itemParams.parse(req.params);
+    await requireMembership(req.user.sub, farmId, "manager");
+    const body = updateSchema.parse(req.body);
+    return inventory.updateItem(farmId, id, body);
   });
 
   app.post("/farms/:farmId/inventory/:id/adjust", { preHandler: [app.authenticate] }, async (req) => {
