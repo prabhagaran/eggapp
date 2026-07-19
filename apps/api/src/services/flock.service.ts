@@ -1,5 +1,5 @@
-import type { FlockPurpose } from "@prisma/client";
-import { ageDaysFrom, birthDate, deriveStage } from "../domain/flock.js";
+import type { FlockPurpose, FlockStage } from "@prisma/client";
+import { ageDaysFrom, birthDate, resolveStage } from "../domain/flock.js";
 import { getPrisma } from "../infra/db.js";
 import { AppError } from "../lib/errors.js";
 
@@ -16,7 +16,7 @@ export interface CreateFlockInput {
   acquisitionNote?: string;
 }
 
-function withDerived<T extends { purpose: FlockPurpose; placedCount: number; hatchEvent: { hatchedAt: Date } | null; acquisitionDate: Date | null; acquisitionAgeDays: number | null; mortalityRecords: { count: number }[] }>(
+function withDerived<T extends { purpose: FlockPurpose; placedCount: number; hatchEvent: { hatchedAt: Date } | null; acquisitionDate: Date | null; acquisitionAgeDays: number | null; stageOverride: FlockStage | null; mortalityRecords: { count: number }[] }>(
   flock: T,
 ) {
   const birth = birthDate({
@@ -25,7 +25,7 @@ function withDerived<T extends { purpose: FlockPurpose; placedCount: number; hat
     acquisitionAgeDays: flock.acquisitionAgeDays,
   });
   const ageDays = birth ? ageDaysFrom(birth) : null;
-  const stage = ageDays != null ? deriveStage(flock.purpose, ageDays) : null;
+  const stage = resolveStage(flock.purpose, ageDays, flock.stageOverride);
   const lost = flock.mortalityRecords.reduce((sum, r) => sum + r.count, 0);
   const currentCount = flock.placedCount - lost; // BR-009: the only ledger, no direct edits
   const { mortalityRecords: _mortalityRecords, ...rest } = flock;
@@ -112,12 +112,16 @@ export interface UpdateFlockInput {
   speciesId?: string;
   purpose?: FlockPurpose;
   acquisitionNote?: string;
+  // Null clears the override back to auto-derive; undefined leaves it alone.
+  stageOverride?: FlockStage | null;
 }
 
 // Cosmetic/classification fields only — placedCount and origin
 // (hatchEventId / acquisitionDate+acquisitionAgeDays) are immutable
 // (BR-009 traceability); fixing those would mean the flock was
-// mis-recorded at creation, not edited.
+// mis-recorded at creation, not edited. stageOverride is the one
+// escape hatch for correcting a wrong derived stage without reopening
+// those immutable origin fields.
 export async function updateFlock(farmId: string, id: string, input: UpdateFlockInput) {
   const prisma = getPrisma();
   const existing = await prisma.flock.findFirst({ where: { id, farmId } });
@@ -133,9 +137,17 @@ export async function updateFlock(farmId: string, id: string, input: UpdateFlock
       speciesId: input.speciesId,
       purpose: input.purpose,
       acquisitionNote: input.acquisitionNote,
+      stageOverride: input.stageOverride,
     },
   });
   return getFlock(farmId, id);
+}
+
+export async function deleteFlock(farmId: string, id: string) {
+  const prisma = getPrisma();
+  const existing = await prisma.flock.findFirst({ where: { id, farmId } });
+  if (!existing) throw new AppError(404, "not_found", "Flock not found");
+  await prisma.flock.delete({ where: { id } });
 }
 
 export interface RecordMortalityInput {

@@ -65,3 +65,15 @@ export function birthDate(flock: {
 export function ageDaysFrom(birth: Date, now: Date = new Date()): number {
   return Math.floor((now.getTime() - birth.getTime()) / 86_400_000);
 }
+
+// A manual stageOverride always wins over the age-derived stage — the
+// escape hatch for when acquisition/hatch data was entered wrong and the
+// derived stage doesn't match reality.
+export function resolveStage(
+  purpose: FlockPurpose,
+  ageDays: number | null,
+  stageOverride: FlockStage | null,
+): FlockStage | null {
+  if (stageOverride) return stageOverride;
+  return ageDays != null ? deriveStage(purpose, ageDays) : null;
+}

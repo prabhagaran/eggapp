@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { FLOCK_PURPOSES, MORTALITY_CAUSES } from "@eggapp/shared-types";
+import { FLOCK_PURPOSES, FLOCK_STAGES, MORTALITY_CAUSES } from "@eggapp/shared-types";
 import { requireMembership } from "../../services/access.js";
 import * as flocks from "../../services/flock.service.js";
 
@@ -28,6 +28,8 @@ const updateSchema = z
     speciesId: z.string().min(1).optional(),
     purpose: z.enum(FLOCK_PURPOSES).optional(),
     acquisitionNote: z.string().max(300).optional(),
+    // null clears the override back to auto-derive
+    stageOverride: z.enum(FLOCK_STAGES).nullable().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, { message: "At least one field is required" });
 
@@ -65,6 +67,13 @@ export async function flockRoutes(app: FastifyInstance) {
     await requireMembership(req.user.sub, farmId, "manager");
     const body = updateSchema.parse(req.body);
     return flocks.updateFlock(farmId, id, body);
+  });
+
+  app.delete("/farms/:farmId/flocks/:id", { preHandler: [app.authenticate] }, async (req, reply) => {
+    const { farmId, id } = flockParams.parse(req.params);
+    await requireMembership(req.user.sub, farmId, "manager");
+    await flocks.deleteFlock(farmId, id);
+    return reply.code(204).send();
   });
 
   // Field record (worker role suffices, same bar as candling/collections).
