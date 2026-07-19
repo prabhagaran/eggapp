@@ -55,6 +55,7 @@ export default function BatchDetailPage() {
 
   if (!farmId || !batch) return null;
   const day = dayOf(batch.setAt);
+  const dayMismatch = day != null && batch.deviceDay != null && Math.abs(day - batch.deviceDay) > 1;
   const nextCandle = batch.candlingDays.find((d) => !batch.candlings.some((c) => c.dayNo === d));
   const active = !["completed", "closed", "aborted"].includes(batch.status);
 
@@ -75,6 +76,12 @@ export default function BatchDetailPage() {
           <b>{day != null ? `${day}/${batch.species.incubationDays}` : "—"}</b>
           <span className="muted">day</span>
         </span>
+        {batch.deviceDay != null && (
+          <span className="stat">
+            <b>{batch.deviceDay}</b>
+            <span className={dayMismatch ? "badge warn" : "muted"}>device day{dayMismatch ? " (mismatch)" : ""}</span>
+          </span>
+        )}
         <span className="stat">
           <b>{batch.fertilityPct != null ? `${batch.fertilityPct}%` : "—"}</b>
           <span className="muted">fertility</span>
@@ -95,6 +102,12 @@ export default function BatchDetailPage() {
           set {fmtDate(batch.setAt)} · candling days {batch.candlingDays.join(", ")} · lockdown{" "}
           {fmtDate(batch.lockdownAt)} · expected hatch {fmtDate(batch.expectedHatchAt)}
         </div>
+        {batch.deviceExpectedHatchAt && (
+          <div className={dayMismatch ? "alert-warn" : "muted"}>
+            device reports day {batch.deviceDay}, expects hatch {fmtDate(batch.deviceExpectedHatchAt)}
+            {dayMismatch ? " — doesn't match the manual schedule above" : ""}
+          </div>
+        )}
         {batch.abortReason && <p className="alert-error">Aborted: {batch.abortReason}</p>}
       </div>
 

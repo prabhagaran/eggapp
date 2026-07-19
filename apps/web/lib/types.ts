@@ -129,6 +129,10 @@ export interface Batch {
   candlingDays: number[];
   lockdownAt: string | null;
   expectedHatchAt: string | null;
+  // Mirrored from the bound device's own telemetry (day/hatchEpoch) —
+  // a cross-check, never overwrites setAt/expectedHatchAt above.
+  deviceDay: number | null;
+  deviceExpectedHatchAt: string | null;
   viableCount: number;
   fertilityPct: number | null;
   hatchOfSetPct: number | null;
