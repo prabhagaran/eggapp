@@ -1,10 +1,8 @@
 package com.eggapp.field.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
@@ -32,30 +30,9 @@ private val LightColors = lightColorScheme(
     onErrorContainer = Color(0xFFB3261E),
 )
 
-private val DarkColors = darkColorScheme(
-    primary = Color(0xFF4FAE7B),
-    onPrimary = Color(0xFF0B1A10),
-    primaryContainer = Color(0xFF1C3427),
-    onPrimaryContainer = Color(0xFFA9E0BF),
-    secondary = Color(0xFFA9E0BF),
-    onSecondary = Color(0xFF0B1A10),
-    background = Color(0xFF10140F),
-    onBackground = Color(0xFFE7ECE2),
-    surface = Color(0xFF181D16),
-    onSurface = Color(0xFFE7ECE2),
-    surfaceVariant = Color(0xFF1E241A),
-    onSurfaceVariant = Color(0xFFA3AB97),
-    outline = Color(0xFF2A3123),
-    outlineVariant = Color(0xFF2A3123),
-    error = Color(0xFFEF9186),
-    onError = Color(0xFF3A1A17),
-    errorContainer = Color(0xFF3A1A17),
-    onErrorContainer = Color(0xFFEF9186),
-)
-
 // Status tints used by StatusPill (ui/components/AppComponents.kt) — kept
 // separate from the M3 scheme since they're semantic (ok/warn/danger), not
-// brand colors, and need a consistent light/dark pair each.
+// brand colors.
 data class StatusColors(
     val okBg: Color, val okText: Color,
     val warnBg: Color, val warnText: Color,
@@ -70,13 +47,6 @@ val LightStatusColors = StatusColors(
     neutralBg = Color(0xFFEEF0EC), neutralText = Color(0xFF6B7267),
 )
 
-val DarkStatusColors = StatusColors(
-    okBg = Color(0xFF163625), okText = Color(0xFF6FDBA0),
-    warnBg = Color(0xFF3A2F10), warnText = Color(0xFFE8C467),
-    dangerBg = Color(0xFF3A1A17), dangerText = Color(0xFFEF9186),
-    neutralBg = Color(0xFF232920), neutralText = Color(0xFFA3AB97),
-)
-
 val AppShapes = Shapes(
     extraSmall = RoundedCornerShape(8.dp),
     small = RoundedCornerShape(10.dp),
@@ -85,13 +55,12 @@ val AppShapes = Shapes(
     extraLarge = RoundedCornerShape(28.dp),
 )
 
+// Always light — no dark mode, regardless of system setting.
 @Composable
 fun EggAppTheme(content: @Composable () -> Unit) {
-    val dark = isSystemInDarkTheme()
-    val statusColors = if (dark) DarkStatusColors else LightStatusColors
-    androidx.compose.runtime.CompositionLocalProvider(LocalStatusColors provides statusColors) {
+    androidx.compose.runtime.CompositionLocalProvider(LocalStatusColors provides LightStatusColors) {
         MaterialTheme(
-            colorScheme = if (dark) DarkColors else LightColors,
+            colorScheme = LightColors,
             shapes = AppShapes,
             content = content,
         )

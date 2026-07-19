@@ -29,41 +29,9 @@
   --radius-md: 14px;
   --radius-sm: 10px;
 
-  /* Deliberately constant across themes — the hero card is always a
-     dark-green surface with white text, in both light and dark mode. */
+  /* The hero card is always a dark-green surface with white text. */
   --hero-start: #123524;
   --hero-end: #1f7a4d;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #10140f;
-    --surface: #181d16;
-    --surface-muted: #1e241a;
-    --text: #e7ece2;
-    --muted: #97a08c;
-    --border: #2a3123;
-
-    --accent: #4fae7b;
-    --accent-dark: #a9e0bf;
-    --accent-soft: #1c3427;
-    --accent-contrast: #0b1a10;
-
-    --ok-bg: #163625;
-    --ok-text: #6fdba0;
-    --warn-bg: #3a2f10;
-    --warn-text: #e8c467;
-    --danger-bg: #3a1a17;
-    --danger-text: #ef9186;
-    --neutral-bg: #232920;
-    --neutral-text: #a3ab97;
-
-    --danger: #ef9186;
-    --ok: #6fdba0;
-
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
-    --shadow-md: 0 10px 30px rgba(0, 0, 0, 0.35);
-  }
 }
 
 * { box-sizing: border-box; }
