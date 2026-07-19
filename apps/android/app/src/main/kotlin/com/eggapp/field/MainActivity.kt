@@ -39,9 +39,11 @@ import com.eggapp.field.ui.flocks.FlockDetailScreen
 import com.eggapp.field.ui.flocks.FlocksScreen
 import com.eggapp.field.ui.incubators.IncubatorsScreen
 import com.eggapp.field.ui.incubators.SetpointsScreen
+import com.eggapp.field.ui.inventory.InventoryScreen
 import com.eggapp.field.ui.login.LoginScreen
 import com.eggapp.field.ui.profile.ProfileScreen
 import com.eggapp.field.ui.theme.EggAppTheme
+import com.eggapp.field.ui.vaccination.VaccinationTemplatesScreen
 
 private const val ROUTE_LOGIN = "login"
 private const val ROUTE_INCUBATORS = "incubators"
@@ -52,11 +54,15 @@ private const val ROUTE_SETPOINTS = "incubator/{incubatorId}/setpoints"
 private const val ROUTE_FLOCKS = "flocks"
 private const val ROUTE_FLOCK_DETAIL = "flock/{flockId}"
 private const val ROUTE_PROFILE = "profile"
+private const val ROUTE_VACCINATION_TEMPLATES = "vaccination-templates"
+private const val ROUTE_INVENTORY = "inventory"
 
 // Bottom tabs — mirrors the eggAPP web sidebar's top-level sections, minus
-// the admin-only ones (Devices/Vaccination templates/Alerts stay web-only
-// per CLAUDE.md's surface split). Collections is reached from the Home tab
-// rather than getting its own slot — four tabs is plenty for one thumb.
+// the admin-only ones (Devices/Alerts stay web-only per CLAUDE.md's surface
+// split). Collections is reached from the Home tab rather than getting its
+// own slot — four tabs is plenty for one thumb. Vaccination templates and
+// Inventory (Phase 4 — full parity with web) are reached from Profile
+// rather than a fifth/sixth tab, for the same reason.
 private data class Tab(val route: String, val label: String, val icon: ImageVector)
 
 private val TABS = listOf(
@@ -136,11 +142,21 @@ class MainActivity : ComponentActivity() {
                                 FlocksScreen(onOpenFlock = { flock -> navController.navigate("flock/${flock.id}") })
                             }
                             composable(ROUTE_PROFILE) {
-                                ProfileScreen(onLoggedOut = {
-                                    navController.navigate(ROUTE_LOGIN) {
-                                        popUpTo(0) { inclusive = true }
-                                    }
-                                })
+                                ProfileScreen(
+                                    onLoggedOut = {
+                                        navController.navigate(ROUTE_LOGIN) {
+                                            popUpTo(0) { inclusive = true }
+                                        }
+                                    },
+                                    onOpenVaccinationTemplates = { navController.navigate(ROUTE_VACCINATION_TEMPLATES) },
+                                    onOpenInventory = { navController.navigate(ROUTE_INVENTORY) },
+                                )
+                            }
+                            composable(ROUTE_VACCINATION_TEMPLATES) {
+                                VaccinationTemplatesScreen(onBack = { navController.popBackStack() })
+                            }
+                            composable(ROUTE_INVENTORY) {
+                                InventoryScreen(onBack = { navController.popBackStack() })
                             }
                             composable(
                                 ROUTE_FLOCK_DETAIL,

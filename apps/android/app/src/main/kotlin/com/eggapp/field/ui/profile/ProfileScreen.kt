@@ -27,7 +27,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProfileScreen(viewModel: ProfileViewModel = viewModel(), onLoggedOut: () -> Unit) {
+fun ProfileScreen(
+    viewModel: ProfileViewModel = viewModel(),
+    onLoggedOut: () -> Unit,
+    onOpenVaccinationTemplates: () -> Unit,
+    onOpenInventory: () -> Unit,
+) {
     val state by viewModel.state.collectAsState()
 
     Scaffold(topBar = { TopAppBar(title = { Text("Profile") }) }) { padding ->
@@ -70,6 +75,21 @@ fun ProfileScreen(viewModel: ProfileViewModel = viewModel(), onLoggedOut: () -> 
                     state.farm?.role?.let {
                         Text("role: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                }
+            }
+
+            Card(modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
+                Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                    Button(
+                        onClick = onOpenVaccinationTemplates,
+                        colors = androidx.compose.material3.ButtonDefaults.textButtonColors(),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Vaccination templates") }
+                    Button(
+                        onClick = onOpenInventory,
+                        colors = androidx.compose.material3.ButtonDefaults.textButtonColors(),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Inventory") }
                 }
             }
 
