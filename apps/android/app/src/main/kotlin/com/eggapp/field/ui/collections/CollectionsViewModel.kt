@@ -9,11 +9,18 @@ import com.eggapp.field.data.DiscardRequest
 import com.eggapp.field.data.FieldRecordRepository
 import com.eggapp.field.data.TokenStore
 import com.eggapp.field.data.local.CollectionEntity
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+
+// assigned/available/discarded counts only reflect a queued collection
+// once SyncWorker has pushed it — poll like IncubatorsViewModel does
+// rather than fetching once at screen-open and going stale.
+private const val POLL_INTERVAL_MS = 15_000L
 
 data class CollectionsUiState(
     val serverCollections: List<Collection> = emptyList(),
@@ -36,7 +43,12 @@ class CollectionsViewModel(application: Application) : AndroidViewModel(applicat
         if (farm == null) {
             _state.value = CollectionsUiState(loading = false, error = "No farm selected")
         } else {
-            reload()
+            viewModelScope.launch {
+                while (isActive) {
+                    reloadOnce()
+                    delay(POLL_INTERVAL_MS)
+                }
+            }
             // Offline-first: queued/unsynced collections show up immediately
             // regardless of connectivity, same pattern as candling/hatch.
             repository.observeCollectionsForFarm(farm)
@@ -48,16 +60,18 @@ class CollectionsViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun reload() {
+        viewModelScope.launch { reloadOnce() }
+    }
+
+    private suspend fun reloadOnce() {
         val farm = farmId ?: return
-        viewModelScope.launch {
-            val result = runCatching { api.collections(farm) }
-            val response = result.getOrNull()
-            _state.value = if (response != null && response.isSuccessful) {
-                _state.value.copy(serverCollections = response.body().orEmpty(), loading = false, error = null)
-            } else {
-                // Fetch failed (offline, etc.) — keep whatever was already loaded, just stop the spinner.
-                _state.value.copy(loading = false)
-            }
+        val result = runCatching { api.collections(farm) }
+        val response = result.getOrNull()
+        _state.value = if (response != null && response.isSuccessful) {
+            _state.value.copy(serverCollections = response.body().orEmpty(), loading = false, error = null)
+        } else {
+            // Fetch failed (offline, etc.) — keep whatever was already loaded, just stop the spinner.
+            _state.value.copy(loading = false)
         }
     }
 

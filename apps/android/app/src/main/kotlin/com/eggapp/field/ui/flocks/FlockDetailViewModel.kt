@@ -14,16 +14,24 @@ import com.eggapp.field.data.local.FeedLogEntity
 import com.eggapp.field.data.local.MortalityEntity
 import com.eggapp.field.data.local.VaccinationEntity
 import com.eggapp.field.data.local.WaterLogEntity
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 // Kotlin has no built-in 4-tuple (only Pair/Triple) — just enough to
 // destructure combine()'s output below.
 private data class Quad<A, B, C, D>(val a: A, val b: B, val c: C, val d: D)
+
+// The server-computed currentCount/compliance shown here only reflect a
+// record after SyncWorker has pushed it (and after anyone else's edits,
+// e.g. from the web dashboard) — poll like IncubatorsViewModel does
+// rather than fetching once at screen-open and going stale.
+private const val POLL_INTERVAL_MS = 15_000L
 
 data class FlockDetailUiState(
     val flock: FlockDetail? = null,
@@ -64,13 +72,16 @@ class FlockDetailViewModel(application: Application, private val flockId: String
     private fun loadFlock() {
         val farm = farmId ?: return
         viewModelScope.launch {
-            val flockResult = runCatching { api.flock(farm, flockId) }.getOrNull()?.body()
-            val complianceResult = runCatching { api.vaccinationCompliance(farm, flockId) }.getOrNull()?.body()
-            _state.value = _state.value.copy(
-                flock = flockResult,
-                compliance = complianceResult.orEmpty(),
-                loading = false,
-            )
+            while (isActive) {
+                val flockResult = runCatching { api.flock(farm, flockId) }.getOrNull()?.body()
+                val complianceResult = runCatching { api.vaccinationCompliance(farm, flockId) }.getOrNull()?.body()
+                _state.value = _state.value.copy(
+                    flock = flockResult ?: _state.value.flock,
+                    compliance = complianceResult ?: _state.value.compliance,
+                    loading = false,
+                )
+                delay(POLL_INTERVAL_MS)
+            }
         }
     }
 

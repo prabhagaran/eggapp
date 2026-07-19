@@ -12,12 +12,19 @@ import com.eggapp.field.data.FieldRecordRepository
 import com.eggapp.field.data.TokenStore
 import com.eggapp.field.data.local.CandlingEntity
 import com.eggapp.field.data.local.HatchEntity
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+
+// Status/counts here only reflect a candling/hatch record after
+// SyncWorker has pushed it — poll like IncubatorsViewModel does rather
+// than fetching once at screen-open and going stale.
+private const val POLL_INTERVAL_MS = 15_000L
 
 data class BatchDetailUiState(
     val batch: Batch? = null,
@@ -58,15 +65,18 @@ class BatchDetailViewModel(application: Application, private val batchId: String
     private fun loadBatch() {
         val farm = farmId ?: return
         viewModelScope.launch {
-            val batches = runCatching { api.batches(farm) }.getOrNull()?.body()
-            val fetched = batches?.find { it.id == batchId }
-            if (fetched != null) {
-                batchCache.save(fetched)
-                _state.value = _state.value.copy(batch = fetched, loading = false)
-            } else {
-                // Fetch failed (offline, etc.) — keep showing the cached
-                // value already set in init{}, just stop the spinner.
-                _state.value = _state.value.copy(loading = false)
+            while (isActive) {
+                val batches = runCatching { api.batches(farm) }.getOrNull()?.body()
+                val fetched = batches?.find { it.id == batchId }
+                if (fetched != null) {
+                    batchCache.save(fetched)
+                    _state.value = _state.value.copy(batch = fetched, loading = false)
+                } else {
+                    // Fetch failed (offline, etc.) — keep showing the last
+                    // known value (cache or a prior poll), just stop the spinner.
+                    _state.value = _state.value.copy(loading = false)
+                }
+                delay(POLL_INTERVAL_MS)
             }
         }
     }
