@@ -268,7 +268,9 @@ data class FlockDetail(
     val name: String,
     val speciesId: String,
     val purpose: String,
+    val acquisitionNote: String?,
     val placedCount: Int,
+    val stageOverride: String?, // manual correction; null = auto-derive (see stage below)
     val ageDays: Int?,
     val stage: String?,
     val currentCount: Int,
@@ -276,4 +278,71 @@ data class FlockDetail(
     val vaccinationRecords: List<VaccinationRecordDto>,
     val recentFeed: List<FeedLogDto>,
     val recentWater: List<WaterLogDto>,
+)
+
+// ── Species (Phase 4 — needed for edit-form dropdowns) ──────────────────
+
+data class Species(val id: String, val name: String)
+
+// ── Batch lifecycle (Phase 4) ────────────────────────────────────────────
+
+// Empty body serializes to "{}" (Gson omits null fields by default) —
+// matches apps/web's post("/set", {}); server defaults setAt to now().
+data class SetBatchRequest(val setAt: String? = null)
+
+// ── Vaccination templates (Phase 4 — new on Android) ─────────────────────
+
+data class VaccinationTemplateItem(
+    val id: String,
+    val speciesId: String,
+    val purpose: String,
+    val ageDaysFrom: Int,
+    val ageDaysTo: Int,
+    val vaccine: String,
+    val disease: String,
+    val route: String,
+)
+
+data class VaccinationTemplateItemRequest(
+    val speciesId: String,
+    val purpose: String,
+    val ageDaysFrom: Int,
+    val ageDaysTo: Int,
+    val vaccine: String,
+    val disease: String,
+    val route: String,
+)
+
+// ── Inventory (Phase 4 — new on Android) ──────────────────────────────────
+
+data class InventoryItem(
+    val id: String,
+    val kind: String, // "feed" | "vaccine" | "consumable"
+    val name: String,
+    val unit: String,
+    val quantity: Double,
+    val lotNumber: String?,
+    val expiry: String?,
+    val lowStockThreshold: Double?,
+)
+
+data class CreateInventoryItemRequest(
+    val kind: String,
+    val name: String,
+    val unit: String,
+    val quantity: Double,
+    val lotNumber: String? = null,
+    val expiry: String? = null,
+    val lowStockThreshold: Double? = null,
+)
+
+// kind/quantity aren't editable here — quantity only ever changes through
+// adjustStock/deductStock so every change stays in the audit ledger
+// (same rule as apps/web's inventory edit form).
+data class UpdateInventoryItemRequest(
+    val name: String,
+    val unit: String,
+    val lotNumber: String? = null,
+    val expiry: String? = null,
+    val lowStockThreshold: Double? = null,
 )

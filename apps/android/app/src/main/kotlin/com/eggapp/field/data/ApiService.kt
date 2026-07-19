@@ -1,8 +1,11 @@
 package com.eggapp.field.data
 
+import okhttp3.RequestBody
 import retrofit2.Response
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -123,4 +126,80 @@ interface ApiService {
         @Path("flockId") flockId: String,
         @Body body: WaterLogRequest,
     ): Response<WaterLogDto>
+
+    // ── Phase 4: edit/set/delete parity with the web dashboard ──────────
+
+    @GET("v1/species")
+    suspend fun species(): Response<List<Species>>
+
+    @PATCH("v1/farms/{farmId}/incubators/{id}")
+    suspend fun updateIncubator(
+        @Path("farmId") farmId: String,
+        @Path("id") id: String,
+        @Body body: RequestBody,
+    ): Response<Incubator>
+
+    @PATCH("v1/farms/{farmId}/flocks/{id}")
+    suspend fun updateFlock(
+        @Path("farmId") farmId: String,
+        @Path("id") id: String,
+        @Body body: RequestBody,
+    ): Response<FlockDetail>
+
+    @DELETE("v1/farms/{farmId}/flocks/{id}")
+    suspend fun deleteFlock(
+        @Path("farmId") farmId: String,
+        @Path("id") id: String,
+    ): Response<Unit>
+
+    @POST("v1/farms/{farmId}/batches/{id}/set")
+    suspend fun setBatch(
+        @Path("farmId") farmId: String,
+        @Path("id") id: String,
+        @Body body: SetBatchRequest,
+    ): Response<Batch>
+
+    @GET("v1/farms/{farmId}/vaccination-templates")
+    suspend fun vaccinationTemplates(@Path("farmId") farmId: String): Response<List<VaccinationTemplateItem>>
+
+    @POST("v1/farms/{farmId}/vaccination-templates")
+    suspend fun createVaccinationTemplate(
+        @Path("farmId") farmId: String,
+        @Body body: VaccinationTemplateItemRequest,
+    ): Response<VaccinationTemplateItem>
+
+    @PATCH("v1/farms/{farmId}/vaccination-templates/{id}")
+    suspend fun updateVaccinationTemplate(
+        @Path("farmId") farmId: String,
+        @Path("id") id: String,
+        @Body body: VaccinationTemplateItemRequest,
+    ): Response<VaccinationTemplateItem>
+
+    @DELETE("v1/farms/{farmId}/vaccination-templates/{id}")
+    suspend fun deleteVaccinationTemplate(
+        @Path("farmId") farmId: String,
+        @Path("id") id: String,
+    ): Response<Unit>
+
+    @GET("v1/farms/{farmId}/inventory")
+    suspend fun inventory(@Path("farmId") farmId: String): Response<List<InventoryItem>>
+
+    @POST("v1/farms/{farmId}/inventory")
+    suspend fun createInventoryItem(
+        @Path("farmId") farmId: String,
+        @Body body: CreateInventoryItemRequest,
+    ): Response<InventoryItem>
+
+    @PATCH("v1/farms/{farmId}/inventory/{id}")
+    suspend fun updateInventoryItem(
+        @Path("farmId") farmId: String,
+        @Path("id") id: String,
+        @Body body: UpdateInventoryItemRequest,
+    ): Response<InventoryItem>
+
+    @DELETE("v1/farms/{farmId}/inventory/{id}")
+    suspend fun deleteInventoryItem(
+        @Path("farmId") farmId: String,
+        @Path("id") id: String,
+    ): Response<Unit>
 }
