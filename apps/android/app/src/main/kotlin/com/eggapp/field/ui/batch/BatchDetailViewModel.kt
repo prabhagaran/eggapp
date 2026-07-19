@@ -9,6 +9,7 @@ import com.eggapp.field.data.ApiClient
 import com.eggapp.field.data.Batch
 import com.eggapp.field.data.BatchCache
 import com.eggapp.field.data.FieldRecordRepository
+import com.eggapp.field.data.SetBatchRequest
 import com.eggapp.field.data.TokenStore
 import com.eggapp.field.data.local.CandlingEntity
 import com.eggapp.field.data.local.HatchEntity
@@ -31,6 +32,7 @@ data class BatchDetailUiState(
     val localCandlings: List<CandlingEntity> = emptyList(),
     val localHatch: HatchEntity? = null,
     val loading: Boolean = true,
+    val settingBatch: Boolean = false,
     val saveError: String? = null,
 )
 
@@ -77,6 +79,25 @@ class BatchDetailViewModel(application: Application, private val batchId: String
                     _state.value = _state.value.copy(loading = false)
                 }
                 delay(POLL_INTERVAL_MS)
+            }
+        }
+    }
+
+    fun setBatch() {
+        val farm = farmId ?: return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(settingBatch = true, saveError = null)
+            val result = runCatching { api.setBatch(farm, batchId, SetBatchRequest()) }
+            val response = result.getOrNull()
+            if (response != null && response.isSuccessful) {
+                val updated = response.body()
+                if (updated != null) batchCache.save(updated)
+                _state.value = _state.value.copy(settingBatch = false, batch = updated ?: _state.value.batch)
+            } else {
+                _state.value = _state.value.copy(
+                    settingBatch = false,
+                    saveError = result.exceptionOrNull()?.message ?: "Failed to start incubation",
+                )
             }
         }
     }

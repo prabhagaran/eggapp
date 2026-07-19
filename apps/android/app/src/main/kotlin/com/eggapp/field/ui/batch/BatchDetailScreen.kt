@@ -72,6 +72,19 @@ fun BatchDetailScreen(batchId: String, onBack: () -> Unit) {
                 state.saveError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
 
+            if (state.batch?.status in listOf("planned", "setting")) {
+                item {
+                    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(enabled = !state.settingBatch, onClick = viewModel::setBatch) {
+                                Text(if (state.settingBatch) "Starting…" else "Eggs are set — start incubation")
+                            }
+                            MutedText("Fixes the lockdown and expected-hatch dates from the species schedule.")
+                        }
+                    }
+                }
+            }
+
             if (state.batch?.status == "incubating") {
                 item { CandlingForm(nextDay = suggestNextDay(state.batch?.candlingDays, state.localCandlings)) { day, f, c, b, u, note ->
                     viewModel.recordCandling(day, f, c, b, u, note)
