@@ -6,10 +6,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.eggapp.field.data.ApiClient
+import com.eggapp.field.data.CLEAR
 import com.eggapp.field.data.ComplianceItem
 import com.eggapp.field.data.FieldRecordRepository
 import com.eggapp.field.data.FlockDetail
+import com.eggapp.field.data.Species
 import com.eggapp.field.data.TokenStore
+import com.eggapp.field.data.jsonPatchBody
 import com.eggapp.field.data.local.FeedLogEntity
 import com.eggapp.field.data.local.MortalityEntity
 import com.eggapp.field.data.local.VaccinationEntity
@@ -40,7 +43,11 @@ data class FlockDetailUiState(
     val localVaccination: List<VaccinationEntity> = emptyList(),
     val localFeed: List<FeedLogEntity> = emptyList(),
     val localWater: List<WaterLogEntity> = emptyList(),
+    val species: List<Species> = emptyList(),
     val loading: Boolean = true,
+    val saving: Boolean = false,
+    val deleting: Boolean = false,
+    val deleted: Boolean = false,
     val saveError: String? = null,
 )
 
@@ -55,6 +62,10 @@ class FlockDetailViewModel(application: Application, private val flockId: String
 
     init {
         loadFlock()
+        viewModelScope.launch {
+            val speciesList = runCatching { api.species() }.getOrNull()?.body().orEmpty()
+            _state.value = _state.value.copy(species = speciesList)
+        }
         // Offline-first: locally-queued records show up immediately
         // regardless of sync state — same pattern as BatchDetailViewModel.
         combine(
@@ -81,6 +92,50 @@ class FlockDetailViewModel(application: Application, private val flockId: String
                     loading = false,
                 )
                 delay(POLL_INTERVAL_MS)
+            }
+        }
+    }
+
+    fun updateFlock(name: String, speciesId: String, purpose: String, acquisitionNote: String?, stageOverride: String?) {
+        val farm = farmId ?: return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(saving = true, saveError = null)
+            // acquisitionNote is optional-but-not-nullable server-side (unlike
+            // stageOverride) — an empty note is omitted, not cleared, same
+            // limitation apps/web's edit form has.
+            val body = jsonPatchBody(
+                "name" to name,
+                "speciesId" to speciesId,
+                "purpose" to purpose,
+                "acquisitionNote" to acquisitionNote,
+                "stageOverride" to (stageOverride ?: CLEAR),
+            )
+            val result = runCatching { api.updateFlock(farm, flockId, body) }
+            val response = result.getOrNull()
+            if (response != null && response.isSuccessful) {
+                _state.value = _state.value.copy(saving = false, flock = response.body())
+            } else {
+                _state.value = _state.value.copy(
+                    saving = false,
+                    saveError = result.exceptionOrNull()?.message ?: "Failed to save flock",
+                )
+            }
+        }
+    }
+
+    fun deleteFlock() {
+        val farm = farmId ?: return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(deleting = true, saveError = null)
+            val result = runCatching { api.deleteFlock(farm, flockId) }
+            val response = result.getOrNull()
+            if (response != null && response.isSuccessful) {
+                _state.value = _state.value.copy(deleting = false, deleted = true)
+            } else {
+                _state.value = _state.value.copy(
+                    deleting = false,
+                    saveError = result.exceptionOrNull()?.message ?: "Failed to delete flock",
+                )
             }
         }
     }
