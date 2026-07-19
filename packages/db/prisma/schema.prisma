@@ -245,6 +245,12 @@ model EggBatch {
   candlingDays        Int[] // day numbers, from Species at creation (BR-008)
   lockdownAt          DateTime?
   expectedHatchAt     DateTime?
+  // Mirrored as-is from the bound device's own telemetry (day/hatchEpoch,
+  // EGG profile only) whenever this batch is the incubator's active one.
+  // Read-only cross-check — never overwrites setAt/expectedHatchAt, which
+  // stay a purely manual record set via /set (BR-009-style traceability).
+  deviceDay             Int?
+  deviceExpectedHatchAt DateTime?
   viableCount         Int               @default(0) // maintained by candling results (BR-003)
   fertilityPct        Float? // BR-015: stored at completion, never recomputed
   hatchOfSetPct       Float?
