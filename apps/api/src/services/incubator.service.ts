@@ -12,6 +12,14 @@ const deviceSummary = {
     currentTempHysteresis: true,
     currentHumSetpoint: true,
     currentHumHysteresis: true,
+    currentFanOn: true,
+    currentFanOverride: true,
+    currentTurnerOn: true,
+    currentTurnerOverride: true,
+    currentHumidifierOn: true,
+    currentHumidifierOverride: true,
+    currentPumpOn: true,
+    currentPumpOverride: true,
   },
 } as const;
 
