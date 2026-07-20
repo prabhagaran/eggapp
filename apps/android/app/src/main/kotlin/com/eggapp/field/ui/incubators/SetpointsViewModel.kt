@@ -93,6 +93,20 @@ class SetpointsViewModel(application: Application, private val incubatorId: Stri
         }
     }
 
+    // Actuator on/off + auto/manual is device state, not command-ack state —
+    // it only shows up once fresh telemetry lands, not when the command is
+    // acked. Re-fetch the incubator (same as apps/web's polling fix) so the
+    // Switch reflects reality instead of the stale snapshot from page load.
+    private fun reloadIncubator() {
+        val farm = farmId ?: return
+        viewModelScope.launch {
+            val response = runCatching { api.incubator(farm, incubatorId) }.getOrNull()
+            if (response != null && response.isSuccessful) {
+                _state.value = _state.value.copy(incubator = response.body())
+            }
+        }
+    }
+
     // While a command hasn't reached a final state, poll to show sent -> received -> applied live.
     private fun maybePollForAck() {
         val cfg = _state.value.config
@@ -106,6 +120,7 @@ class SetpointsViewModel(application: Application, private val incubatorId: Stri
                 if (response != null && response.isSuccessful) {
                     val fresh = response.body()
                     _state.value = _state.value.copy(config = fresh)
+                    reloadIncubator()
                     if (fresh == null || fresh.state == "applied" || fresh.state == "unconfirmed") return@launch
                 }
             }
@@ -148,6 +163,7 @@ class SetpointsViewModel(application: Application, private val incubatorId: Stri
             if (response != null && response.isSuccessful) {
                 _state.value = _state.value.copy(saving = false, config = response.body())
                 maybePollForAck()
+                reloadIncubator()
             } else {
                 _state.value = _state.value.copy(
                     saving = false,
