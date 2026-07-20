@@ -58,9 +58,8 @@ agents — it is not re-litigated per feature.
 - **Data contract disagreements** (schema shape, migration strategy) escalate to
   **database-architect**.
 - **Device/protocol contract disagreements** (MQTT topic structure, payload
-  schema — constrained by firmware that is out of scope for this repo) escalate
-  to **iot-integration-architect**; this contract is authoritative and other
-  agents adapt to it, not the reverse.
+  schema) escalate to **iot-integration-architect**; this contract is
+  authoritative and other agents adapt to it, not the reverse.
 - If chief-product-architect and system-architect disagree with each other,
   product scope wins for *what* gets built; system-architect retains final say
   on *how* it is technically modeled.
@@ -78,8 +77,14 @@ capacity-sensitive decisions (storage engine, retention windows, partitioning),
 farm, expected telemetry frequency/volume, data retention period, expected
 concurrent users, and whether this is single-tenant or multi-tenant SaaS.
 
-## Out of Scope for This Repository
-- ESP32 firmware implementation (already complete, lives elsewhere). Agents may
-  only consume the device-facing contract documented in
-  `docs/iot/mqtt-topics.md` / `docs/iot/telemetry-contract.md` — they do not
-  redesign firmware behavior.
+## Client / Device Surfaces
+This product has **three** first-class surfaces, not two:
+- **ESP32 firmware** (`apps/firmware/`, owned by iot-integration-architect) —
+  merged into this repo as a git subtree of `egg-incubator-esp32-rtos`
+  (history preserved). It publishes/consumes the device-facing contract
+  documented in `docs/iot/mqtt-topics.md` / `docs/iot/telemetry-contract.md`.
+  That contract remains authoritative per the escalation rule above — other
+  agents adapt to it, not the reverse — but firmware behavior is now in-repo
+  and may be reviewed/modified here rather than treated as a black box.
+- **Android app** (owned by android-architect) — see "Client surfaces" below.
+- **Web dashboard** (owned by frontend-architect) — see "Client surfaces" below.
