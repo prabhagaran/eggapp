@@ -51,6 +51,29 @@ modeling or auth review.
 - `docs/security/threat-model.md`
 - CI/CD pipeline configuration (`infra/ci/`)
 - `infra/docker/` environment definitions
+- `infra/deploy/` — Radxa deploy scripts and runbook (`infra/deploy/README.md`)
+
+## Deploy Runbook
+`apps/api` and `apps/web` run as native Node processes under systemd on the
+Radxa (192.168.1.44 / Tailscale 100.92.177.99) — see `infra/deploy/README.md`
+for the full one-time-setup and redeploy steps (`deploy-api.sh` /
+`deploy-web.sh`). Key points an agent acting on this repo must know:
+- **Service restarts require an interactive TTY.** The `/etc/sudoers.d/`
+  NOPASSWD rules only satisfy sudo's tty_tickets requirement from a real,
+  human-driven terminal session (`ssh -t` run by the user). An agent's
+  non-interactive shell — even with `ssh -t`/`ssh -tt`/`sudo -n` and the
+  exact allowed command — reliably fails with "sudo: a password is
+  required," regardless of what `sudo -l` reports. Do not attempt to work
+  around this (no `--no-verify`-style bypass, no asking the user for their
+  sudo password); hand the user the exact `ssh radxa@... "sudo systemctl
+  restart eggapp-api && sudo systemctl restart eggapp-web"` command to run
+  themselves.
+- A silent/no-output result from a restart command is **not** evidence of
+  success — always verify with a follow-up `systemctl status` check before
+  reporting a deploy as live.
+- Any Prisma schema change ships as a migration run once against the shared
+  Supabase DB (`pnpm --filter @eggapp/db db:deploy`), independent of the
+  Radxa app redeploy.
 
 ## Definition of Done
 - Threat model explicitly covers cross-tenant data isolation and device

@@ -61,6 +61,14 @@ restart step needs a live TTY the first time in a session for `ssh -t`,
 though with the NOPASSWD sudoers rules in place it won't actually prompt
 for a password.
 
+**This must be run by a human from an actual terminal, not by an agent's
+non-interactive shell.** sudo's tty_tickets requirement isn't satisfied by
+an agent-driven `ssh -t`/`ssh -tt`/`sudo -n` call even though `sudo -l`
+shows the exact command as NOPASSWD — it fails with "sudo: a password is
+required" every time. A silent/no-output result from the restart command is
+not proof it worked; always confirm with `systemctl status` before treating
+a deploy as live.
+
 **If an apps/api change includes a schema migration**, run it yourself first:
 ```
 pnpm --filter @eggapp/db db:deploy
