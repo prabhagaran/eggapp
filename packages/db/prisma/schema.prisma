@@ -122,27 +122,38 @@ enum DeviceEventType {
 }
 
 model Device {
-  id                    String             @id @default(uuid())
-  farmId                String
-  hardwareId            String             @unique // e.g. ESP32 MAC
-  name                  String?
-  status                DeviceStatus       @default(provisioned)
-  lastSeenAt            DateTime?
-  firmwareVersion       String?
+  id                        String             @id @default(uuid())
+  farmId                    String
+  hardwareId                String             @unique // e.g. ESP32 MAC
+  name                      String?
+  status                    DeviceStatus       @default(provisioned)
+  lastSeenAt                DateTime?
+  firmwareVersion           String?
   // Latest known control-loop values, mirrored from telemetry's setTemp/
   // setHum/setTempHyst/setHumHyst on every message (US-INC-003 — the
   // remote setpoint UI needs to show what it's about to change). A
   // snapshot, not a history — TelemetryReading rows stay unchanged.
-  currentTempSetpoint   Float?
-  currentTempHysteresis Float?
-  currentHumSetpoint    Float?
-  currentHumHysteresis  Float?
-  createdAt             DateTime           @default(now())
-  farm                  Farm               @relation(fields: [farmId], references: [id], onDelete: Cascade)
-  incubator             Incubator? // set via Incubator.deviceId (BR-007: 0..1)
-  events                DeviceEvent[]
-  configs               DeviceConfig[]
-  telemetry             TelemetryReading[]
+  currentTempSetpoint       Float?
+  currentTempHysteresis     Float?
+  currentHumSetpoint        Float?
+  currentHumHysteresis      Float?
+  // Same snapshot idiom, mirrored from telemetry's fan/turner/humidifier/
+  // pump + *Override fields — lets a remote actuator toggle UI show
+  // current on/off and auto-vs-manual state before the user changes it.
+  currentFanOn              Boolean?
+  currentFanOverride        Boolean?
+  currentTurnerOn           Boolean?
+  currentTurnerOverride     Boolean?
+  currentHumidifierOn       Boolean?
+  currentHumidifierOverride Boolean?
+  currentPumpOn             Boolean?
+  currentPumpOverride       Boolean?
+  createdAt                 DateTime           @default(now())
+  farm                      Farm               @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  incubator                 Incubator? // set via Incubator.deviceId (BR-007: 0..1)
+  events                    DeviceEvent[]
+  configs                   DeviceConfig[]
+  telemetry                 TelemetryReading[]
 
   @@index([farmId])
 }
@@ -165,14 +176,19 @@ model Incubator {
 
 // Append-only time series (NFR: plain table + index is sufficient at scale)
 model TelemetryReading {
-  id          BigInt          @id @default(autoincrement())
-  deviceId    String
-  ts          DateTime
-  tempC       Float?
-  humidityPct Float?
-  turnerOn    Boolean?
-  source      TelemetrySource @default(mqtt)
-  device      Device          @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  id           BigInt          @id @default(autoincrement())
+  deviceId     String
+  ts           DateTime
+  tempC        Float?
+  humidityPct  Float?
+  heaterOn     Boolean?
+  coolerOn     Boolean?
+  humidifierOn Boolean?
+  fanOn        Boolean?
+  pumpOn       Boolean?
+  turnerOn     Boolean?
+  source       TelemetrySource @default(mqtt)
+  device       Device          @relation(fields: [deviceId], references: [id], onDelete: Cascade)
 
   @@index([deviceId, ts(sort: Desc)])
 }
@@ -236,34 +252,34 @@ model EggCollection {
 }
 
 model EggBatch {
-  id                  String            @id @default(uuid())
-  farmId              String
-  incubatorId         String
-  speciesId           String
-  status              BatchStatus       @default(planned)
-  setAt               DateTime?
-  candlingDays        Int[] // day numbers, from Species at creation (BR-008)
-  lockdownAt          DateTime?
-  expectedHatchAt     DateTime?
+  id                    String            @id @default(uuid())
+  farmId                String
+  incubatorId           String
+  speciesId             String
+  status                BatchStatus       @default(planned)
+  setAt                 DateTime?
+  candlingDays          Int[] // day numbers, from Species at creation (BR-008)
+  lockdownAt            DateTime?
+  expectedHatchAt       DateTime?
   // Mirrored as-is from the bound device's own telemetry (day/hatchEpoch,
   // EGG profile only) whenever this batch is the incubator's active one.
   // Read-only cross-check — never overwrites setAt/expectedHatchAt, which
   // stay a purely manual record set via /set (BR-009-style traceability).
   deviceDay             Int?
   deviceExpectedHatchAt DateTime?
-  viableCount         Int               @default(0) // maintained by candling results (BR-003)
-  fertilityPct        Float? // BR-015: stored at completion, never recomputed
-  hatchOfSetPct       Float?
-  hatchOfFertilePct   Float?
-  abortReason         String?
-  storageOverrideNote String? // BR-011: why >14-day eggs were set anyway
-  createdAt           DateTime          @default(now())
-  farm                Farm              @relation(fields: [farmId], references: [id], onDelete: Cascade)
-  incubator           Incubator         @relation(fields: [incubatorId], references: [id])
-  species             Species           @relation(fields: [speciesId], references: [id])
-  sources             BatchEggSource[]
-  candlings           CandlingSession[]
-  hatch               HatchEvent?
+  viableCount           Int               @default(0) // maintained by candling results (BR-003)
+  fertilityPct          Float? // BR-015: stored at completion, never recomputed
+  hatchOfSetPct         Float?
+  hatchOfFertilePct     Float?
+  abortReason           String?
+  storageOverrideNote   String? // BR-011: why >14-day eggs were set anyway
+  createdAt             DateTime          @default(now())
+  farm                  Farm              @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  incubator             Incubator         @relation(fields: [incubatorId], references: [id])
+  species               Species           @relation(fields: [speciesId], references: [id])
+  sources               BatchEggSource[]
+  candlings             CandlingSession[]
+  hatch                 HatchEvent?
 
   @@index([farmId, status])
 }

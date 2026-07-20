@@ -37,6 +37,14 @@ data class DeviceSummary(
     val currentTempHysteresis: Double?,
     val currentHumSetpoint: Double?,
     val currentHumHysteresis: Double?,
+    val currentFanOn: Boolean?,
+    val currentFanOverride: Boolean?,
+    val currentTurnerOn: Boolean?,
+    val currentTurnerOverride: Boolean?,
+    val currentHumidifierOn: Boolean?,
+    val currentHumidifierOverride: Boolean?,
+    val currentPumpOn: Boolean?,
+    val currentPumpOverride: Boolean?,
 )
 
 data class LatestTelemetry(
@@ -200,6 +208,14 @@ data class SetpointRequest(
     val tempHysteresis: Double? = null,
     val humSetpoint: Double? = null,
     val humHysteresis: Double? = null,
+    val fanOverride: Boolean? = null,
+    val fanOn: Boolean? = null,
+    val turnerOverride: Boolean? = null,
+    val turnerOn: Boolean? = null,
+    val humidifierOverride: Boolean? = null,
+    val humidifierOn: Boolean? = null,
+    val pumpOverride: Boolean? = null,
+    val pumpOn: Boolean? = null,
 )
 
 data class DeviceConfigPayload(
@@ -207,6 +223,14 @@ data class DeviceConfigPayload(
     val tempHysteresis: Double?,
     val humSetpoint: Double?,
     val humHysteresis: Double?,
+    val fanOverride: Boolean? = null,
+    val fanOn: Boolean? = null,
+    val turnerOverride: Boolean? = null,
+    val turnerOn: Boolean? = null,
+    val humidifierOverride: Boolean? = null,
+    val humidifierOn: Boolean? = null,
+    val pumpOverride: Boolean? = null,
+    val pumpOn: Boolean? = null,
 )
 
 data class DeviceConfig(

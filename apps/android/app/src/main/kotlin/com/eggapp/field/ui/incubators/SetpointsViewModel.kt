@@ -136,6 +136,27 @@ class SetpointsViewModel(application: Application, private val incubatorId: Stri
         }
     }
 
+    // Actuator-control increment: same push+poll pipeline as submit(), but
+    // only the two fields for one actuator are set per call so an
+    // independent toggle doesn't touch the other three or the setpoints.
+    fun submitActuator(request: SetpointRequest) {
+        val farm = farmId ?: return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(saving = true, error = null)
+            val result = runCatching { api.pushSetpoints(farm, incubatorId, request) }
+            val response = result.getOrNull()
+            if (response != null && response.isSuccessful) {
+                _state.value = _state.value.copy(saving = false, config = response.body())
+                maybePollForAck()
+            } else {
+                _state.value = _state.value.copy(
+                    saving = false,
+                    error = result.exceptionOrNull()?.message ?: "Failed to send actuator command",
+                )
+            }
+        }
+    }
+
     class Factory(private val application: Application, private val incubatorId: String) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T =

@@ -13,7 +13,9 @@ wire order. Example, captured live:
 {"id":"INCUBATOR_01","fw":"2.0.0","profile":"EGG","temp":24.1,"hum":89,
  "setTemp":37.5,"setHum":60,"setTempHyst":0.3,"setHumHyst":3,
  "mode":"AUTO","heater":1,"cooler":0,
- "humidifier":0,"fan":1,"pump":0,"turner":0,"day":44,"daysLeft":0,
+ "humidifier":0,"fan":1,"pump":0,"turner":0,
+ "fanOverride":0,"turnerOverride":0,"humidifierOverride":0,"pumpOverride":0,
+ "day":44,"daysLeft":0,
  "hatchEpoch":1782345600}
 ```
 
@@ -30,6 +32,7 @@ wire order. Example, captured live:
 | `setHumHyst` | number | % | Current humidity hysteresis (same reason) |
 | `mode` | string | — | `"AUTO"` or `"MANUAL"` |
 | `heater`,`cooler`,`humidifier`,`fan`,`pump`,`turner` | 0 \| 1 | — | Relay states at publish time |
+| `fanOverride`,`turnerOverride`,`humidifierOverride`,`pumpOverride` | 0 \| 1 | — | `1` = that actuator is under remote manual override (see "Commands" in `mqtt-topics.md`) and its `*On` field above reflects the override value, not automatic control-loop output |
 | `day` | int | — | Incubation day. **Only present when `profile:"EGG"`.** |
 | `daysLeft` | int | — | Days to expected hatch. **EGG only.** |
 | `hatchEpoch` | int | unix seconds | Expected hatch time. **EGG only.** |
@@ -54,9 +57,14 @@ app (it currently isn't — see domain-model.md, no such entity).
 - Match `id` against `Device.hardwareId`; **unmatched IDs are logged and
   dropped**, never auto-create a device record (mirrors BR-007: telemetry
   from an unbound/unknown device is rejected, not silently stored).
-- Persist as `TelemetryReading{ tempC: temp, humidityPct: hum, turnerOn:
-  turner, source: "mqtt" }`; `null` sensor values stored as `null`, not
-  coerced to 0.
+- Persist as `TelemetryReading{ tempC: temp, humidityPct: hum, heaterOn,
+  coolerOn, humidifierOn, fanOn, pumpOn, turnerOn, source: "mqtt" }`
+  (each `*On` mapped from the matching 0|1 field); `null` sensor values
+  stored as `null`, not coerced to 0.
+- `fanOverride`/`turnerOverride`/`humidifierOverride`/`pumpOverride` and
+  the actuator on/off fields are mirrored onto `Device.currentFanOn` /
+  `currentFanOverride` / etc. (same snapshot pattern as `currentTempSetpoint`
+  below) so a remote-control UI can show current state before toggling it.
 - Update `Device.lastSeenAt` on every telemetry message. Also promotes
   `Device.status` to `active` if it wasn't already (telemetry is itself
   proof-of-life — covers the case where the one-off retained `status`

@@ -103,6 +103,18 @@ typedef struct {
     // Manual overrides
     bool          heaterManualOn;
     bool          coolerManualOn;
+    // Per-actuator remote manual override (independent of ControlMode,
+    // which only ever gated heater/cooler) — added for remote fan/turner/
+    // humidifier/pump control via MQTT cmd. *ManualOverride = actuator is
+    // remote-controlled right now; *ManualOn = desired state while so.
+    bool          fanManualOverride;
+    bool          fanManualOn;
+    bool          turnerManualOverride;
+    bool          turnerManualOn;
+    bool          humidifierManualOverride;
+    bool          humidifierManualOn;
+    bool          pumpManualOverride;
+    bool          pumpManualOn;
 
     // Egg incubator
     EggType       eggType;

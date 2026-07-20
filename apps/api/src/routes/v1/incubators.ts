@@ -18,6 +18,14 @@ const setpointSchema = z
     tempHysteresis: z.number().optional(),
     humSetpoint: z.number().optional(),
     humHysteresis: z.number().optional(),
+    fanOverride: z.boolean().optional(),
+    fanOn: z.boolean().optional(),
+    turnerOverride: z.boolean().optional(),
+    turnerOn: z.boolean().optional(),
+    humidifierOverride: z.boolean().optional(),
+    humidifierOn: z.boolean().optional(),
+    pumpOverride: z.boolean().optional(),
+    pumpOn: z.boolean().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, { message: "At least one setpoint field is required" });
 

@@ -28,6 +28,26 @@ void task_turner(void* pvParameters) {
           }
         }
 
+        // ── Remote manual override: skip auto scheduling, drive relay directly ──
+        {
+            bool ovr = false, on = false;
+            if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+                ovr = gSettings.turnerManualOverride;
+                on  = gSettings.turnerManualOn;
+                xSemaphoreGive(settingsMutex);
+            }
+            if (ovr) {
+                setRelay(RELAY_TURNER, on);
+                uint32_t icmd = 0;
+                if (xTaskNotifyWait(0, 0xFFFFFFFFUL, &icmd, pdMS_TO_TICKS(2000)) == pdTRUE && icmd == TASK_CMD_SUSPEND) {
+                    setRelay(RELAY_TURNER, false);
+                    xEventGroupSetBits(suspendAckGroup, TASK_SUSPEND_BIT_TURNER);
+                    vTaskSuspend(NULL);
+                }
+                continue;
+            }
+        }
+
         if (!turnerActive()) {
             // Past lockdown — keep relay off and wait
             setRelay(RELAY_TURNER, false);
@@ -172,16 +192,22 @@ void task_fan(void* pvParameters) {
 
         uint8_t speed = 0;
         ProfileType profile = PROFILE_EGG_INCUBATOR;
+        bool fanOverride = false, fanOn = false;
 
         if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
             speed = (uint8_t)gSettings.fanSpeedPercent;
             profile = gSettings.activeProfile;
+            fanOverride = gSettings.fanManualOverride;
+            fanOn = gSettings.fanManualOn;
             xSemaphoreGive(settingsMutex);
         }
 
         if (profile != PROFILE_EGG_INCUBATOR) {
             // Ensure fan is off when not in incubator profile
             setFanSpeed(0);
+        } else if (fanOverride) {
+            // Remote manual override: full speed or off, bypassing fanSpeedPercent
+            setFanSpeed(fanOn ? 100 : 0);
         } else {
             setFanSpeed(speed);
         }
@@ -253,6 +279,26 @@ void task_pump(void* pvParameters) {
               xEventGroupSetBits(suspendAckGroup, TASK_SUSPEND_BIT_PUMP);
               vTaskSuspend(NULL);
           }
+        }
+
+        // ── Remote manual override: skip auto trigger logic, drive relay directly ──
+        {
+            bool ovr = false, on = false;
+            if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+                ovr = gSettings.pumpManualOverride;
+                on  = gSettings.pumpManualOn;
+                xSemaphoreGive(settingsMutex);
+            }
+            if (ovr) {
+                setRelay(RELAY_PUMP, on);
+                uint32_t icmd = 0;
+                if (xTaskNotifyWait(0, 0xFFFFFFFFUL, &icmd, pdMS_TO_TICKS(2000)) == pdTRUE && icmd == TASK_CMD_SUSPEND) {
+                    setRelay(RELAY_PUMP, false);
+                    xEventGroupSetBits(suspendAckGroup, TASK_SUSPEND_BIT_PUMP);
+                    vTaskSuspend(NULL);
+                }
+                continue;
+            }
         }
 
         float currentHum = 0.0f;

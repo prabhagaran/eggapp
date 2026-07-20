@@ -70,6 +70,7 @@ export default function IncubatorHistoryPage() {
       {error && <p className="alert-error">{error}</p>}
 
       {incubator?.device && <SetpointsCard farmId={farmId} incubatorId={id} device={incubator.device} />}
+      {incubator?.device && <ActuatorsCard farmId={farmId} incubatorId={id} device={incubator.device} />}
 
       <h2>History</h2>
       <div className="row" style={{ marginBottom: "1rem" }}>
@@ -253,6 +254,118 @@ function SetpointsCard({
           {saving ? "Sending…" : "Send to device"}
         </button>
       </form>
+      {config && (
+        <p className={config.state === "unconfirmed" ? "badge warn" : "muted"} style={{ marginTop: "0.5rem" }}>
+          v{config.version}: {CONFIG_STATE_LABEL[config.state] ?? config.state}
+        </p>
+      )}
+    </div>
+  );
+}
+
+const ACTUATORS = [
+  { key: "fan", label: "Fan" },
+  { key: "turner", label: "Turner" },
+  { key: "humidifier", label: "Humidifier" },
+  { key: "pump", label: "Pump" },
+] as const;
+
+// Follow-up to SetpointsCard's US-INC-003 pattern, now that telemetry
+// mirrors fan/turner/humidifier/pump on-off + override state (see
+// docs/iot/mqtt-topics.md "Commands"). Each row toggles that one
+// actuator's remote override on/off via the same /config endpoint and
+// sent->received->applied pipeline.
+function ActuatorsCard({
+  farmId,
+  incubatorId,
+  device,
+}: {
+  farmId: string;
+  incubatorId: string;
+  device: NonNullable<Incubator["device"]>;
+}) {
+  const [config, setConfig] = useState<DeviceConfig | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState<string | null>(null);
+
+  const reloadConfig = useCallback(() => {
+    api<DeviceConfig | null>(`/v1/farms/${farmId}/incubators/${incubatorId}/config`).then(setConfig);
+  }, [farmId, incubatorId]);
+  useEffect(reloadConfig, [reloadConfig]);
+
+  useEffect(() => {
+    if (!config || config.state === "applied" || config.state === "unconfirmed") return;
+    const t = setInterval(reloadConfig, 3_000);
+    return () => clearInterval(t);
+  }, [config, reloadConfig]);
+
+  async function toggle(key: (typeof ACTUATORS)[number]["key"], nextOn: boolean) {
+    setError(null);
+    setPending(key);
+    try {
+      const result = await api<DeviceConfig>(`/v1/farms/${farmId}/incubators/${incubatorId}/config`, {
+        method: "POST",
+        body: { [`${key}Override`]: true, [`${key}On`]: nextOn },
+      });
+      setConfig(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : `Failed to toggle ${key}`);
+    } finally {
+      setPending(null);
+    }
+  }
+
+  async function setAuto(key: (typeof ACTUATORS)[number]["key"]) {
+    setError(null);
+    setPending(key);
+    try {
+      const result = await api<DeviceConfig>(`/v1/farms/${farmId}/incubators/${incubatorId}/config`, {
+        method: "POST",
+        body: { [`${key}Override`]: false },
+      });
+      setConfig(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : `Failed to reset ${key} to auto`);
+    } finally {
+      setPending(null);
+    }
+  }
+
+  return (
+    <div className="card">
+      <h2 style={{ marginTop: 0 }}>Actuators</h2>
+      {error && <p className="alert-error">{error}</p>}
+      <div className="row">
+        {ACTUATORS.map(({ key, label }) => {
+          const on = device[`current${label}On` as keyof typeof device] as boolean | null;
+          const override = device[`current${label}Override` as keyof typeof device] as boolean | null;
+          return (
+            <div key={key} className="card" style={{ minWidth: "160px" }}>
+              <div style={{ fontWeight: 600 }}>{label}</div>
+              <p className="muted" style={{ margin: "0.25rem 0" }}>
+                {on == null ? "no telemetry yet" : on ? "on" : "off"} — {override ? "manual" : "auto"}
+              </p>
+              <div className="row">
+                <button
+                  className={on ? "" : "primary"}
+                  disabled={pending === key}
+                  onClick={() => toggle(key, false)}
+                >
+                  Off
+                </button>
+                <button className={on ? "primary" : ""} disabled={pending === key} onClick={() => toggle(key, true)}>
+                  On
+                </button>
+                {override && (
+                  <button disabled={pending === key} onClick={() => setAuto(key)}>
+                    Auto
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
       {config && (
         <p className={config.state === "unconfirmed" ? "badge warn" : "muted"} style={{ marginTop: "0.5rem" }}>
           v{config.version}: {CONFIG_STATE_LABEL[config.state] ?? config.state}

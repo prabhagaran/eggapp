@@ -18,6 +18,18 @@ export interface SetpointInput {
   // setpoints since the wire mechanics (version, ack states, 2-minute
   // timeout) are identical, not because it's conceptually a setpoint.
   startEpoch?: number;
+  // Actuator-control increment: remote manual override + desired on/off
+  // per actuator, routed through this same version/ack/unconfirmed
+  // pipeline — mechanically identical to the setpoint fields above, see
+  // docs/iot/mqtt-topics.md "Commands".
+  fanOverride?: boolean;
+  fanOn?: boolean;
+  turnerOverride?: boolean;
+  turnerOn?: boolean;
+  humidifierOverride?: boolean;
+  humidifierOn?: boolean;
+  pumpOverride?: boolean;
+  pumpOn?: boolean;
 }
 
 // No ack at all within this window means something's wrong (device

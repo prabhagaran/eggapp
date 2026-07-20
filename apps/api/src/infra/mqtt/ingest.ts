@@ -33,6 +33,17 @@ const telemetrySchema = z.object({
   temp: z.number().nullable(),
   hum: z.number().nullable(),
   turner: z.union([z.literal(0), z.literal(1)]),
+  // Optional — older firmware (pre actuator-control increment) won't send
+  // these yet, same reasoning as the setpoint hysteresis fields below.
+  heater: z.union([z.literal(0), z.literal(1)]).optional(),
+  cooler: z.union([z.literal(0), z.literal(1)]).optional(),
+  humidifier: z.union([z.literal(0), z.literal(1)]).optional(),
+  fan: z.union([z.literal(0), z.literal(1)]).optional(),
+  pump: z.union([z.literal(0), z.literal(1)]).optional(),
+  fanOverride: z.union([z.literal(0), z.literal(1)]).optional(),
+  turnerOverride: z.union([z.literal(0), z.literal(1)]).optional(),
+  humidifierOverride: z.union([z.literal(0), z.literal(1)]).optional(),
+  pumpOverride: z.union([z.literal(0), z.literal(1)]).optional(),
   setTemp: z.number().optional(),
   setHum: z.number().optional(),
   setTempHyst: z.number().optional(),
@@ -87,6 +98,11 @@ async function handleTelemetry(log: FastifyBaseLogger, deviceId: string, raw: Bu
         tempC: parsed.data.temp,
         humidityPct: parsed.data.hum,
         turnerOn: parsed.data.turner === 1,
+        ...(parsed.data.heater != null ? { heaterOn: parsed.data.heater === 1 } : {}),
+        ...(parsed.data.cooler != null ? { coolerOn: parsed.data.cooler === 1 } : {}),
+        ...(parsed.data.humidifier != null ? { humidifierOn: parsed.data.humidifier === 1 } : {}),
+        ...(parsed.data.fan != null ? { fanOn: parsed.data.fan === 1 } : {}),
+        ...(parsed.data.pump != null ? { pumpOn: parsed.data.pump === 1 } : {}),
         source: "mqtt",
       },
     });
@@ -102,6 +118,18 @@ async function handleTelemetry(log: FastifyBaseLogger, deviceId: string, raw: Bu
         ...(parsed.data.setTempHyst != null ? { currentTempHysteresis: parsed.data.setTempHyst } : {}),
         ...(parsed.data.setHum != null ? { currentHumSetpoint: parsed.data.setHum } : {}),
         ...(parsed.data.setHumHyst != null ? { currentHumHysteresis: parsed.data.setHumHyst } : {}),
+        // Actuator-control increment: same snapshot idiom for fan/turner/
+        // humidifier/pump on-off + manual-override state.
+        ...(parsed.data.fan != null ? { currentFanOn: parsed.data.fan === 1 } : {}),
+        ...(parsed.data.fanOverride != null ? { currentFanOverride: parsed.data.fanOverride === 1 } : {}),
+        ...(parsed.data.turner != null ? { currentTurnerOn: parsed.data.turner === 1 } : {}),
+        ...(parsed.data.turnerOverride != null ? { currentTurnerOverride: parsed.data.turnerOverride === 1 } : {}),
+        ...(parsed.data.humidifier != null ? { currentHumidifierOn: parsed.data.humidifier === 1 } : {}),
+        ...(parsed.data.humidifierOverride != null
+          ? { currentHumidifierOverride: parsed.data.humidifierOverride === 1 }
+          : {}),
+        ...(parsed.data.pump != null ? { currentPumpOn: parsed.data.pump === 1 } : {}),
+        ...(parsed.data.pumpOverride != null ? { currentPumpOverride: parsed.data.pumpOverride === 1 } : {}),
       },
     });
     // Cross-check only — mirrors the device's own day/hatchEpoch onto

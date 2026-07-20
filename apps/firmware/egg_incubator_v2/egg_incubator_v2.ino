@@ -51,6 +51,14 @@ void loadSettings(void) {
 
         gSettings.heaterManualOn      = prefs.getBool("heatMan",    false);
         gSettings.coolerManualOn      = prefs.getBool("coolMan",    false);
+        gSettings.fanManualOverride         = prefs.getBool("fanMOvr",  false);
+        gSettings.fanManualOn               = prefs.getBool("fanMOn",   false);
+        gSettings.turnerManualOverride      = prefs.getBool("trnMOvr",  false);
+        gSettings.turnerManualOn            = prefs.getBool("trnMOn",   false);
+        gSettings.humidifierManualOverride  = prefs.getBool("humMOvr",  false);
+        gSettings.humidifierManualOn        = prefs.getBool("humMOn",   false);
+        gSettings.pumpManualOverride        = prefs.getBool("pmpMOvr",  false);
+        gSettings.pumpManualOn              = prefs.getBool("pmpMOn",   false);
 
         // Egg incubator
         gSettings.eggType             = (EggType)prefs.getUInt("eggType",  EGG_CHICKEN);
@@ -176,6 +184,14 @@ void saveSettings(void) {
 
     prefs.putBool("heatMan",    snap.heaterManualOn);
     prefs.putBool("coolMan",    snap.coolerManualOn);
+    prefs.putBool("fanMOvr",    snap.fanManualOverride);
+    prefs.putBool("fanMOn",     snap.fanManualOn);
+    prefs.putBool("trnMOvr",    snap.turnerManualOverride);
+    prefs.putBool("trnMOn",     snap.turnerManualOn);
+    prefs.putBool("humMOvr",    snap.humidifierManualOverride);
+    prefs.putBool("humMOn",     snap.humidifierManualOn);
+    prefs.putBool("pmpMOvr",    snap.pumpManualOverride);
+    prefs.putBool("pmpMOn",     snap.pumpManualOn);
 
     prefs.putUInt("eggType",    (uint32_t)snap.eggType);
     prefs.putUInt("totalDays",  snap.totalDays);

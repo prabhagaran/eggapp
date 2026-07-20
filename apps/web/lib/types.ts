@@ -43,6 +43,14 @@ export interface DeviceSummary {
   currentTempHysteresis: number | null;
   currentHumSetpoint: number | null;
   currentHumHysteresis: number | null;
+  currentFanOn: boolean | null;
+  currentFanOverride: boolean | null;
+  currentTurnerOn: boolean | null;
+  currentTurnerOverride: boolean | null;
+  currentHumidifierOn: boolean | null;
+  currentHumidifierOverride: boolean | null;
+  currentPumpOn: boolean | null;
+  currentPumpOverride: boolean | null;
 }
 
 export type ConfigState = "sent" | "received" | "applied" | "unconfirmed";
@@ -55,6 +63,14 @@ export interface DeviceConfig {
     tempHysteresis?: number;
     humSetpoint?: number;
     humHysteresis?: number;
+    fanOverride?: boolean;
+    fanOn?: boolean;
+    turnerOverride?: boolean;
+    turnerOn?: boolean;
+    humidifierOverride?: boolean;
+    humidifierOn?: boolean;
+    pumpOverride?: boolean;
+    pumpOn?: boolean;
   };
   state: ConfigState;
   sentAt: string;

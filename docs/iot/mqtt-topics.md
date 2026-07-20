@@ -60,10 +60,11 @@ Scope for this increment: the four EGG-incubator control-loop values
 already exposed in telemetry as `setTemp`/`setHum` (plus their
 hysteresis, newly added to telemetry alongside this — see
 `telemetry-contract.md`), plus the incubation start date (`startEpoch`,
-added by ADR 0008). Turner/fan/pump/mode are **not** covered yet — their
-current values aren't surfaced in telemetry, so a remote edit UI
-couldn't show what it's changing *from*; a follow-up increment can add
-those once telemetry mirrors them.
+added by ADR 0008), plus (the follow-up increment referenced above)
+remote on/off control of fan, turner, humidifier, and pump — now that
+telemetry mirrors their current on/off and override state (see
+`telemetry-contract.md`), a remote toggle UI can show what it's
+changing from.
 
 ### `eggapp/devices/<id>/cmd` (platform → device)
 
@@ -75,12 +76,36 @@ those once telemetry mirrors them.
 {"version":5,"startEpoch":1721347200}
 ```
 
+```json
+{"version":6,"fanOverride":true,"fanOn":true}
+```
+
+```json
+{"version":7,"turnerOverride":false}
+```
+
 - `version` is a per-device monotonic integer, assigned by the backend
   (`DeviceConfig.version`) — lets the device (and backend) tell commands
   apart and ignore anything older than the last one it acted on.
 - All fields are optional and independent; only the fields present are
-  changed, and any combination (including all five at once) is valid in
-  a single payload.
+  changed, and any combination (including all thirteen at once) is
+  valid in a single payload.
+- `fanOverride`/`turnerOverride`/`humidifierOverride`/`pumpOverride`
+  (bool) — enters (`true`) or exits (`false`) remote manual control for
+  that one actuator, independent of the other three and independent of
+  the existing `ControlMode` (which only ever gated heater/cooler).
+  While an actuator's override is `true`, its automatic scheduling logic
+  (turner interval, fan PWM curve, pump humidity trigger, humidifier
+  hysteresis) is bypassed and the relay/PWM follows `fanOn`/`turnerOn`/
+  `humidifierOn`/`pumpOn` directly. Setting override back to `false`
+  resumes automatic control on the next task iteration. Existing safety
+  gates (sensor-invalid, over-temperature fault latch) still force
+  outputs off regardless of override.
+- `fanOn`/`turnerOn`/`humidifierOn`/`pumpOn` (bool) — the desired state
+  while that actuator's override is active. Sending `fanOn` without
+  `fanOverride:true` (in this payload or a prior one) updates the stored
+  value but has no visible effect until override is actually on.
+  Accepts JSON `true`/`false` or numeric `1`/`0` on the wire.
 - Setpoint fields are clamped to the existing `config.h` edit limits
   (`TEMP_SETPOINT_MIN/MAX`, `TEMP_HYST_MIN/MAX`, `HUM_SETPOINT_MIN/MAX`,
   `HUM_HYST_MIN/MAX` — the same bounds the physical button UI already

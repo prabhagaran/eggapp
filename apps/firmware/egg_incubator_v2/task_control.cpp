@@ -115,6 +115,7 @@ void task_temperature_control(void* pvParameters) {
         float      humHyst   = DEFAULT_HUM_HYSTERESIS;
         ControlMode ctrlMode = MODE_AUTO;
         bool       heatMan   = false;
+        bool       humOverride = false, humManualOn = false;
 
         if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
             tempSP   = gSettings.tempSetpoint;
@@ -123,6 +124,8 @@ void task_temperature_control(void* pvParameters) {
             humHyst  = gSettings.humHysteresis;
             ctrlMode = gSettings.controlMode;
             heatMan  = gSettings.heaterManualOn;
+            humOverride = gSettings.humidifierManualOverride;
+            humManualOn = gSettings.humidifierManualOn;
             xSemaphoreGive(settingsMutex);
         }
 
@@ -151,9 +154,12 @@ void task_temperature_control(void* pvParameters) {
             }
         }
 
-        // ── 5. Humidifier hysteresis control (same in auto & manual) ─────────
+        // ── 5. Humidifier control ──────────────────────────────────────────
         if (!humValid) {
             setRelay(RELAY_HUMIDIFIER, false);
+        } else if (humOverride) {
+            // Remote manual override: relay directly follows user toggle
+            setRelay(RELAY_HUMIDIFIER, humManualOn);
         } else {
             bool humOn = false;
             if (xSemaphoreTake(controlMutex, pdMS_TO_TICKS(20)) == pdTRUE) {

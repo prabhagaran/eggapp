@@ -59,6 +59,23 @@ static float clampf(float v, float lo, float hi) {
     return v;
 }
 
+// Accepts JSON `true`/`false` literals (how JSON.stringify serializes a JS
+// boolean, e.g. from the backend's SetpointInput) as well as numeric 0/1
+// (consistent with every other field in this file), since the wire format
+// isn't otherwise pinned down for booleans the way it is for numbers.
+static bool extractBoolField(const char* json, const char* key, bool* out) {
+    char pattern[24];
+    snprintf(pattern, sizeof(pattern), "\"%s\":", key);
+    const char* p = strstr(json, pattern);
+    if (!p) return false;
+    p += strlen(pattern);
+    while (*p == ' ') p++;
+    if (strncmp(p, "true", 4) == 0)  { *out = true;  return true; }
+    if (strncmp(p, "false", 5) == 0) { *out = false; return true; }
+    *out = strtol(p, nullptr, 10) != 0;
+    return true;
+}
+
 // Sets the incubation start date, replicating every side effect the
 // physical-button flow performs on its final OK (task_ui.cpp,
 // UI_ENV_INCUBATION_DAY / IM_EDIT): restore humidity to the egg-type
@@ -132,6 +149,17 @@ static void handleCommand(PubSubClient& mqttClient, const char* ackTopic, const 
     bool hasHumSP = extractFloatField(payload, "humSetpoint", &humSetpoint);
     bool hasHumHyst = extractFloatField(payload, "humHysteresis", &humHysteresis);
 
+    bool fanOverride, fanOn, turnerOverride, turnerOn;
+    bool humidifierOverride, humidifierOn, pumpOverride, pumpOn;
+    bool hasFanOvr   = extractBoolField(payload, "fanOverride", &fanOverride);
+    bool hasFanOn    = extractBoolField(payload, "fanOn", &fanOn);
+    bool hasTurnOvr  = extractBoolField(payload, "turnerOverride", &turnerOverride);
+    bool hasTurnOn   = extractBoolField(payload, "turnerOn", &turnerOn);
+    bool hasHumOvr   = extractBoolField(payload, "humidifierOverride", &humidifierOverride);
+    bool hasHumOn    = extractBoolField(payload, "humidifierOn", &humidifierOn);
+    bool hasPumpOvr  = extractBoolField(payload, "pumpOverride", &pumpOverride);
+    bool hasPumpOn   = extractBoolField(payload, "pumpOn", &pumpOn);
+
     long startEpochRaw = 0;
     bool hasStartEpoch = extractLongField(payload, "startEpoch", &startEpochRaw);
     if (hasStartEpoch) {
@@ -156,6 +184,14 @@ static void handleCommand(PubSubClient& mqttClient, const char* ackTopic, const 
         if (hasTempHyst) gSettings.tempHysteresis = clampf(tempHysteresis, TEMP_HYST_MIN, TEMP_HYST_MAX);
         if (hasHumSP) gSettings.humSetpoint = clampf(humSetpoint, HUM_SETPOINT_MIN, HUM_SETPOINT_MAX);
         if (hasHumHyst) gSettings.humHysteresis = clampf(humHysteresis, HUM_HYST_MIN, HUM_HYST_MAX);
+        if (hasFanOvr)  gSettings.fanManualOverride = fanOverride;
+        if (hasFanOn)   gSettings.fanManualOn = fanOn;
+        if (hasTurnOvr) gSettings.turnerManualOverride = turnerOverride;
+        if (hasTurnOn)  gSettings.turnerManualOn = turnerOn;
+        if (hasHumOvr)  gSettings.humidifierManualOverride = humidifierOverride;
+        if (hasHumOn)   gSettings.humidifierManualOn = humidifierOn;
+        if (hasPumpOvr) gSettings.pumpManualOverride = pumpOverride;
+        if (hasPumpOn)  gSettings.pumpManualOn = pumpOn;
         xSemaphoreGive(settingsMutex);
     } else {
         Serial.println("[MQTT] settingsMutex timeout — cmd not applied");
@@ -164,6 +200,24 @@ static void handleCommand(PubSubClient& mqttClient, const char* ackTopic, const 
 
     if (hasStartEpoch) {
         applyStartEpoch((uint32_t)startEpochRaw);
+    }
+
+    // Persist only the changed actuator-override keys to NVS — same
+    // targeted-write idiom as applyStartEpoch, so a remote toggle survives
+    // reboot without a full saveSettings() call from this file.
+    if (hasFanOvr || hasFanOn || hasTurnOvr || hasTurnOn ||
+        hasHumOvr || hasHumOn || hasPumpOvr || hasPumpOn) {
+        Preferences actuatorPrefs;
+        actuatorPrefs.begin("incubator", false);
+        if (hasFanOvr)  actuatorPrefs.putBool("fanMOvr", fanOverride);
+        if (hasFanOn)   actuatorPrefs.putBool("fanMOn", fanOn);
+        if (hasTurnOvr) actuatorPrefs.putBool("trnMOvr", turnerOverride);
+        if (hasTurnOn)  actuatorPrefs.putBool("trnMOn", turnerOn);
+        if (hasHumOvr)  actuatorPrefs.putBool("humMOvr", humidifierOverride);
+        if (hasHumOn)   actuatorPrefs.putBool("humMOn", humidifierOn);
+        if (hasPumpOvr) actuatorPrefs.putBool("pmpMOvr", pumpOverride);
+        if (hasPumpOn)  actuatorPrefs.putBool("pmpMOn", pumpOn);
+        actuatorPrefs.end();
     }
 
     char appliedAck[48];
@@ -289,6 +343,7 @@ void task_mqtt(void* pvParameters) {
             float           tempHyst = DEFAULT_TEMP_HYSTERESIS, humHyst = DEFAULT_HUM_HYSTERESIS;
             ControlMode     ctrlMode = MODE_AUTO;
             ProfileType     prof     = PROFILE_EGG_INCUBATOR;
+            bool            fanOvr = false, turnerOvr = false, humOvr = false, pumpOvr = false;
 
             if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
                 tempSP   = gSettings.tempSetpoint;
@@ -297,6 +352,10 @@ void task_mqtt(void* pvParameters) {
                 humHyst  = gSettings.humHysteresis;
                 ctrlMode = gSettings.controlMode;
                 prof     = gSettings.activeProfile;
+                fanOvr     = gSettings.fanManualOverride;
+                turnerOvr  = gSettings.turnerManualOverride;
+                humOvr     = gSettings.humidifierManualOverride;
+                pumpOvr    = gSettings.pumpManualOverride;
                 xSemaphoreGive(settingsMutex);
             }
 
@@ -329,14 +388,16 @@ void task_mqtt(void* pvParameters) {
                 "\"temp\":%s,\"hum\":%s,\"setTemp\":%.1f,\"setHum\":%d,"
                 "\"setTempHyst\":%.1f,\"setHumHyst\":%.1f,"
                 "\"mode\":\"%s\",\"heater\":%d,\"cooler\":%d,\"humidifier\":%d,"
-                "\"fan\":%d,\"pump\":%d,\"turner\":%d",
+                "\"fan\":%d,\"pump\":%d,\"turner\":%d,"
+                "\"fanOverride\":%d,\"turnerOverride\":%d,\"humidifierOverride\":%d,\"pumpOverride\":%d",
                 DEVICE_ID, FW_VERSION,
                 prof == PROFILE_EGG_INCUBATOR ? "EGG" : "CLIMATE",
                 tempStr, humStr, tempSP, (int)humSP,
                 tempHyst, humHyst,
                 ctrlMode == MODE_AUTO ? "AUTO" : "MANUAL",
                 rs.heaterOn ? 1 : 0, rs.coolerOn ? 1 : 0, rs.humidifierOn ? 1 : 0,
-                rs.fanOn ? 1 : 0, rs.pumpOn ? 1 : 0, rs.turnerOn ? 1 : 0);
+                rs.fanOn ? 1 : 0, rs.pumpOn ? 1 : 0, rs.turnerOn ? 1 : 0,
+                fanOvr ? 1 : 0, turnerOvr ? 1 : 0, humOvr ? 1 : 0, pumpOvr ? 1 : 0);
 
             if (prof == PROFILE_EGG_INCUBATOR) {
                 char extra[64];
