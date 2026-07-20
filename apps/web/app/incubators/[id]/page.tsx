@@ -43,14 +43,25 @@ export default function IncubatorHistoryPage() {
   const [history, setHistory] = useState<History | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const reloadIncubator = useCallback(() => {
     if (!farmId || !id) return;
     api<Incubator>(`/v1/farms/${farmId}/incubators/${id}`).then(setIncubator);
+  }, [farmId, id]);
+
+  useEffect(() => {
+    if (!farmId || !id) return;
+    reloadIncubator();
     api<Batch[]>(`/v1/farms/${farmId}/batches`).then((all) => {
       const forThis = all.find((b) => b.incubatorId === id && b.status !== "aborted" && b.status !== "closed");
       setActiveBatch(forThis ?? null);
     });
-  }, [farmId, id]);
+    // Telemetry (incl. actuator on/off + override state) lands every ~60s;
+    // poll a bit faster, same idiom as the incubators list page, so
+    // SetpointsCard/ActuatorsCard reflect fresh device state without a
+    // manual page refresh.
+    const t = setInterval(reloadIncubator, 15_000);
+    return () => clearInterval(t);
+  }, [farmId, id, reloadIncubator]);
 
   const reload = useCallback(() => {
     if (!farmId || !id) return;
