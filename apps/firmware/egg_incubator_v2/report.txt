@@ -1,0 +1,448 @@
+================================================================================
+  EGG INCUBATOR v2  —  FULL CODE REVIEW REPORT
+  Target: ESP32 (DOIT DevKit v1)   FW: 2.0.0   Date: 2026-04-01
+  Reviewer: GitHub Copilot (Claude Sonnet 4.6)
+  Previous review: 2025-07  |  This review: 2026-04-01
+================================================================================
+
+FILES REVIEWED
+--------------
+  config.h                    oled_ui.h / .cpp (layout)
+  globals.h / .cpp            incubator_logic.h / .cpp
+  egg_incubator_v2.ino        climate_logic.h / .cpp
+  task_sensors.h / .cpp       task_rtc.h / .cpp
+  task_control.h / .cpp       task_buttons.h / .cpp
+  task_climate_control.cpp    task_ui.h / .cpp
+  task_incubator.h / .cpp     task_wifi_manager.h / .cpp
+  task_cloud.h / .cpp
+
+BUILD STATUS: PASS — firmware compiled and uploaded; HTTP 200 telemetry
+confirmed on COM3.  TWDT enrolled (5-second timeout).
+
+REVIEW SUMMARY (2026-04-01)
+----------------------------
+  Issues in previous report (2025-07) .............. 27
+  Issues resolved since last review ................. 19
+  Issues remaining open ............................  7
+  Net new issues found this review ...................  0
+
+================================================================================
+  SECTION 1 — ISSUES BY SEVERITY
+================================================================================
+
+Legend: [FIXED] = resolved since last review.  Open items listed below.
+
+────────────────────────────────────────────────────────────────────────────────
+CRITICAL  (must fix — security or data-integrity risk)
+────────────────────────────────────────────────────────────────────────────────
+
+C-1  [FIXED] CLOUD_TOKEN stored in plaintext in config.h
+     Resolved: Moved to gitignored secrets.h via __has_include guard in
+     config.h.  Empty fallback defaults prevent accidental commit.
+     Files changed: config.h, secrets.h, secrets.h.example, .gitignore
+
+C-2  [FIXED] GOOGLE_SCRIPT_URL hardcoded in config.h
+     Resolved: Moved to secrets.h alongside CLOUD_TOKEN.
+     Files changed: config.h, secrets.h, secrets.h.example
+
+C-3  [PARTIAL] TLS verification disabled — CLOUD_ROOT_CA defaults to empty
+     File: secrets.h / config.h, task_cloud.cpp
+     Infrastructure is now in place: task_cloud.cpp calls setCACert() when
+     CLOUD_ROOT_CA length > 10, otherwise falls back to setInsecure().
+     ROOT_CA_EXTRACT.md provides step-by-step instructions to extract the PEM.
+     However, secrets.h still ships with CLOUD_ROOT_CA "" (empty), so the
+     device currently runs with HTTPS certificate verification disabled.
+     REMAINING ACTION: Populate CLOUD_ROOT_CA in secrets.h with the Google
+     ISRG Root X1 / GTS Root R4 PEM chain as described in ROOT_CA_EXTRACT.md.
+
+────────────────────────────────────────────────────────────────────────────────
+HIGH  (functional bug or significant design flaw)
+────────────────────────────────────────────────────────────────────────────────
+
+H-1  [FIXED] RELAY_FAN / LEDC pin conflict — gRelayState.fanOn always false
+     Resolved: RELAY_FAN removed from setRelay() and allRelaysOff().
+     allRelaysOff() now calls setFanSpeed(0). setFanSpeed() updates
+     gRelayState.fanOn under controlMutex after each PWM write.
+     Cloud telemetry now reports correct fan state.
+     Files changed: globals.cpp, task_incubator.cpp
+
+H-2  [FIXED] Turner records lastTurnEpoch before turn completes
+     Resolved: task_turner() re-reads gRtcTime.epoch into finishedEpoch after
+     vTaskDelay(durationSec * 1000UL); uses finishedEpoch for both the in-memory
+     update and the NVS "lastTurn" write.  Fallback to pre-turn epoch if RTC
+     unavailable post-delay.
+     Files changed: task_incubator.cpp
+
+H-3  [FIXED] Climate cycleStartEpoch and ramp state not persisted to NVS
+     Resolved: cyclicInHeatPhase() bootstrap now writes prefs.putULong
+     ("cycleStart"); getRampTargetTemp() writes rampStart + rampIdx to NVS on
+     step bootstrap and on every step advance.  Power cycles resume the correct
+     phase and ramp step.
+     Files changed: climate_logic.cpp
+
+H-4  [FIXED] Lockdown humidity change not persisted to NVS
+     Resolved: task_milestone() writes prefs.putFloat("setHum") immediately
+     after raising gSettings.humSetpoint to lockdownHumidity.
+     Files changed: task_incubator.cpp
+
+H-5  [FIXED] task_pump() acts on stale / invalid humidity reading
+     Resolved: hum_valid is read under the same sensorMutex critical section as
+     humidity_dht; if false, the task delays 30 s and skips pump logic entirely.
+     Files changed: task_incubator.cpp
+
+────────────────────────────────────────────────────────────────────────────────
+MEDIUM  (improvement or minor correctness issue)
+────────────────────────────────────────────────────────────────────────────────
+
+M-1  [FIXED] Orphaned defines DEFAULT_FAN_INTERVAL_MIN / DEFAULT_FAN_DURATION_SEC
+     Resolved: Both defines removed from config.h FAN DEFAULTS block.
+     Only DEFAULT_FAN_SPEED_PERCENT remains.
+     Files changed: config.h
+
+M-2  [FIXED] TelemetryMsg_t declared after its extern in globals.h
+     Resolved: TelemetryMsg_t typedef now appears directly before
+     extern QueueHandle_t telemetryQueue in globals.h.
+     Files changed: globals.h
+
+M-3  [FIXED] Candling day hardcoded to day 7 for all egg types
+     Resolved: Per-type candle day constants added to config.h:
+       CHICKEN_CANDLE_DAY 7, DUCK_CANDLE_DAY 10, QUAIL_CANDLE_DAY 7.
+     checkMilestone() in incubator_logic.cpp reads eggType from gSettings
+     and selects the appropriate candleDay constant.
+     Files changed: config.h, incubator_logic.cpp
+
+M-4  [FIXED] SENSOR_INVALID_HIGH sentinel widened to avoid DS18B20 POR clash
+  Resolved: `SENSOR_INVALID_HIGH` changed to 100.0f in `config.h`.
+  DS18B20 power-on-reset sentinel (85.0 °C) is still explicitly detected
+  in `task_sensors.cpp` via `if (t == 85.0f)`, so POR handling remains
+  unchanged while the range guard was widened to avoid semantic collision.
+  Files changed: config.h
+
+M-5  [FIXED] TURNER_MIN_INTERVAL_MIN comment vs. value mismatch
+     Resolved: Value corrected to 60 to match "60 min minimum allowed" comment.
+     Files changed: config.h
+
+M-6  [FIXED] switchProfile() safe-suspend via task notifications
+     Resolved: Replaced all direct vTaskSuspend() calls in switchProfile() with
+     a task-notification based mechanism.  Each suspendable task
+     (task_temperature_control, task_climate_control, task_turner, task_fan,
+     task_pump, task_milestone) now checks for TASK_CMD_SUSPEND (0xA5A5) at the
+     very top of its for(;;) loop — outside any mutex.  switchProfile() sends
+     xTaskNotify(handle, TASK_CMD_SUSPEND, eSetValueWithOverwrite) only to the
+     tasks being suspended, waits 200 ms for them to reach their safe point, then
+     calls xTaskNotifyStateClear() before vTaskResume() on tasks being activated
+     so they cannot re-suspend from a stale notification.
+     Files changed: config.h, task_control.cpp, task_climate_control.cpp,
+                    task_incubator.cpp (turner/fan/pump/milestone), egg_incubator_v2.ino
+
+M-7  [FIXED] Cloud retry loop over-processes not-yet-due messages
+     Resolved: The retry loop now uses `xQueuePeek()` to inspect the queue
+     head before dequeuing. If the head item's `nextAttemptMs` is still in
+     the future the loop breaks immediately, stopping all re-enqueue churn.
+     FIFO ordering means if the head is not yet due, all remaining items in
+     this pass are not due either.
+     Root cause was: iterating with a snapshot count, dequeuing each item,
+     and re-enqueueing not-yet-due items -- causing tight busy-loop CPU spikes
+     on Core 0 whenever backoff items dominated the queue.
+     Files changed: task_cloud.cpp
+
+M-8  wifiUserEnabled / wifiPortalActive — volatile without memory barriers
+     File: globals.h / globals.cpp
+     These flags are written from Core 0 (task_wifi_manager) and read from
+     Core 1 (task_ui) and Core 0 (task_cloud).  On dual-core ESP32, volatile
+     alone does not guarantee cross-core visibility without a memory barrier.
+     FIX: Wrap reads and writes in portENTER_CRITICAL / portEXIT_CRITICAL
+     (with a dedicated spinlock), or change type to std::atomic<bool>.
+
+────────────────────────────────────────────────────────────────────────────────
+LOW  (code quality, maintainability, or minor style)
+────────────────────────────────────────────────────────────────────────────────
+
+L-1  task_ui.cpp monolithic (~1,493 lines)
+     No change since last review.  Split into per-screen modules remains a
+     recommended refactor for maintainability.
+
+L-2  TelemetryMsg_t.url[768] — no truncation warning when building URL
+     File: task_cloud.cpp, URL-build block
+     The telemetry and error URLs are built as Arduino String objects.
+     strncpy(t.url, url.c_str(), sizeof(t.url)-1) limits the copy, but no
+     runtime warning is emitted if the URL String exceeds 767 bytes.
+     FIX: After strncpy, check if url.length() >= sizeof(t.url)-1 and call
+     pushError("URL_TRUNC", "Telemetry URL truncated") if so.
+
+L-3  pushError silently drops messages when errorQueue is full
+     File: globals.cpp, pushError()
+     xQueueSend with timeout 0 drops silently.
+     FIX: Increment a volatile uint32_t droppedErrors counter and
+     periodically log or display it.
+
+L-4  Serial.printf in hot control loops
+     Multiple files (task_control.cpp, task_climate_control.cpp) print relay
+     state changes via Serial.printf.  On ESP32, Serial writes can block for
+     several milliseconds under UART TX pressure.
+     FIX: Gate behind a compile-time #if SERIAL_DEBUG flag for production
+     firmware.
+
+L-5  DS18B20 uses getTempCByIndex(0) — single-sensor assumption
+     File: task_sensors.cpp
+     Index 0 silently reads whichever sensor is first on the 1-Wire bus.
+     A wiring fault or second device could redirect reads.
+     FIX: Read and persist the device ROM address at first boot (NVS), then
+     address by address on subsequent reads.
+
+L-6  [FIXED] RTC epoch not validated during operation
+     Resolved: task_rtc.cpp validates epoch > 1700000000 UL on every read.
+     Sets rtcEpochValid = false and calls pushError("FAULT","RTC epoch invalid")
+     with a 30-second throttle when stale.  rtcEpochValid added as a global
+     volatile bool in globals.h / globals.cpp.
+     Files changed: task_rtc.cpp, globals.h, globals.cpp
+
+L-7  [FIXED] No task watchdog enrollment
+     Resolved: esp_task_wdt_init() called in setup() with 5-second timeout
+     using the IDF v5 esp_task_wdt_config_t struct API.
+     esp_task_wdt_add(NULL) removed from individual tasks that may be
+     suspended during profile switching (avoids watchdog-triggered resets on
+     suspend).
+     Files changed: egg_incubator_v2.ino
+
+L-8  [FIXED] Factory reset leaves relays energised before reboot
+     Resolved: allRelaysOff() is now the first call in factoryReset().
+     Files changed: egg_incubator_v2.ino
+
+L-9  [FIXED] milestoneMutex created inside task_milestone() not in setup()
+     Resolved: milestoneMutex = xSemaphoreCreateMutex() moved to setup()
+     alongside all other RTOS primitives, eliminating the nullptr-access window.
+     Files changed: egg_incubator_v2.ino, task_incubator.cpp
+
+L-10 HTTP response body always read even when unused
+     File: task_cloud.cpp
+     http.getString() is called after every successful GET.  For error-channel
+     sends the body content is not inspected (only logged).  On a constrained
+     ESP32 heap, allocating a String for an unneeded response wastes RAM.
+     FIX: Call http.getString() only in the telemetry path where the body
+     may carry a server status message worth logging.
+
+================================================================================
+  SECTION 2 — PER-FILE SUMMARY (2026-04-01)
+================================================================================
+
+config.h
+  • Good: clean single-file constants; all HW pins documented; secrets fully
+    separated to gitignored secrets.h; per-egg candle-day constants added;
+    TURNER_MIN_INTERVAL_MIN corrected to 60; orphaned fan interval/duration
+    defines removed; __has_include guard for secrets.h is portable.
+  • Open: none.
+
+globals.h / globals.cpp
+  • Good: all shared state behind mutexes; TelemetryMsg_t typedef now precedes
+    telemetryQueue extern; setRelay() no longer touches RELAY_FAN;
+    allRelaysOff() uses setFanSpeed(0); rtcEpochValid added.
+  • Open: none.
+
+egg_incubator_v2.ino
+  • Good: factoryReset() calls allRelaysOff() first; milestoneMutex created
+    in setup(); TWDT enrolled (5 s, trigger_panic=true) with IDF v5 API;
+    switchProfile() now uses task-notification safe-suspend (M-6 fixed).
+  • Open: none.
+
+task_sensors.cpp
+  • Good: DS18B20 non-blocking conversion; DHT single read per cycle with
+    2.5 s sampling; 5-consecutive-failure auto reinit; stale-hold on DHT;
+    per-sensor error throttling via lastErrorMs.
+  • Open: L-5 (index 0 DS18B20 assumption).
+
+task_control.cpp / task_climate_control.cpp
+  • Good: clean separation of incubator vs. climate logic; fault latch model
+    correct; hysteresis applied symmetrically; cooler lockout present.
+  • Open: L-4 (Serial.printf in hot loop).
+
+task_incubator.cpp
+  • Good: lastTurnEpoch saved AFTER turn (finishedEpoch), with RTC fallback;
+    bootstrap persists initial lastTurnEpoch; setFanSpeed() updates fanOn
+    under controlMutex; task_pump() validates hum_valid; task_milestone()
+    persists lockdown humidity to NVS; milestoneMutex moved to setup().
+  • Open: none critical.
+
+incubator_logic.cpp
+  • Good: calcIncubationDay / calcDaysLeft / calcHatchEpoch are clean epoch
+    arithmetic; turnerActive() respects lockdownDay correctly; checkMilestone()
+    now uses per-egg-type candle day constants.
+  • Open: none.
+
+climate_logic.cpp
+  • Good: scheduleAllowsHeat() handles midnight-spanning windows; cyclicInHeatPhase()
+    and getRampTargetTemp() now persist state to NVS; applyDualControl() prevents
+    simultaneous heater+cooler and has cooler lockout.
+  • Open: none.
+
+task_rtc.cpp
+  • Good: validates epoch > 1700000000 UL every second; sets rtcEpochValid
+    flag; pushes throttled "RTC epoch invalid" error; first-boot epoch logged.
+  • Open: none.
+
+task_cloud.cpp
+  • Good: non-blocking single-attempt pattern; retry queue with exponential
+    backoff; error and telemetry sends separated; CA/insecure fallback;
+    retry loop now uses peek+break to stop on first not-yet-due head (M-7).
+  • Open: C-3 (CA still empty by default),
+    L-2 (no URL truncation warning), L-10 (body always read).
+
+task_wifi_manager.cpp
+  • Good: non-blocking portal; user-controlled connect/disconnect; auto-reconnect
+    only when wifiUserEnabled; 8-second boot wait.
+  • Open: none.
+
+task_ui.cpp
+  • Good: state-machine based; confirmed edits write to NVS immediately for
+    critical keys; OLED highlight-bar UI with paginated 4-row menus and
+    scrollbar implemented; climate and system menus use sliding window.
+  • Open: L-1 (monolithic ~1,493 lines).
+
+task_rtc.h / task_cloud.h
+  • Both headers restored with full include guards, C++ extern "C" blocks,
+    and function declarations.  Previously the files in egg_incubator_v2/ were
+    empty; now match the documented API.
+
+================================================================================
+  SECTION 3 — COMPLETED FIXES (all sessions to date)
+================================================================================
+
+  [DONE 2025-07] lastTurnEpoch persisted immediately after each turn and on bootstrap.
+         task_incubator.cpp — Preferences single-key write after vTaskDelay.
+
+  [DONE 2025-07] H-2: lastTurnEpoch now recorded AFTER turn delay, not before.
+         task_incubator.cpp — Re-reads gRtcTime.epoch into finishedEpoch after
+         vTaskDelay(durationSec * 1000UL); uses finishedEpoch for both the
+         in-memory gSettings.lastTurnEpoch and the NVS "lastTurn" key.
+         Fallback to pre-turn nowEpoch if RTC is unavailable post-delay.
+
+  [DONE 2025-07] fanIntervalMin / fanDurationSec removed from Settings_t and NVS.
+         globals.h, egg_incubator_v2.ino (loadSettings / saveSettings).
+
+  [DONE 2025-07] startEpoch persisted immediately on incubation start date confirm.
+         task_ui.cpp — prefs.putULong("startEpoch") + prefs.putULong("lastTurn",0).
+
+  [DONE 2025-07] Cloud telemetry refactored to non-blocking single-attempt + retry queue.
+         task_cloud.cpp — TelemetryMsg_t queue, exponential backoff, retry loop.
+
+  [DONE 2025-07] TLS CA infrastructure added.
+         config.h — CLOUD_ROOT_CA ""; task_cloud.cpp — setCACert / setInsecure.
+
+  [DONE 2025-07] TelemetryMsg_t struct and telemetryQueue plumbed through globals.
+         globals.h, globals.cpp, egg_incubator_v2.ino.
+
+  [DONE 2026-03] C-1 / C-2: Cloud secrets moved to gitignored secrets.h.
+         config.h uses __has_include to include secrets.h when present;
+         secrets.h.example added; .gitignore entry added.
+
+  [DONE 2026-03] H-1: Fan / LEDC conflict resolved.
+         allRelaysOff() calls setFanSpeed(0); setFanSpeed() updates
+         gRelayState.fanOn under controlMutex.  globals.cpp, task_incubator.cpp.
+
+  [DONE 2026-03] H-3: Climate cycleStartEpoch and ramp state persisted to NVS.
+         climate_logic.cpp — cyclicInHeatPhase() writes "cycleStart";
+         getRampTargetTemp() writes "rampIdx" and "rampStart" on bootstrap and
+         on every step advance.
+
+  [DONE 2026-03] H-4: Lockdown humidity persisted to NVS.
+         task_incubator.cpp — task_milestone() writes prefs.putFloat("setHum")
+         immediately after updating gSettings.humSetpoint.
+
+  [DONE 2026-03] H-5: task_pump() now validates hum_valid before acting.
+         task_incubator.cpp — reads humValid under sensorMutex; skips pump
+         logic and delays 30 s when humValid is false.
+
+  [DONE 2026-03] M-1: Orphaned DEFAULT_FAN_INTERVAL_MIN / DEFAULT_FAN_DURATION_SEC removed.
+         config.h.
+
+  [DONE 2026-03] M-2: TelemetryMsg_t typedef moved before telemetryQueue extern.
+         globals.h.
+
+  [DONE 2026-03] M-3: Per-egg-type candle day constants added.
+         config.h — CHICKEN_CANDLE_DAY 7, DUCK_CANDLE_DAY 10, QUAIL_CANDLE_DAY 7.
+         incubator_logic.cpp — checkMilestone() looks up per-type candleDay.
+
+  [DONE 2026-03] M-5: TURNER_MIN_INTERVAL_MIN corrected to 60.
+         config.h.
+
+  [DONE 2026-03] L-6: RTC epoch sanity check added to task_rtc().
+         task_rtc.cpp — validates epoch > 1700000000 UL; sets rtcEpochValid;
+         pushes throttled "RTC epoch invalid" error.
+
+  [DONE 2026-03] L-7: TWDT enrolled in setup().
+         egg_incubator_v2.ino — esp_task_wdt_init() with 5-second timeout
+         using IDF v5 esp_task_wdt_config_t struct API.
+
+  [DONE 2026-03] L-8: allRelaysOff() called at start of factoryReset().
+         egg_incubator_v2.ino.
+
+  [DONE 2026-03] L-9: milestoneMutex creation moved to setup().
+         egg_incubator_v2.ino, task_incubator.cpp.
+
+  [DONE 2026-03] DHT11 reliability: single read per cycle, 2.5 s sampling,
+         warm-up after dht.begin(), auto reinit after 5 consecutive failures.
+         task_sensors.cpp.
+
+  [DONE 2026-03] OLED UI overhaul: highlight selection bar with text inversion,
+         3 px vertical scrollbar, 4-row paginated menus in all menu screens.
+         oled_ui.cpp, oled_ui.h, task_ui.cpp.
+
+  [DONE 2026-04] task_cloud.h and task_rtc.h restored with full include guards,
+         extern "C" blocks, and function declarations.
+         egg_incubator_v2/task_cloud.h, egg_incubator_v2/task_rtc.h.
+
+    [DONE 2026-04] M-4: SENSOR_INVALID_HIGH sentinel widened to 100.0f.
+      config.h — `SENSOR_INVALID_HIGH` set to 100.0f; `task_sensors.cpp`
+      retains the explicit `85.0f` POR detection (`if (t == 85.0f)`).
+
+  [DONE 2026-04] M-6: switchProfile() safe-suspend via TASK_CMD_SUSPEND notification.
+         config.h — added `TASK_CMD_SUSPEND 0xA5A5UL`.
+         task_control.cpp, task_climate_control.cpp, task_incubator.cpp —
+         each suspendable task loop checks xTaskNotifyWait() at its top
+         (outside any mutex) and calls vTaskSuspend(NULL) on TASK_CMD_SUSPEND.
+         egg_incubator_v2.ino — switchProfile() replaced direct vTaskSuspend()
+         with xTaskNotify() + 200 ms delay + xTaskNotifyStateClear() before
+         vTaskResume(), eliminating the mutex-hold deadlock window entirely.
+
+  [DONE 2026-04] M-7: Cloud retry loop tight-loop fixed with peek+break.
+         task_cloud.cpp — retry loop now calls xQueuePeek() on the head
+         before dequeuing; breaks immediately if head.nextAttemptMs is in
+          the future, eliminating all re-enqueue churn in backoff-dominated
+          queues and removing the Core 0 CPU spike.
+
+        [DONE 2026-04] M-8: wifiUserEnabled / wifiPortalActive converted to atomics.
+          globals.h / globals.cpp — `wifiUserEnabled` and `wifiPortalActive`
+          changed from `volatile bool` to `std::atomic<bool>` and defined in
+          globals.cpp.  task_cloud.cpp and task_wifi_manager.cpp updated to use
+          `.load()` / `.store()` with appropriate memory-order semantics to
+          ensure cross-core visibility without heavyweight locking.
+
+      ================================================================================
+
+        Priority 1 — Security
+    1a. Populate CLOUD_ROOT_CA in secrets.h with the Google TLS root certificate
+        PEM chain.  See ROOT_CA_EXTRACT.md for step-by-step extraction.
+        Resolves C-3 (currently running MITM-vulnerable with setInsecure()).
+
+  Priority 2 — Reliability / correctness
+    2a. Fix cloud retry loop (M-7): DONE — peek+break implemented in
+        task_cloud.cpp; loop stops on first not-yet-due head item.
+    2b. Fix SENSOR_INVALID_HIGH to 100.0f (M-4): DONE — set to 100.0f in
+      config.h; DS18B20 POR detection remains explicit in task_sensors.cpp.
+    2c. Guard wifiUserEnabled / wifiPortalActive with portENTER_CRITICAL or
+      std::atomic<bool> for correct dual-core visibility (M-8): DONE —
+      converted to `std::atomic<bool>` and updated reads/writes across tasks.
+    2d. M-6 switchProfile() deadlock: DONE — task-notification safe-suspend
+        implemented in all 6 suspendable tasks and switchProfile().
+        flag to eliminate variable-latency serial writes in production (L-4).
+
+  Priority 4 — Maintainability
+    4a. Refactor task_ui.cpp into per-screen-group modules (L-1).
+    4b. Provision DS18B20 ROM address at first boot and address by address
+        on subsequent reads to replace index-0 assumption (L-5).
+    4c. Read http.getString() only on the telemetry path; skip body read on
+        error-channel GETs where it is never inspected (L-10).
+
+================================================================================
+  END OF REPORT  (2026-04-01)
+================================================================================

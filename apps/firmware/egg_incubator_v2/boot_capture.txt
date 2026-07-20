@@ -1,0 +1,66 @@
+ets Jul 29 2019 12:21:46
+
+rst:0x1 (POWERON_RESET),boot:0x17 (SPI_FAST_FLASH_BOOT)
+configsip: 0, SPIWP:0xee
+clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00
+mode:DIO, clock div:1
+load:0x3fff0030,len:4876
+ho 0 tail 12 room 4
+load:0x40078000,len:16560
+load:0x40080400,len:3500
+entry 0x400805b4
+[SETUP] Boot v2.0.0
+[NVS] Settings loaded
+[NVS] startEpoch loaded = 1780531200
+[SETUP] WiFi.begin() called (non-blocking)
+[RTC] nowEpoch = 1784330681
+E (138) task_wdt: esp_task_wdt_reset(707): task not found
+E (138) task_wdt: esp_task_wdt_reset(707): task not found
+[MILESTONE] New batch detected — lockdown state reset
+[SETUP] All tasks started
+E (243) task_wdt: esp_task_wdt_init(517): TWDT already initialized
+[WDT] Initialised (10 s, panic on expire)
+[WDT] Control task subscribed
+[DS18B20] Temp: 23.81 C
+[CTRL] Heater ON  (23.8 / 37.5)
+[WIFI] Auto-connected at boot: 192.168.1.41
+[DS18B20] Temp: 23.81 C
+[DHT] Humidity: 89.6 %
+[DS18B20] Temp: 23.81 C
+[CLOUD] Sending telemetry: https://script.google.com/macros/s/AKfycbxOkIpDNoZbdiVFBfnGHnkWrUMzI6szJ0iOtwp9x14sBoDp_l-wxwqPLZEmWdbzKVad/exec?id=INCUBATOR_01&fw=2.0.0&profile=EGG&temp=23.8&hum=89&setTemp=37.5&setHum=60&mode=AUTO&heater=1&cooler=0&humidifier=0&fan=1&pump=0&turner=0&day=44&daysLeft=0&hatchEpoch=1782345600 [token redacted]
+[MQTT] Connecting to 192.168.1.44:1883 as INCUBATOR_01...
+[MQTT] Connected
+[DS18B20] Temp: 23.81 C
+[DHT] Humidity: 89.6 %
+[DS18B20] Temp: 23.81 C
+[DHT] Humidity: 89.6 %
+[DS18B20] Temp: 23.81 C
+[CLOUD] HTTP 200
+[DS18B20] Temp: 23.81 C
+[DHT] Humidity: 89.6 %
+[DS18B20] Temp: 23.81 C
+[DHT] Humidity: 89.5 %
+[DS18B20] Temp: 23.88 C
+[DHT] Humidity: 89.5 %
+[DS18B20] Temp: 23.88 C
+[DS18B20] Temp: 23.88 C
+[DHT] Humidity: 89.5 %
+[DS18B20] Temp: 23.88 C
+[DHT] Humidity: 89.5 %
+[DS18B20] Temp: 23.88 C
+[DHT] Humidity: 89.5 %
+[DS18B20] Temp: 23.88 C
+[DS18B20] Temp: 23.88 C
+[DHT] Humidity: 89.4 %
+[DS18B20] Temp: 23.94 C
+[DHT] Humidity: 89.4 %
+[DS18B20] Temp: 23.94 C
+[DS18B20] Temp: 23.94 C
+[DHT] Humidity: 89.4 %
+[DS18B20] Temp: 23.94 C
+[DHT] Humidity: 89.3 %
+[DS18B20] Temp: 23.94 C
+[DHT] Humidity: 89.4 %
+[DS18B20] Temp: 23.94 C
+[DS18B20] Temp: 23.94 C
+[DHT] Humidity: 89.4 %

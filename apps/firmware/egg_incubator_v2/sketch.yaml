@@ -1,0 +1,6 @@
+# Arduino CLI project file — makes the partition scheme part of the project
+# so every `arduino-cli compile` uses the 1.9 MB dual-OTA-slot layout.
+# (Arduino IDE users: select Tools > Partition Scheme > "Minimal SPIFFS
+#  (1.9MB APP with OTA/190KB SPIFFS)" to match.)
+default_fqbn: esp32:esp32:esp32:PartitionScheme=min_spiffs
+default_port: COM3

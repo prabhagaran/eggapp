@@ -1,0 +1,148 @@
+/**
+ * Apps Script: Telemetry receiver for ESP32 Egg Incubator firmware.
+ *
+ * INSTRUCTIONS:
+ *  1. Replace SHEET_ID below with your Google Sheet ID
+ *     (the long string in the Sheet URL between /d/ and /edit).
+ *  2. Set TOKEN to match CLOUD_TOKEN in your firmware's config.h / secrets.h.
+ *  3. Save, then:
+ *       Deploy → New Deployment → Web App
+ *       Execute as: Me
+ *       Who has access: Anyone
+ *  4. Copy the deployment URL into GOOGLE_SCRIPT_URL in secrets.h.
+ *
+ * Two sheets are auto-created on first use:
+ *   Telemetry  — all normal sensor readings
+ *   ErrorLogs  — error events (when `error` param is present and non-empty)
+ *
+ * Accepts both HTTP GET and HTTP POST (JSON body or URL parameters).
+ * Returns plain-text "OK" (HTTP 200) on success.
+ */
+
+// ─── Configuration ────────────────────────────────────────────────────────────
+const TOKEN    = 'a1b2c3d4e5f60718293a4b5c6d7e8f90'; // must match CLOUD_TOKEN in config.h / secrets.h
+const SHEET_ID = '1p3ud1bIm_ypz806wJOYs797Bpn0PZ_ON2fb6KQXr9OE';             // Google Sheet ID from the URL
+
+// ─── Sheet header definitions ─────────────────────────────────────────────────
+const TELEMETRY_HEADERS = [
+  'Timestamp', 'DeviceID', 'FW', 'Profile',
+  'Temp', 'Hum', 'SetTemp', 'SetHum', 'Mode',
+  'Heater', 'Cooler', 'Humidifier', 'Fan', 'Pump', 'Turner',
+  'Day', 'DaysLeft', 'HatchEpoch', 'Phase'
+];
+
+const ERROR_HEADERS = [
+  'Timestamp', 'DeviceID', 'FW', 'Profile',
+  'ErrorCode', 'ErrorMessage'
+];
+
+// ─── getOrCreateSheet ─────────────────────────────────────────────────────────
+// Returns the named sheet, creating it (with a frozen header row) if absent.
+function getOrCreateSheet(name, headers) {
+  var ss    = SpreadsheetApp.openById(SHEET_ID);
+  var sheet = ss.getSheetByName(name);
+
+  if (!sheet) {
+    sheet = ss.insertSheet(name);
+  }
+
+  // Auto-create header row on first use
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(headers);
+    sheet.setFrozenRows(1);
+  }
+
+  return sheet;
+}
+
+// ─── handleParams ─────────────────────────────────────────────────────────────
+// Routes the incoming request to the correct sheet based on the `error` param.
+function handleParams(params) {
+  var now = new Date();
+
+  var isError = params.error &&
+                params.error !== '' &&
+                params.error !== '0';
+
+  if (isError) {
+    // ── Error log ─────────────────────────────────────────────────────────────
+    var errorSheet = getOrCreateSheet('ErrorLogs', ERROR_HEADERS);
+    errorSheet.appendRow([
+      now,
+      params.id      || '',
+      params.fw      || '',
+      params.profile || '',
+      params.error   || '',
+      params.msg     || ''
+    ]);
+  } else {
+    // ── Telemetry ─────────────────────────────────────────────────────────────
+    var telSheet = getOrCreateSheet('Telemetry', TELEMETRY_HEADERS);
+    telSheet.appendRow([
+      now,
+      params.id          || '',
+      params.fw          || '',
+      params.profile     || '',
+      params.temp        || '',
+      params.hum         || '',
+      params.setTemp     || '',
+      params.setHum      || '',
+      params.mode        || '',
+      params.heater      || '',
+      params.cooler      || '',
+      params.humidifier  || '',
+      params.fan         || '',
+      params.pump        || '',
+      params.turner      || '',
+      params.day         || '',
+      params.daysLeft    || '',
+      params.hatchEpoch  || '',
+      params.phase       || ''
+    ]);
+  }
+}
+
+// ─── doGet ────────────────────────────────────────────────────────────────────
+function doGet(e) {
+  try {
+    if (!e || !e.parameter || e.parameter.token !== TOKEN) {
+      return ContentService
+        .createTextOutput('Unauthorized')
+        .setMimeType(ContentService.MimeType.TEXT);
+    }
+    handleParams(e.parameter);
+    return ContentService
+      .createTextOutput('OK')
+      .setMimeType(ContentService.MimeType.TEXT);
+  } catch (err) {
+    return ContentService
+      .createTextOutput('Error: ' + err.toString())
+      .setMimeType(ContentService.MimeType.TEXT);
+  }
+}
+
+// ─── doPost ───────────────────────────────────────────────────────────────────
+function doPost(e) {
+  try {
+    var params = {};
+    if (e.postData && e.postData.type === 'application/json') {
+      params = JSON.parse(e.postData.contents);
+    } else if (e.parameter) {
+      params = e.parameter;
+    }
+
+    if (params.token !== TOKEN) {
+      return ContentService
+        .createTextOutput('Unauthorized')
+        .setMimeType(ContentService.MimeType.TEXT);
+    }
+    handleParams(params);
+    return ContentService
+      .createTextOutput('OK')
+      .setMimeType(ContentService.MimeType.TEXT);
+  } catch (err) {
+    return ContentService
+      .createTextOutput('Error: ' + err.toString())
+      .setMimeType(ContentService.MimeType.TEXT);
+  }
+}

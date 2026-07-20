@@ -1,0 +1,38 @@
+name,gpio,role,defined_in,defined_line,status,notes
+BTN_UP,32,Button,config.h,13,used,Active-LOW; internal pull-up; 50 ms debounce in task_buttons
+BTN_DOWN,33,Button,config.h,14,used,Active-LOW; internal pull-up
+BTN_OK,25,Button,config.h,15,used,Active-LOW; internal pull-up; 3 s hold = fault reset
+I2C_SDA,21,I2C SDA,config.h,20,used,Shared bus: SSD1306 OLED (0x3C) + DS1307 RTC
+I2C_SCL,22,I2C SCL,config.h,21,used,Shared bus: SSD1306 OLED (0x3C) + DS1307 RTC
+DHT_PIN,4,DHT22 sensor,config.h,26,used,Humidity + cross-check temperature
+DS18B20_PIN,18,DS18B20 data,config.h,29,used,1-Wire; 4.7k pull-up to 3.3 V; primary temperature
+RELAY_HEATER,26,Relay - heater,config.h,34,used,Active-LOW relay board (RELAY_ON = LOW)
+RELAY_COOLER,27,Relay - cooler,config.h,35,used,Active-LOW; climate-chamber profile only
+RELAY_HUMIDIFIER,14,Relay - humidifier,config.h,36,used,Active-LOW
+RELAY_FAN,13,Fan PWM,config.h,37,used,LEDC PWM with INVERTED duty (100% speed = pin LOW); not a plain relay drive
+RELAY_PUMP,12,Relay - pump,config.h,38,used,WARNING strapping pin MTDI (BUG-004): external pull-up at reset can brick boot; relocate to 16/17/19/23 or burn flash-voltage eFuse
+RELAY_TURNER,15,Relay - turner,config.h,39,used,WARNING strapping pin MTDO (BUG-004): verify boot with relay board attached; candidate for relocation
+
+GPIO16,16,General purpose,, ,free,Safe on WROOM (reserved for PSRAM on WROVER); preferred relocation target for pump/turner
+GPIO17,17,General purpose,, ,free,Safe on WROOM (reserved for PSRAM on WROVER); preferred relocation target for pump/turner
+GPIO19,19,General purpose,, ,free,Safe; relocation target
+GPIO23,23,General purpose,, ,free,Safe; relocation target
+GPIO5,5,General purpose,, ,free,Usable but a strapping pin (SDIO timing); boots HIGH - avoid for fail-ON loads
+
+GPIO34,34,Input-only,, ,input-only,No pull-ups; ADC capable (candidate: water-level sensor)
+GPIO35,35,Input-only,, ,input-only,No pull-ups; ADC capable
+GPIO36,36,Input-only,, ,input-only,No pull-ups; ADC capable (SVP)
+GPIO39,39,Input-only,, ,input-only,No pull-ups; ADC capable (SVN)
+
+GPIO1,1,UART TX0,, ,avoid,Serial TX0 (USB logging) - do not reuse
+GPIO3,3,UART RX0,, ,avoid,Serial RX0 (USB logging) - do not reuse
+
+GPIO6,6,Flash,, ,avoid,Internal flash - never use
+GPIO7,7,Flash,, ,avoid,Internal flash - never use
+GPIO8,8,Flash,, ,avoid,Internal flash - never use
+GPIO9,9,Flash,, ,avoid,Internal flash - never use
+GPIO10,10,Flash,, ,avoid,Internal flash - never use
+GPIO11,11,Flash,, ,avoid,Internal flash - never use
+
+GPIO0,0,Boot strapping,, ,avoid,Must be HIGH at reset (boot mode); onboard BOOT button on devkits
+GPIO2,2,Boot strapping,, ,avoid,Must be LOW/floating at reset for flashing; onboard LED on many devkits
