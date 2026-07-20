@@ -5,7 +5,18 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <Arduino.h>
+#include <Preferences.h>
 #include <stdlib.h>
+
+// A remotely-set start date more than this far in the future or the past
+// is rejected rather than applied — config.h has no existing bound for
+// this (unlike TEMP_SETPOINT_MIN/MAX etc.) since the physical-button UI
+// never needed one (year picker itself clamps to 2020-2099). Loose
+// bounds: a real incubation is never started more than a day ahead of
+// "now", and >13 months in the past is certainly a stale/bogus payload
+// rather than an intentional backfill.
+static const long START_EPOCH_MAX_FUTURE_SEC = 24L * 60 * 60;         // 1 day
+static const long START_EPOCH_MAX_PAST_SEC   = 400L * 24 * 60 * 60;   // ~13 months
 
 // ─────────────────────────────────────────────────────────────────────────────
 // COMMAND HANDLING (US-INC-003 — setpoint config with ack)
@@ -48,9 +59,60 @@ static float clampf(float v, float lo, float hi) {
     return v;
 }
 
-// Applies whichever setpoint fields are present in `payload`, clamped to
-// the same config.h edit limits the physical button UI already enforces
-// (task_ui.cpp). Publishes "received" before taking the mutex and
+// Sets the incubation start date, replicating every side effect the
+// physical-button flow performs on its final OK (task_ui.cpp,
+// UI_ENV_INCUBATION_DAY / IM_EDIT): restore humidity to the egg-type
+// default (undoes a lockdown bump), reset lastTurnEpoch, resume the
+// turner task if lockdown had suspended it, and persist startEpoch/
+// lastTurn/setHum to NVS — a remote date-set must survive reboot the
+// same way a locally-set one does, not silently revert. Returns false
+// (does not touch state) if newEpoch is out of the sane bounds checked
+// by the caller, or if settingsMutex can't be acquired.
+static bool applyStartEpoch(uint32_t newEpoch) {
+    float defaultHum = DEFAULT_HUM_SETPOINT;
+    EggType curEggType = EGG_CHICKEN;
+    if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(200)) == pdTRUE) {
+        curEggType = gSettings.eggType;
+        xSemaphoreGive(settingsMutex);
+    }
+    switch (curEggType) {
+        case EGG_DUCK:  defaultHum = DUCK_DEFAULT_HUM;   break;
+        case EGG_QUAIL: defaultHum = QUAIL_DEFAULT_HUM;  break;
+        default:        defaultHum = CHICKEN_DEFAULT_HUM; break;
+    }
+
+    if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(200)) == pdTRUE) {
+        gSettings.startEpoch    = newEpoch;
+        gSettings.lastTurnEpoch = 0;
+        gSettings.humSetpoint   = defaultHum;
+        xSemaphoreGive(settingsMutex);
+    } else {
+        Serial.println("[MQTT] settingsMutex timeout — startEpoch not applied");
+        return false;
+    }
+
+    // Resume the turner in case it was suspended for lockdown — no-op if
+    // the task isn't suspended.
+    if (hTaskTurner != nullptr) {
+        vTaskResume(hTaskTurner);
+        Serial.println("[MQTT] Turner resumed for remotely-set start date");
+    }
+
+    // Persist only the startEpoch, lastTurn and setHum keys to NVS, same
+    // as the local UI flow — a reboot must not lose an app-set date.
+    Preferences prefs;
+    prefs.begin("incubator", false);
+    prefs.putULong("startEpoch", newEpoch);
+    prefs.putULong("lastTurn", 0);
+    prefs.putFloat("setHum", defaultHum);
+    prefs.end();
+
+    return true;
+}
+
+// Applies whichever setpoint/startEpoch fields are present in `payload`,
+// clamped to the same config.h edit limits the physical button UI already
+// enforces (task_ui.cpp). Publishes "received" before taking the mutex and
 // "applied" right after — both typically land within the same MQTT
 // keepalive tick, but modeled distinctly per the DeviceConfig ack schema.
 static void handleCommand(PubSubClient& mqttClient, const char* ackTopic, const char* payload) {
@@ -70,6 +132,25 @@ static void handleCommand(PubSubClient& mqttClient, const char* ackTopic, const 
     bool hasHumSP = extractFloatField(payload, "humSetpoint", &humSetpoint);
     bool hasHumHyst = extractFloatField(payload, "humHysteresis", &humHysteresis);
 
+    long startEpochRaw = 0;
+    bool hasStartEpoch = extractLongField(payload, "startEpoch", &startEpochRaw);
+    if (hasStartEpoch) {
+        bool inBounds = true;
+        if (rtcEpochValid) {
+            uint32_t nowEpoch = 0;
+            if (xSemaphoreTake(rtcMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+                nowEpoch = gRtcTime.epoch;
+                xSemaphoreGive(rtcMutex);
+            }
+            long delta = (long)startEpochRaw - (long)nowEpoch;
+            inBounds = delta <= START_EPOCH_MAX_FUTURE_SEC && delta >= -START_EPOCH_MAX_PAST_SEC;
+        }
+        if (startEpochRaw <= 0 || !inBounds) {
+            Serial.printf("[MQTT] startEpoch %ld out of bounds — ignored\n", startEpochRaw);
+            hasStartEpoch = false;
+        }
+    }
+
     if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(200)) == pdTRUE) {
         if (hasTempSP) gSettings.tempSetpoint = clampf(tempSetpoint, TEMP_SETPOINT_MIN, TEMP_SETPOINT_MAX);
         if (hasTempHyst) gSettings.tempHysteresis = clampf(tempHysteresis, TEMP_HYST_MIN, TEMP_HYST_MAX);
@@ -79,6 +160,10 @@ static void handleCommand(PubSubClient& mqttClient, const char* ackTopic, const 
     } else {
         Serial.println("[MQTT] settingsMutex timeout — cmd not applied");
         return;
+    }
+
+    if (hasStartEpoch) {
+        applyStartEpoch((uint32_t)startEpochRaw);
     }
 
     char appliedAck[48];
