@@ -1,4 +1,5 @@
 import type { BatchStatus, Prisma } from "@prisma/client";
+import type { FastifyBaseLogger } from "fastify";
 import {
   assertHatchDateAllowed,
   assertTransition,
@@ -11,6 +12,7 @@ import {
   hatchDiscrepancy,
   hatchMetrics,
 } from "../domain/incubation.js";
+import { pushSetpoints } from "./deviceConfig.service.js";
 import { getPrisma } from "../infra/db.js";
 import { AppError } from "../lib/errors.js";
 
@@ -84,9 +86,132 @@ export async function createBatch(farmId: string, input: CreateBatchInput, now =
   });
 }
 
-// planned/setting → incubating: eggs are physically in; schedule dates fix here.
-export async function setBatch(farmId: string, id: string, setAt = new Date()) {
+export interface UpdateBatchInput {
+  incubatorId?: string;
+  speciesId?: string;
+  sources?: { collectionId: string; count: number }[];
+  overrideNote?: string;
+}
+
+// "planned" and "incubating" batches are editable. "incubating" is allowed
+// so a mis-set incubator/species/source can be corrected while still live;
+// when species changes on an incubating batch we re-snapshot candlingDays
+// (BR-008) and recompute lockdownAt/expectedHatchAt off the existing setAt
+// below, since those were computed from the old species. Anything past
+// incubating (lockdown+) has candling/hatch data already recorded against
+// the schedule and is not editable.
+const EDITABLE_STATUSES: BatchStatus[] = ["planned", "incubating"];
+
+export async function updateBatch(farmId: string, id: string, input: UpdateBatchInput, now = new Date()) {
   return getPrisma().$transaction(async (tx) => {
+    const batch = await getFarmBatch(tx, farmId, id);
+    if (!EDITABLE_STATUSES.includes(batch.status)) {
+      throw new AppError(409, "not_editable", `Only 'planned' or 'incubating' batches can be edited (this one is '${batch.status}')`);
+    }
+
+    if (input.incubatorId) {
+      const incubator = await tx.incubator.findFirst({ where: { id: input.incubatorId, farmId } });
+      if (!incubator) throw new AppError(404, "not_found", "Incubator not found");
+    }
+
+    let speciesId = batch.speciesId;
+    let candlingDays = batch.candlingDays;
+    let lockdownAt = batch.lockdownAt;
+    let expectedHatchAt = batch.expectedHatchAt;
+    if (input.speciesId && input.speciesId !== batch.speciesId) {
+      const species = await tx.species.findUnique({ where: { id: input.speciesId } });
+      if (!species) throw new AppError(400, "unknown_species", `No species '${input.speciesId}'`);
+      speciesId = species.id;
+      candlingDays = species.candlingDays; // BR-008: re-snapshot since species changed
+      if (batch.status === "incubating" && batch.setAt) {
+        const schedule = computeSchedule(species, batch.setAt);
+        lockdownAt = schedule.lockdownAt;
+        expectedHatchAt = schedule.expectedHatchAt;
+      }
+    }
+
+    const warnings: string[] = [];
+    let viableCount = batch.viableCount;
+    if (input.sources) {
+      if (input.sources.length === 0) {
+        throw new AppError(400, "sources_required", "A batch needs at least one egg source");
+      }
+      // Release this batch's own current sources first so re-validating
+      // "available" below doesn't double-count them against themselves
+      // (e.g. lowering — or even just re-submitting — a count on the
+      // same collection this batch already draws from).
+      await tx.batchEggSource.deleteMany({ where: { batchId: id } });
+
+      let total = 0;
+      for (const source of input.sources) {
+        const collection = await tx.eggCollection.findFirst({
+          where: { id: source.collectionId, farmId },
+          include: { batchSources: { select: { count: true } } },
+        });
+        if (!collection) throw new AppError(404, "not_found", `Collection ${source.collectionId} not found`);
+        const assigned = collection.batchSources.reduce((sum, s) => sum + s.count, 0);
+        const available = collection.count - collection.discardedCount - assigned;
+        if (source.count > available) {
+          throw new AppError(409, "insufficient_eggs", `Collection has only ${available} eggs available`);
+        }
+        // BR-011
+        const age = classifyStorageAge(collection.collectedOn, now);
+        if (age.verdict === "blocked" && !input.overrideNote && !batch.storageOverrideNote) {
+          throw new AppError(
+            400,
+            "eggs_too_old",
+            `Eggs are ${age.ageDays} days old (>14); provide overrideNote to set anyway`,
+          );
+        }
+        if (age.verdict !== "ok") {
+          warnings.push(`Collection ${collection.id}: eggs ${age.ageDays} days old`);
+        }
+        total += source.count;
+      }
+      await tx.batchEggSource.createMany({
+        data: input.sources.map((s) => ({ batchId: id, ...s })),
+      });
+      viableCount = total;
+    }
+
+    const updated = await tx.eggBatch.update({
+      where: { id },
+      data: {
+        ...(input.incubatorId ? { incubatorId: input.incubatorId } : {}),
+        speciesId,
+        candlingDays,
+        lockdownAt,
+        expectedHatchAt,
+        viableCount,
+        storageOverrideNote: input.overrideNote ?? batch.storageOverrideNote,
+      },
+    });
+    return { batch: updated, warnings };
+  });
+}
+
+// "planned" (never happened) and "aborted" (terminal, no hardware using it)
+// are safe to hard-delete. "incubating" is deliberately excluded — eggs are
+// physically in a device; use the /status abort transition instead of
+// deleting so there's a record of what happened to them.
+const DELETABLE_STATUSES: BatchStatus[] = ["planned", "aborted"];
+
+export async function deleteBatch(farmId: string, id: string) {
+  return getPrisma().$transaction(async (tx) => {
+    const batch = await getFarmBatch(tx, farmId, id);
+    if (!DELETABLE_STATUSES.includes(batch.status)) {
+      throw new AppError(409, "not_deletable", `Only 'planned' or 'aborted' batches can be deleted (this one is '${batch.status}')`);
+    }
+    // BatchEggSource rows cascade-delete (schema onDelete: Cascade),
+    // releasing their egg counts back to each collection's available
+    // pool automatically since "available" is computed, not stored.
+    await tx.eggBatch.delete({ where: { id } });
+  });
+}
+
+// planned/setting → incubating: eggs are physically in; schedule dates fix here.
+export async function setBatch(farmId: string, id: string, setAt = new Date(), log?: FastifyBaseLogger) {
+  const updated = await getPrisma().$transaction(async (tx) => {
     const batch = await getFarmBatch(tx, farmId, id);
     assertTransition(batch.status, "incubating");
     const species = await tx.species.findUniqueOrThrow({ where: { id: batch.speciesId } });
@@ -101,6 +226,22 @@ export async function setBatch(farmId: string, id: string, setAt = new Date()) {
       },
     });
   });
+
+  // Best-effort: push the start date to the device's own day counter too
+  // (see task_mqtt.cpp's startEpoch command), so "set eggs" from the app
+  // doesn't leave the physical incubator's local clock unset/stale. Not
+  // part of the transaction above and never fails the batch transition —
+  // an incubator with no bound device, or a broker that's unreachable, is
+  // routine (not every incubator has MQTT wired up), and pushSetpoints
+  // already routes delivery failure into the existing unconfirmed-config
+  // alert path once a device *is* bound.
+  try {
+    await pushSetpoints(farmId, updated.incubatorId, { startEpoch: Math.floor(setAt.getTime() / 1000) });
+  } catch (err) {
+    log?.info({ err, batchId: id, incubatorId: updated.incubatorId }, "[batch] startEpoch device push skipped");
+  }
+
+  return updated;
 }
 
 // Manual lifecycle moves (BR-001). `completed` only via recordHatch.

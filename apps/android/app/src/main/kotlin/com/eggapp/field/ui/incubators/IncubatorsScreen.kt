@@ -8,27 +8,34 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.eggapp.field.data.Incubator
+import com.eggapp.field.ui.components.DropdownField
 import com.eggapp.field.ui.components.MutedText
 import com.eggapp.field.ui.components.PillTone
 import com.eggapp.field.ui.components.StatusPill
@@ -50,6 +57,7 @@ fun IncubatorsScreen(
     onOpenCollections: () -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
+    var showCreate by remember { mutableStateOf(false) }
 
     // Drives the on-screen "Xs ago" labels forward between poll cycles.
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -100,7 +108,24 @@ fun IncubatorsScreen(
         }
 
         item {
-            Text("Incubators", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Incubators", style = MaterialTheme.typography.titleMedium)
+                TextButton(onClick = { showCreate = !showCreate }) { Text(if (showCreate) "Cancel" else "Add") }
+            }
+        }
+
+        if (showCreate) {
+            item {
+                CreateIncubatorForm(
+                    species = state.species,
+                    saving = state.saving,
+                    onSave = { name, capacity, speciesId -> viewModel.createIncubator(name, capacity, speciesId) { showCreate = false } },
+                )
+            }
         }
 
         if (state.loading) {
@@ -173,6 +198,43 @@ private fun IncubatorCard(inc: Incubator, nowMillis: Long, onOpenSetpoints: (Str
                     MutedText(if (fresh) age else "$age ⚠")
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun CreateIncubatorForm(
+    species: List<com.eggapp.field.data.Species>,
+    saving: Boolean,
+    onSave: (String, Int, String?) -> Unit,
+) {
+    var name by remember { mutableStateOf("") }
+    var capacity by remember { mutableStateOf("") }
+    var speciesId by remember { mutableStateOf("") }
+
+    Card(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Add incubator", style = MaterialTheme.typography.titleMedium)
+            OutlinedTextField(name, { name = it }, label = { Text("Name") }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(
+                capacity, { capacity = it }, label = { Text("Capacity (eggs)") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            DropdownField(
+                label = "Default species (optional)",
+                selectedValue = speciesId,
+                options = listOf("" to "—") + species.map { it.id to it.name },
+                onSelect = { speciesId = it },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Button(
+                enabled = !saving && name.isNotBlank(),
+                onClick = {
+                    val cap = capacity.toIntOrNull()
+                    if (cap != null) onSave(name, cap, speciesId.ifBlank { null })
+                },
+            ) { Text(if (saving) "Saving…" else "Add incubator") }
         }
     }
 }

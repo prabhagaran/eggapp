@@ -29,6 +29,12 @@ interface ApiService {
     @GET("v1/farms/{farmId}/incubators")
     suspend fun incubators(@Path("farmId") farmId: String): Response<List<Incubator>>
 
+    @POST("v1/farms/{farmId}/incubators")
+    suspend fun createIncubator(
+        @Path("farmId") farmId: String,
+        @Body body: CreateIncubatorRequest,
+    ): Response<Incubator>
+
     @GET("v1/farms/{farmId}/incubators/{id}")
     suspend fun incubator(
         @Path("farmId") farmId: String,
@@ -40,6 +46,31 @@ interface ApiService {
         @Path("farmId") farmId: String,
         @Query("status") status: String? = null,
     ): Response<List<Batch>>
+
+    @POST("v1/farms/{farmId}/batches")
+    suspend fun createBatch(
+        @Path("farmId") farmId: String,
+        @Body body: CreateBatchRequest,
+    ): Response<CreateBatchResponse>
+
+    @GET("v1/farms/{farmId}/batches/{id}")
+    suspend fun batchDetail(
+        @Path("farmId") farmId: String,
+        @Path("id") id: String,
+    ): Response<BatchDetail>
+
+    @PATCH("v1/farms/{farmId}/batches/{id}")
+    suspend fun updateBatch(
+        @Path("farmId") farmId: String,
+        @Path("id") id: String,
+        @Body body: UpdateBatchRequest,
+    ): Response<UpdateBatchResponse>
+
+    @DELETE("v1/farms/{farmId}/batches/{id}")
+    suspend fun deleteBatch(
+        @Path("farmId") farmId: String,
+        @Path("id") id: String,
+    ): Response<Unit>
 
     @POST("v1/farms/{farmId}/batches/{batchId}/candlings")
     suspend fun recordCandling(
@@ -86,6 +117,12 @@ interface ApiService {
 
     @GET("v1/farms/{farmId}/flocks")
     suspend fun flocks(@Path("farmId") farmId: String): Response<List<Flock>>
+
+    @POST("v1/farms/{farmId}/flocks")
+    suspend fun createFlock(
+        @Path("farmId") farmId: String,
+        @Body body: CreateFlockRequest,
+    ): Response<Flock>
 
     @GET("v1/farms/{farmId}/flocks/{id}")
     suspend fun flock(

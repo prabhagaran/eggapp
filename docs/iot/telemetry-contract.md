@@ -69,8 +69,16 @@ app (it currently isn't — see domain-model.md, no such entity).
   currently `incubating` on this device's incubator — a read-only
   cross-check the app surfaces if it disagrees with the batch's own
   `setAt`-derived schedule. **Never** written back to `setAt` or
-  `expectedHatchAt` themselves: there is no command in this contract for
-  the platform to set the device's day counter (only setpoints are
-  remotely settable — see "Commands" in `mqtt-topics.md`), so the
-  device's own clock and the app's manually-recorded one are
-  independent by construction, not just by choice.
+  `expectedHatchAt` themselves — that direction stays one-way, since
+  `setAt` is the record used for reporting and must stay a manual,
+  auditable entry rather than something a device can silently overwrite.
+  The *other* direction now exists (ADR 0008, superseding the original
+  "independent by construction" design here): `POST /batches/:id/set`
+  best-effort pushes `startEpoch` to the device via the `cmd` topic (see
+  "Commands" in `mqtt-topics.md`), so `day`/`hatchEpoch` are *usually*
+  seeded from the app's schedule rather than fully independent of it.
+  They can still drift from it — the push can fail to deliver (no
+  device bound, broker unreachable, unconfirmed within the 2-minute
+  window), or a farm worker can set/override the date locally via the
+  physical button UI afterward — which is exactly the case this
+  cross-check mirror exists to surface, not eliminate.

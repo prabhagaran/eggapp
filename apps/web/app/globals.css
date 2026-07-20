@@ -162,6 +162,7 @@ a.card:hover { text-decoration: none; box-shadow: var(--shadow-md); }
 }
 .card.dark .muted { color: rgba(255, 255, 255, 0.75); }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; }
+.grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; margin-bottom: 0.5rem; }
 
 .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 0.5rem; }
 .stat-card { display: flex; flex-direction: column; gap: 0.4rem; }

@@ -12,6 +12,12 @@ export interface SetpointInput {
   tempHysteresis?: number;
   humSetpoint?: number;
   humHysteresis?: number;
+  // Unix seconds. Pushes the app's incubation start date to the device's
+  // own day counter (see docs/iot/mqtt-topics.md "startEpoch") — routed
+  // through the same DeviceConfig/ack/unconfirmed-alert pipeline as
+  // setpoints since the wire mechanics (version, ack states, 2-minute
+  // timeout) are identical, not because it's conceptually a setpoint.
+  startEpoch?: number;
 }
 
 // No ack at all within this window means something's wrong (device

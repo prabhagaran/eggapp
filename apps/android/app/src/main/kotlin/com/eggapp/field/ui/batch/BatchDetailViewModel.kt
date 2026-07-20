@@ -8,9 +8,15 @@ import androidx.lifecycle.viewModelScope
 import com.eggapp.field.data.ApiClient
 import com.eggapp.field.data.Batch
 import com.eggapp.field.data.BatchCache
+import com.eggapp.field.data.BatchDetail
+import com.eggapp.field.data.BatchEggSourceInput
+import com.eggapp.field.data.Collection
 import com.eggapp.field.data.FieldRecordRepository
+import com.eggapp.field.data.Incubator
 import com.eggapp.field.data.SetBatchRequest
+import com.eggapp.field.data.Species
 import com.eggapp.field.data.TokenStore
+import com.eggapp.field.data.UpdateBatchRequest
 import com.eggapp.field.data.local.CandlingEntity
 import com.eggapp.field.data.local.HatchEntity
 import kotlinx.coroutines.delay
@@ -34,6 +40,15 @@ data class BatchDetailUiState(
     val loading: Boolean = true,
     val settingBatch: Boolean = false,
     val saveError: String? = null,
+    // Edit/delete — only ever populated for a "planned" or "incubating"
+    // batch (loadEditData is only called from that state's UI).
+    val editDetail: BatchDetail? = null,
+    val editSpecies: List<Species> = emptyList(),
+    val editIncubators: List<Incubator> = emptyList(),
+    val editCollections: List<Collection> = emptyList(),
+    val savingEdit: Boolean = false,
+    val deleting: Boolean = false,
+    val deleted: Boolean = false,
 )
 
 class BatchDetailViewModel(application: Application, private val batchId: String) : AndroidViewModel(application) {
@@ -83,11 +98,11 @@ class BatchDetailViewModel(application: Application, private val batchId: String
         }
     }
 
-    fun setBatch() {
+    fun setBatch(setAt: String? = null) {
         val farm = farmId ?: return
         viewModelScope.launch {
             _state.value = _state.value.copy(settingBatch = true, saveError = null)
-            val result = runCatching { api.setBatch(farm, batchId, SetBatchRequest()) }
+            val result = runCatching { api.setBatch(farm, batchId, SetBatchRequest(setAt = setAt)) }
             val response = result.getOrNull()
             if (response != null && response.isSuccessful) {
                 val updated = response.body()
@@ -100,6 +115,62 @@ class BatchDetailViewModel(application: Application, private val batchId: String
                 )
             }
         }
+    }
+
+    // Lazily fetches everything the edit form needs — only called when the
+    // user actually opens edit, not on every screen load (the list poll in
+    // loadBatch() already covers the common read-only view).
+    fun loadEditData() {
+        val farm = farmId ?: return
+        viewModelScope.launch {
+            val detail = runCatching { api.batchDetail(farm, batchId) }.getOrNull()?.body()
+            val species = runCatching { api.species() }.getOrNull()?.body().orEmpty()
+            val incubators = runCatching { api.incubators(farm) }.getOrNull()?.body().orEmpty()
+            val collections = runCatching { api.collections(farm) }.getOrNull()?.body().orEmpty()
+            _state.value = _state.value.copy(
+                editDetail = detail,
+                editSpecies = species,
+                editIncubators = incubators,
+                editCollections = collections,
+            )
+        }
+    }
+
+    fun updateBatch(incubatorId: String, speciesId: String, sources: List<BatchEggSourceInput>, overrideNote: String?, onDone: () -> Unit) {
+        val farm = farmId ?: return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(savingEdit = true, saveError = null)
+            val result = runCatching {
+                api.updateBatch(farm, batchId, UpdateBatchRequest(incubatorId, speciesId, sources, overrideNote))
+            }
+            val response = result.getOrNull()
+            if (response != null && response.isSuccessful) {
+                val updated = response.body()?.batch
+                if (updated != null) batchCache.save(updated)
+                _state.value = _state.value.copy(savingEdit = false, batch = updated ?: _state.value.batch, editDetail = null)
+                onDone()
+            } else {
+                _state.value = _state.value.copy(savingEdit = false, saveError = result.exceptionOrNull()?.message ?: "Failed to save changes")
+            }
+        }
+    }
+
+    fun deleteBatch() {
+        val farm = farmId ?: return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(deleting = true, saveError = null)
+            val result = runCatching { api.deleteBatch(farm, batchId) }
+            val response = result.getOrNull()
+            if (response != null && response.isSuccessful) {
+                _state.value = _state.value.copy(deleting = false, deleted = true)
+            } else {
+                _state.value = _state.value.copy(deleting = false, saveError = result.exceptionOrNull()?.message ?: "Failed to delete batch")
+            }
+        }
+    }
+
+    fun cancelEdit() {
+        _state.value = _state.value.copy(editDetail = null)
     }
 
     fun recordCandling(dayNo: Int, fertile: Int, clear: Int, bloodRing: Int, unsure: Int, note: String?) {

@@ -15,6 +15,13 @@ const createSchema = z.object({
   overrideNote: z.string().max(300).optional(), // BR-011
 });
 
+const updateSchema = z.object({
+  incubatorId: z.uuid().optional(),
+  speciesId: z.string().min(1).optional(),
+  sources: z.array(z.object({ collectionId: z.uuid(), count: z.number().int().positive() })).min(1).optional(),
+  overrideNote: z.string().max(300).optional(), // BR-011
+});
+
 const setSchema = z.object({ setAt: z.coerce.date().optional() });
 
 const statusSchema = z.object({
@@ -72,11 +79,26 @@ export async function batchRoutes(app: FastifyInstance) {
     return batches.getBatch(farmId, id);
   });
 
+  // Edit/delete — manager+, "planned" batches only (see updateBatch/deleteBatch).
+  app.patch("/farms/:farmId/batches/:id", { preHandler: [app.authenticate] }, async (req) => {
+    const { farmId, id } = batchParams.parse(req.params);
+    await requireMembership(req.user.sub, farmId, "manager");
+    const body = updateSchema.parse(req.body);
+    return batches.updateBatch(farmId, id, body);
+  });
+
+  app.delete("/farms/:farmId/batches/:id", { preHandler: [app.authenticate] }, async (req, reply) => {
+    const { farmId, id } = batchParams.parse(req.params);
+    await requireMembership(req.user.sub, farmId, "manager");
+    await batches.deleteBatch(farmId, id);
+    return reply.code(204).send();
+  });
+
   app.post("/farms/:farmId/batches/:id/set", { preHandler: [app.authenticate] }, async (req) => {
     const { farmId, id } = batchParams.parse(req.params);
     await requireMembership(req.user.sub, farmId, "manager");
     const body = setSchema.parse(req.body ?? {});
-    return batches.setBatch(farmId, id, body.setAt);
+    return batches.setBatch(farmId, id, body.setAt, req.log);
   });
 
   app.post("/farms/:farmId/batches/:id/status", { preHandler: [app.authenticate] }, async (req) => {

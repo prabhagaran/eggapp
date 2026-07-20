@@ -1,20 +1,58 @@
 "use client";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../../../lib/api";
-import type { BatchDetail } from "../../../lib/types";
+import type { BatchDetail, EggCollection, Incubator, Species } from "../../../lib/types";
 import { batchBadgeClass, dayOf, fmtDate, useAuthedFarm } from "../../../lib/useAuthedFarm";
+
+// datetime-local inputs need "YYYY-MM-DDTHH:mm" in local time, no timezone suffix.
+function toLocalInputValue(d: Date) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function ageDays(collectedOn: string) {
+  return Math.floor((Date.now() - Date.parse(collectedOn)) / 86_400_000);
+}
 
 export default function BatchDetailPage() {
   const farmId = useAuthedFarm();
+  const router = useRouter();
   const { id } = useParams<{ id: string }>();
   const [batch, setBatch] = useState<BatchDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [setAtInput, setSetAtInput] = useState(() => toLocalInputValue(new Date()));
+
+  const [editing, setEditing] = useState(false);
+  const [species, setSpecies] = useState<Species[]>([]);
+  const [incubators, setIncubators] = useState<Incubator[]>([]);
+  const [collections, setCollections] = useState<EggCollection[]>([]);
+  const [editIncubatorId, setEditIncubatorId] = useState("");
+  const [editSpeciesId, setEditSpeciesId] = useState("");
+  const [editPicked, setEditPicked] = useState<Record<string, number>>({});
+  const [editOverrideNote, setEditOverrideNote] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   const reload = useCallback(() => {
     if (farmId && id) api<BatchDetail>(`/v1/farms/${farmId}/batches/${id}`).then(setBatch);
   }, [farmId, id]);
   useEffect(reload, [reload]);
+
+  useEffect(() => {
+    if (!farmId) return;
+    api<Species[]>("/v1/species").then(setSpecies);
+    api<Incubator[]>(`/v1/farms/${farmId}/incubators`).then(setIncubators);
+    api<EggCollection[]>(`/v1/farms/${farmId}/collections`).then(setCollections);
+  }, [farmId]);
+
+  function startEdit() {
+    if (!batch) return;
+    setEditIncubatorId(batch.incubatorId);
+    setEditSpeciesId(batch.speciesId);
+    setEditPicked(Object.fromEntries(batch.sources.map((s) => [s.collectionId, s.count])));
+    setEditOverrideNote("");
+    setEditing(true);
+  }
 
   async function post(path: string, body?: unknown) {
     setError(null);
@@ -23,6 +61,46 @@ export default function BatchDetailPage() {
       reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
+    }
+  }
+
+  async function onSaveEdit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const sources = Object.entries(editPicked)
+      .filter(([, n]) => n > 0)
+      .map(([collectionId, count]) => ({ collectionId, count }));
+    if (sources.length === 0) {
+      setError("Pick at least one collection (set a count > 0)");
+      return;
+    }
+    setError(null);
+    try {
+      await api(`/v1/farms/${farmId}/batches/${id}`, {
+        method: "PATCH",
+        body: {
+          incubatorId: editIncubatorId,
+          speciesId: editSpeciesId,
+          sources,
+          overrideNote: editOverrideNote || undefined,
+        },
+      });
+      setEditing(false);
+      reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save changes");
+    }
+  }
+
+  async function onDelete() {
+    if (!window.confirm("Delete this batch? Its egg sources are released back to their collections.")) return;
+    setError(null);
+    setDeleting(true);
+    try {
+      await api(`/v1/farms/${farmId}/batches/${id}`, { method: "DELETE" });
+      router.push("/batches");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete batch");
+      setDeleting(false);
     }
   }
 
@@ -58,6 +136,8 @@ export default function BatchDetailPage() {
   const dayMismatch = day != null && batch.deviceDay != null && Math.abs(day - batch.deviceDay) > 1;
   const nextCandle = batch.candlingDays.find((d) => !batch.candlings.some((c) => c.dayNo === d));
   const active = !["completed", "closed", "aborted"].includes(batch.status);
+  const canEdit = batch.status === "planned" || batch.status === "incubating";
+  const canDelete = batch.status === "planned" || batch.status === "aborted";
 
   return (
     <>
@@ -111,9 +191,132 @@ export default function BatchDetailPage() {
         {batch.abortReason && <p className="alert-error">Aborted: {batch.abortReason}</p>}
       </div>
 
+      {(canEdit || canDelete) && !editing && (
+        <div className="card">
+          <div className="row">
+            {canEdit && (
+              <button className="secondary" onClick={startEdit}>
+                Edit batch
+              </button>
+            )}
+            {canDelete && (
+              <button className="danger" onClick={onDelete} disabled={deleting}>
+                {deleting ? "Deleting…" : "Delete batch"}
+              </button>
+            )}
+          </div>
+          <p className="muted">
+            {batch.status === "incubating"
+              ? "Editing an incubating batch changes its live incubator/species/source assignment — the schedule is recomputed if species changes."
+              : batch.status === "aborted"
+                ? "Deleting an aborted batch permanently removes its record."
+                : "Only possible before eggs are set — editing after that would invalidate the computed schedule."}
+          </p>
+        </div>
+      )}
+
+      {canEdit && editing && (
+        <div className="card">
+          <h2 style={{ marginTop: 0 }}>Edit batch</h2>
+          <form className="stack" style={{ maxWidth: 640 }} onSubmit={onSaveEdit}>
+            <div className="row">
+              <label>
+                Incubator
+                <select value={editIncubatorId} onChange={(e) => setEditIncubatorId(e.target.value)} required>
+                  {incubators.map((i) => (
+                    <option key={i.id} value={i.id}>
+                      {i.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Species
+                <select value={editSpeciesId} onChange={(e) => setEditSpeciesId(e.target.value)} required>
+                  {species.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.incubationDays} d)
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Collection</th>
+                    <th>Age</th>
+                    <th>Available</th>
+                    <th>Use</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {collections
+                    // This batch's own current usage of a collection is
+                    // already subtracted out of availableCount server-side
+                    // — add it back below so editing (including just
+                    // re-saving the same count) isn't blocked by the
+                    // batch's own prior assignment.
+                    .map((c) => {
+                      const own = batch.sources.find((s) => s.collectionId === c.id)?.count ?? 0;
+                      const effectiveAvailable = c.availableCount + own;
+                      if (effectiveAvailable <= 0) return null;
+                      const age = ageDays(c.collectedOn);
+                      return (
+                        <tr key={c.id}>
+                          <td>
+                            {fmtDate(c.collectedOn)} <span className="muted">{c.sourceNote ?? ""}</span>
+                          </td>
+                          <td>
+                            <span className={`badge ${age > 14 ? "danger" : age > 7 ? "warn" : "ok"}`}>{age} d</span>
+                          </td>
+                          <td>{effectiveAvailable}</td>
+                          <td>
+                            <input
+                              type="number"
+                              min={0}
+                              max={effectiveAvailable}
+                              value={editPicked[c.id] ?? 0}
+                              onChange={(e) =>
+                                setEditPicked((p) => ({ ...p, [c.id]: Number(e.target.value) }))
+                              }
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+            <label>
+              Override note (only needed if any picked collection's eggs are older than 14 days)
+              <input value={editOverrideNote} onChange={(e) => setEditOverrideNote(e.target.value)} />
+            </label>
+            <div className="row">
+              <button className="primary">Save changes</button>
+              <button type="button" className="secondary" onClick={() => setEditing(false)}>
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {(batch.status === "planned" || batch.status === "setting") && (
         <div className="card">
-          <button className="primary" onClick={() => post("/set", {})}>
+          <label>
+            Set at
+            <input
+              type="datetime-local"
+              value={setAtInput}
+              onChange={(e) => setSetAtInput(e.target.value)}
+            />
+          </label>
+          <button
+            className="primary"
+            onClick={() => post("/set", { setAt: new Date(setAtInput).toISOString() })}
+          >
             Eggs are set — start incubation
           </button>
           <p className="muted">Fixes the lockdown and expected-hatch dates from the species schedule.</p>

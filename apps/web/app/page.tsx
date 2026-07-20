@@ -3,10 +3,40 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Egg, Bird, Thermometer, BellRing } from "lucide-react";
 import { api } from "../lib/api";
-import type { Alert, Batch, Flock, Incubator } from "../lib/types";
+import { AlertsSeverityBars, BatchPipelineChart, IncubatorEnvChart, Sparkline } from "../components/DashboardCharts";
+import type { Alert, Batch, Flock, Incubator, IncubatorHistory } from "../lib/types";
 import { dayOf, fmtAge, isFresh, useAuthedFarm } from "../lib/useAuthedFarm";
 
 const ACTIVE: Batch["status"][] = ["planned", "setting", "incubating", "lockdown", "hatching"];
+
+// Last 8 ISO week buckets (Mon–Sun), oldest first — enough to show a
+// meaningful trend without the sparkline turning into a full chart.
+function weeklyBuckets(dates: string[], weeks = 8) {
+  const now = new Date();
+  const startOfWeek = (d: Date) => {
+    const day = (d.getDay() + 6) % 7; // 0 = Monday
+    const s = new Date(d);
+    s.setHours(0, 0, 0, 0);
+    s.setDate(s.getDate() - day);
+    return s;
+  };
+  const thisWeekStart = startOfWeek(now);
+  const buckets = Array.from({ length: weeks }, (_, i) => {
+    const start = new Date(thisWeekStart);
+    start.setDate(start.getDate() - (weeks - 1 - i) * 7);
+    return { start, value: 0 };
+  });
+  for (const iso of dates) {
+    const d = new Date(iso);
+    for (let i = buckets.length - 1; i >= 0; i--) {
+      if (d >= buckets[i]!.start) {
+        buckets[i]!.value += 1;
+        break;
+      }
+    }
+  }
+  return buckets.map((b) => ({ value: b.value }));
+}
 
 export default function Dashboard() {
   const farmId = useAuthedFarm();
@@ -14,6 +44,7 @@ export default function Dashboard() {
   const [batches, setBatches] = useState<Batch[] | null>(null);
   const [flocks, setFlocks] = useState<Flock[] | null>(null);
   const [alerts, setAlerts] = useState<Alert[] | null>(null);
+  const [envHistory, setEnvHistory] = useState<Record<string, IncubatorHistory>>({});
 
   useEffect(() => {
     if (!farmId) return;
@@ -30,10 +61,31 @@ export default function Dashboard() {
     return () => clearInterval(t);
   }, [farmId]);
 
+  // One history fetch per incubator that has a device bound — separate
+  // effect so it doesn't re-fire on every 15s poll above, just when the
+  // incubator list itself changes (new one added/removed).
+  useEffect(() => {
+    if (!farmId || !incubators) return;
+    for (const inc of incubators) {
+      if (!inc.device) continue;
+      api<IncubatorHistory>(`/v1/farms/${farmId}/incubators/${inc.id}/history?range=24h`).then((h) =>
+        setEnvHistory((prev) => ({ ...prev, [inc.id]: h })),
+      );
+    }
+  }, [farmId, incubators?.map((i) => i.id).join(",")]);
+
   if (!farmId) return null;
   const active = (batches ?? []).filter((b) => ACTIVE.includes(b.status));
   const birds = (flocks ?? []).reduce((sum, f) => sum + f.currentCount, 0);
   const devicesOnline = (incubators ?? []).filter((i) => i.device?.status === "active").length;
+  const warningAlerts = (alerts ?? []).filter((a) => a.severity === "warning").length;
+  const criticalAlerts = (alerts ?? []).filter((a) => a.severity === "critical").length;
+
+  const batchTrend = batches ? weeklyBuckets(batches.map((b) => b.createdAt)) : [];
+  const pipelineCounts = (batches ?? []).reduce<Record<string, number>>((acc, b) => {
+    acc[b.status] = (acc[b.status] ?? 0) + 1;
+    return acc;
+  }, {});
 
   return (
     <>
@@ -56,6 +108,7 @@ export default function Dashboard() {
           </div>
           <span className="stat-value">{batches ? active.length : "—"}</span>
           <span className="muted">of {batches?.length ?? 0} total</span>
+          {batches && batchTrend.some((b) => b.value > 0) && <Sparkline data={batchTrend} />}
         </div>
         <div className="card stat-card">
           <div className="stat-top">
@@ -74,6 +127,23 @@ export default function Dashboard() {
           <span className="muted">
             <Link href="/alerts">review →</Link>
           </span>
+        </div>
+      </div>
+
+      <div className="grid-2">
+        <div className="card">
+          <b>Batch pipeline</b>
+          <p className="muted" style={{ marginTop: "0.15rem" }}>Where every batch sits right now</p>
+          {batches ? <BatchPipelineChart counts={pipelineCounts} /> : <p className="muted">Loading…</p>}
+        </div>
+        <div className="card">
+          <b>Open alerts by severity</b>
+          <p className="muted" style={{ marginTop: "0.15rem" }}>{alerts ? alerts.length : "—"} open right now</p>
+          {alerts && (
+            <div style={{ marginTop: "1rem" }}>
+              <AlertsSeverityBars warning={warningAlerts} critical={criticalAlerts} />
+            </div>
+          )}
         </div>
       </div>
 
@@ -139,6 +209,11 @@ export default function Dashboard() {
                 >
                   {fmtAge(inc.latestTelemetry.ts)}
                 </span>
+              </div>
+            )}
+            {inc.device && envHistory[inc.id] && (
+              <div style={{ marginTop: "0.6rem" }}>
+                <IncubatorEnvChart history={envHistory[inc.id]!} />
               </div>
             )}
           </div>

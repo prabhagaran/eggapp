@@ -57,11 +57,20 @@ data class Incubator(
     val latestTelemetry: LatestTelemetry?,
 )
 
+data class CreateIncubatorRequest(
+    val name: String,
+    val capacity: Int,
+    val defaultSpeciesId: String? = null,
+)
+
 data class ApiErrorBody(val error: ApiErrorDetail?)
 data class ApiErrorDetail(val code: String, val message: String)
 
 data class SpeciesRef(val id: String, val name: String, val incubationDays: Int)
 data class IncubatorRef(val id: String, val name: String)
+
+data class BatchHatchFlockRef(val id: String)
+data class BatchHatchRef(val id: String, val flock: BatchHatchFlockRef?)
 
 data class Batch(
     val id: String,
@@ -78,7 +87,60 @@ data class Batch(
     val hatchOfFertilePct: Double?,
     val species: SpeciesRef?,
     val incubator: IncubatorRef?,
+    // Only present when status is (at least) hatching — lets Flock
+    // creation offer "from this hatch" once it exists and isn't already
+    // linked to a flock (matches apps/web's flocks/page.tsx filter).
+    val hatch: BatchHatchRef? = null,
 )
+
+data class BatchEggSourceInput(val collectionId: String, val count: Int)
+
+data class CreateBatchRequest(
+    val incubatorId: String,
+    val speciesId: String,
+    val sources: List<BatchEggSourceInput>,
+    val overrideNote: String? = null,
+)
+
+data class CreateBatchResponse(val batch: Batch, val warnings: List<String>)
+
+// Detail view — separate from Batch since only the single-batch GET
+// includes egg sources (needed to pre-fill the edit form with what this
+// batch already draws from; the list endpoint omits them, matching
+// apps/web's BatchDetail vs Batch split in lib/types.ts).
+data class BatchSourceRef(val collectionId: String, val count: Int, val collection: Collection)
+
+data class BatchDetail(
+    val id: String,
+    val incubatorId: String,
+    val speciesId: String,
+    val status: String,
+    val setAt: String?,
+    val candlingDays: List<Int>,
+    val lockdownAt: String?,
+    val expectedHatchAt: String?,
+    val viableCount: Int,
+    val fertilityPct: Double?,
+    val hatchOfSetPct: Double?,
+    val hatchOfFertilePct: Double?,
+    val species: SpeciesRef?,
+    val incubator: IncubatorRef?,
+    val sources: List<BatchSourceRef>,
+    val hatch: BatchHatchRef? = null,
+)
+
+// Only "planned" batches are editable/deletable (server enforces this;
+// see docs/architecture/adr for the batch lifecycle). All fields optional
+// — a partial update (e.g. incubator only) omits `sources` entirely
+// rather than sending an empty list, which the API would reject.
+data class UpdateBatchRequest(
+    val incubatorId: String? = null,
+    val speciesId: String? = null,
+    val sources: List<BatchEggSourceInput>? = null,
+    val overrideNote: String? = null,
+)
+
+data class UpdateBatchResponse(val batch: Batch, val warnings: List<String>)
 
 // BR-010: clientId makes this create idempotent — replaying the same
 // clientId returns the original record (200) instead of duplicating (201).
@@ -160,6 +222,19 @@ data class DeviceConfig(
 // ── Flock operations (Phase 2) ──────────────────────────────────
 
 data class FlockSpeciesRef(val id: String, val name: String)
+
+// Exactly one origin (US-FLK-001, BR-009 traceability): either
+// hatchEventId, or acquisitionDate+acquisitionAgeDays — never both.
+data class CreateFlockRequest(
+    val name: String,
+    val speciesId: String,
+    val purpose: String,
+    val placedCount: Int,
+    val hatchEventId: String? = null,
+    val acquisitionDate: String? = null,
+    val acquisitionAgeDays: Int? = null,
+    val acquisitionNote: String? = null,
+)
 
 // Server derives ageDays/stage/currentCount — never sent by the client (US-FLK-002/BR-009).
 data class Flock(
@@ -286,8 +361,8 @@ data class Species(val id: String, val name: String)
 
 // ── Batch lifecycle (Phase 4) ────────────────────────────────────────────
 
-// Empty body serializes to "{}" (Gson omits null fields by default) —
-// matches apps/web's post("/set", {}); server defaults setAt to now().
+// setAt is an ISO-8601 UTC instant; null omits the field (Gson skips nulls
+// by default) and the server defaults to now().
 data class SetBatchRequest(val setAt: String? = null)
 
 // ── Vaccination templates (Phase 4 — new on Android) ─────────────────────

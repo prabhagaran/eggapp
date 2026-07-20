@@ -59,8 +59,9 @@ record.
 Scope for this increment: the four EGG-incubator control-loop values
 already exposed in telemetry as `setTemp`/`setHum` (plus their
 hysteresis, newly added to telemetry alongside this — see
-`telemetry-contract.md`). Turner/fan/pump/mode are **not** covered yet —
-their current values aren't surfaced in telemetry, so a remote edit UI
+`telemetry-contract.md`), plus the incubation start date (`startEpoch`,
+added by ADR 0008). Turner/fan/pump/mode are **not** covered yet — their
+current values aren't surfaced in telemetry, so a remote edit UI
 couldn't show what it's changing *from*; a follow-up increment can add
 those once telemetry mirrors them.
 
@@ -70,15 +71,36 @@ those once telemetry mirrors them.
 {"version":4,"tempSetpoint":37.6,"tempHysteresis":0.3,"humSetpoint":62,"humHysteresis":3}
 ```
 
+```json
+{"version":5,"startEpoch":1721347200}
+```
+
 - `version` is a per-device monotonic integer, assigned by the backend
   (`DeviceConfig.version`) — lets the device (and backend) tell commands
   apart and ignore anything older than the last one it acted on.
-- All setpoint fields are optional; only the fields present are changed.
-  Firmware clamps each to the existing `config.h` edit limits
+- All fields are optional and independent; only the fields present are
+  changed, and any combination (including all five at once) is valid in
+  a single payload.
+- Setpoint fields are clamped to the existing `config.h` edit limits
   (`TEMP_SETPOINT_MIN/MAX`, `TEMP_HYST_MIN/MAX`, `HUM_SETPOINT_MIN/MAX`,
   `HUM_HYST_MIN/MAX` — the same bounds the physical button UI already
   enforces in `task_ui.cpp`) rather than rejecting an out-of-range value
   outright, so a slightly-off request still lands somewhere sane.
+- `startEpoch` (Unix seconds, ADR 0008) sets the device's own
+  incubation-day counter — the same value the physical button UI writes
+  via `task_ui.cpp`'s `UI_ENV_INCUBATION_DAY` screen. Applying it
+  triggers the same side effects as that screen's final OK: humidity
+  restored to the egg-type default, `lastTurnEpoch` reset, the turner
+  task resumed if lockdown had suspended it, and the value persisted to
+  NVS (`task_mqtt.cpp`'s `applyStartEpoch()`) so it survives a reboot.
+  Unlike the setpoint fields, an out-of-range `startEpoch` (more than a
+  day in the future, or ~13 months in the past, relative to the
+  device's own RTC — only checked once the RTC has valid time) is
+  **rejected outright, not clamped**: there's no sane "closest valid
+  date" to clamp a bogus timestamp to. The app pushes this automatically
+  when a batch is set (`POST /batches/:id/set`) if the incubator has a
+  bound device — see ADR 0008 for why this is one-way and best-effort,
+  not a hard requirement of that endpoint succeeding.
 
 ### `eggapp/devices/<id>/cmd/ack` (device → platform)
 

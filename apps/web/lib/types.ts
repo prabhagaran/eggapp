@@ -125,6 +125,7 @@ export interface Batch {
   incubatorId: string;
   speciesId: string;
   status: BatchStatus;
+  createdAt: string;
   setAt: string | null;
   candlingDays: number[];
   lockdownAt: string | null;
@@ -141,6 +142,17 @@ export interface Batch {
   species?: { id: string; name: string; incubationDays: number };
   incubator?: { id: string; name: string };
   hatch?: { id: string; flock: { id: string } | null } | null;
+}
+
+export interface IncubatorHistory {
+  range: "24h" | "7d" | "batch";
+  from: string | null;
+  to: string | null;
+  summary: {
+    temp: { min: number | null; max: number | null; avg: number | null };
+    humidity: { min: number | null; max: number | null; avg: number | null };
+  };
+  points: { ts: string; tempC: number | null; humidityPct: number | null }[];
 }
 
 export interface Alert {

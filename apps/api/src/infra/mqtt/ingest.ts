@@ -38,8 +38,13 @@ const telemetrySchema = z.object({
   setTempHyst: z.number().optional(),
   setHumHyst: z.number().optional(),
   // EGG profile only — the device's own incubation-day counter and
-  // expected-hatch clock, computed on-device independently of anything
-  // set via this app's /batches/:id/set.
+  // expected-hatch clock. /batches/:id/set best-effort seeds the
+  // device's startEpoch (task_mqtt.cpp) so these normally track the
+  // app's schedule, but the device also has its own physical-button UI
+  // to set/reset this independently — so day/hatchEpoch can still drift
+  // from setAt/expectedHatchAt (unconfirmed push, offline device, local
+  // button used after the fact), which is exactly what this cross-check
+  // mirror below is for.
   day: z.number().int().optional(),
   hatchEpoch: z.number().int().optional(),
 });
