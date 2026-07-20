@@ -154,25 +154,41 @@ fun SetpointsScreen(incubatorId: String, onBack: () -> Unit) {
 
             Text("Actuators", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp))
             state.incubator?.device?.let { device ->
-                ActuatorRow("Fan", device.currentFanOn, device.currentFanOverride) { on ->
+                // currentXxxOn only reflects reality while the device is
+                // actively reporting — an offline device's last-known
+                // on/off is stale, possibly by a long margin, so callers
+                // need that caveat surfaced rather than shown as fact.
+                val deviceOnline = device.status == "active"
+                ActuatorRow("Fan", device.currentFanOn, device.currentFanOverride, deviceOnline) { on ->
                     viewModel.submitActuator(SetpointRequest(fanOverride = true, fanOn = on))
                 }
-                ActuatorRow("Turner", device.currentTurnerOn, device.currentTurnerOverride) { on ->
+                ActuatorRow("Turner", device.currentTurnerOn, device.currentTurnerOverride, deviceOnline) { on ->
                     viewModel.submitActuator(SetpointRequest(turnerOverride = true, turnerOn = on))
                 }
-                ActuatorRow("Humidifier", device.currentHumidifierOn, device.currentHumidifierOverride) { on ->
+                ActuatorRow("Humidifier", device.currentHumidifierOn, device.currentHumidifierOverride, deviceOnline) { on ->
                     viewModel.submitActuator(SetpointRequest(humidifierOverride = true, humidifierOn = on))
                 }
-                ActuatorRow("Pump", device.currentPumpOn, device.currentPumpOverride) { on ->
+                ActuatorRow("Pump", device.currentPumpOn, device.currentPumpOverride, deviceOnline) { on ->
                     viewModel.submitActuator(SetpointRequest(pumpOverride = true, pumpOn = on))
+                }
+                if (!deviceOnline) {
+                    MutedText("Device offline — on/off shown is the last known state, not live.")
                 }
             }
         }
     }
 }
 
+// Read-only by default — just reports what the device last told us. Passing
+// onToggle adds a remote-control Switch alongside the status pill.
 @Composable
-private fun ActuatorRow(label: String, on: Boolean?, override: Boolean?, onToggle: (Boolean) -> Unit) {
+private fun ActuatorRow(
+    label: String,
+    on: Boolean?,
+    override: Boolean?,
+    deviceOnline: Boolean,
+    onToggle: ((Boolean) -> Unit)? = null,
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -182,7 +198,19 @@ private fun ActuatorRow(label: String, on: Boolean?, override: Boolean?, onToggl
             Text(label)
             MutedText(if (override == true) "manual" else "auto")
         }
-        Switch(checked = on == true, onCheckedChange = onToggle)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            StatusPill(
+                if (on == true) "ON" else "OFF",
+                tone = when {
+                    !deviceOnline -> PillTone.Neutral
+                    on == true -> PillTone.Ok
+                    else -> PillTone.Neutral
+                },
+            )
+            if (onToggle != null) {
+                Switch(checked = on == true, onCheckedChange = onToggle)
+            }
+        }
     }
 }
 

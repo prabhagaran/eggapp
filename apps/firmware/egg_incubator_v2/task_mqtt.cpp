@@ -35,6 +35,24 @@ static PubSubClient mqttClient(wifiClient);
 static char         cmdTopic[64];
 static char         cmdAckTopic[64];
 
+// Set by handleCommand() once a command is applied, so the telemetry loop
+// below publishes soon after instead of waiting up to
+// MQTT_TELEMETRY_INTERVAL_MS (60s) — otherwise an actuator toggle applies
+// on the relay within milliseconds but the app/web UI, which only learns
+// the new state from telemetry, shows it as unchanged for up to a minute.
+//
+// This is a due-time, not an immediate-fire flag: handleCommand only
+// updates gSettings (e.g. fanManualOn) — the relay tasks (task_fan,
+// task_turner, task_pump in task_incubator.cpp) each poll gSettings on
+// their own 1-2s cycle and are what actually flip gRelayState to match.
+// Publishing the instant gSettings changes (as an earlier version of this
+// fix did) routinely wins that race and reports the relay's *old* state,
+// since gRelayState hasn't caught up yet. task_turner/task_pump's
+// under-override re-poll (2000ms) is the slowest of the three, so the
+// publish is delayed past that instead of firing immediately.
+static const unsigned long FORCE_TELEMETRY_SETTLE_MS = 2200UL;
+static volatile unsigned long forceTelemetryAtMs = 0; // 0 = none pending
+
 static bool extractFloatField(const char* json, const char* key, float* out) {
     char pattern[24];
     snprintf(pattern, sizeof(pattern), "\"%s\":", key);
@@ -224,6 +242,9 @@ static void handleCommand(PubSubClient& mqttClient, const char* ackTopic, const 
     snprintf(appliedAck, sizeof(appliedAck), "{\"version\":%ld,\"state\":\"applied\"}", version);
     mqttClient.publish(ackTopic, appliedAck);
     Serial.printf("[MQTT] cmd version %ld applied\n", version);
+
+    unsigned long due = millis() + FORCE_TELEMETRY_SETTLE_MS;
+    forceTelemetryAtMs = (due == 0) ? 1 : due; // 0 is the sentinel for "none pending"
 }
 
 // PubSubClient's callback signature has no context parameter, hence the
@@ -327,9 +348,12 @@ void task_mqtt(void* pvParameters) {
         // Service the MQTT connection (keepalive pings, incoming packets).
         mqttClient.loop();
 
-        // ── Publish telemetry on schedule ────────────────────────────────────
-        if (millis() - lastPublishMs >= MQTT_TELEMETRY_INTERVAL_MS) {
+        // ── Publish telemetry on schedule, or once relay tasks have caught up ──
+        unsigned long dueAt = forceTelemetryAtMs;
+        bool forceDue = dueAt != 0 && (long)(millis() - dueAt) >= 0;
+        if (millis() - lastPublishMs >= MQTT_TELEMETRY_INTERVAL_MS || forceDue) {
             lastPublishMs = millis();
+            if (forceDue) forceTelemetryAtMs = 0;
 
             // Snapshot all state — same mutex pattern as task_cloud.
             float temp = 0.0f, hum = 0.0f;
