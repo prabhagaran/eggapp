@@ -31,6 +31,44 @@ const ACTIVE: Batch["status"][] = ["planned", "setting", "incubating", "lockdown
 // so its band comes from the device's own setpoints — a bird house has
 // genuine species-independent comfort and welfare ranges, so fixed bands
 // are right here.
+/**
+ * Machine picker for a live strip. Rendered only when more than one device
+ * is reporting — a single chip would just be a label, and would imply
+ * there is something to switch to when there isn't.
+ *
+ * Every machine gets a chip whether or not it is fresh, each carrying its
+ * own status dot. Hiding stale ones would make a whole incubator vanish
+ * from the dashboard exactly when it stopped reporting, which is the
+ * moment you most need to notice it.
+ */
+function StripSelector({
+  items,
+  selectedId,
+  onSelect,
+}: {
+  items: { id: string; name: string; fresh: boolean }[];
+  selectedId: string | undefined;
+  onSelect: (id: string) => void;
+}) {
+  if (items.length < 2) return null;
+  return (
+    <div className="strip-tabs" role="tablist">
+      {items.map((m) => (
+        <button
+          key={m.id}
+          role="tab"
+          aria-selected={m.id === selectedId}
+          className={`strip-tab${m.id === selectedId ? " active" : ""}`}
+          onClick={() => onSelect(m.id)}
+        >
+          <span className={`strip-dot${m.fresh ? "" : " stale"}`} />
+          {m.name}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 const COOP_TEMP_RANGE = { min: 18, max: 30, warnBand: 4 };
 const COOP_HUM_RANGE = { min: 50, max: 70, warnBand: 10 };
 const CO2_RANGE = { max: 450, warnBand: 550 };      // >1000 ppm = critical
@@ -75,6 +113,12 @@ export default function Dashboard() {
   const [alerts, setAlerts] = useState<Alert[] | null>(null);
   const [coops, setCoops] = useState<Coop[] | null>(null);
   const [envHistory, setEnvHistory] = useState<Record<string, IncubatorHistory>>({});
+  // Which machine each strip is showing. null = follow the freshest, which
+  // is also the behaviour before the user has picked anything. Storing the
+  // id rather than an index keeps the selection stable across the 15s poll
+  // even if the list reorders.
+  const [selectedCoopId, setSelectedCoopId] = useState<string | null>(null);
+  const [selectedIncId, setSelectedIncId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!farmId) return;
@@ -122,16 +166,20 @@ export default function Dashboard() {
   // are house measurements, not incubator ones). Pick the coop with the
   // freshest reading rather than the first in the list, so a stale or
   // offline node doesn't mask a live one.
-  const monitored = (coops ?? [])
+  const reportingCoops = (coops ?? [])
     .filter((c) => c.latestTelemetry)
-    .sort((a, b) => Date.parse(b.latestTelemetry!.ts) - Date.parse(a.latestTelemetry!.ts))[0];
+    .sort((a, b) => Date.parse(b.latestTelemetry!.ts) - Date.parse(a.latestTelemetry!.ts));
+  // Falls back to the freshest when nothing is selected, and also when the
+  // selected machine disappears (unbound, deleted) — otherwise the strip
+  // would silently blank out with no explanation.
+  const monitored = reportingCoops.find((c) => c.id === selectedCoopId) ?? reportingCoops[0];
   const t = monitored?.latestTelemetry;
   const live = t ? isFresh(t.ts) : false;
 
-  // Same "freshest wins" rule for the incubator strip.
-  const liveInc = (incubators ?? [])
+  const reportingIncs = (incubators ?? [])
     .filter((i) => i.latestTelemetry)
-    .sort((a, b) => Date.parse(b.latestTelemetry!.ts) - Date.parse(a.latestTelemetry!.ts))[0];
+    .sort((a, b) => Date.parse(b.latestTelemetry!.ts) - Date.parse(a.latestTelemetry!.ts));
+  const liveInc = reportingIncs.find((i) => i.id === selectedIncId) ?? reportingIncs[0];
   const it = liveInc?.latestTelemetry;
   const incFresh = it ? isFresh(it.ts) : false;
 
@@ -243,6 +291,16 @@ export default function Dashboard() {
             </div>
           </section>
 
+          <StripSelector
+            items={reportingCoops.map((c) => ({
+              id: c.id,
+              name: c.name,
+              fresh: isFresh(c.latestTelemetry!.ts),
+            }))}
+            selectedId={monitored?.id}
+            onSelect={setSelectedCoopId}
+          />
+
           {!live && (
             <p className="stale-note">
               Last reading was <b>{fmtAge(t!.ts)}</b>. These values were true then, not now — the coop node has stopped
@@ -311,6 +369,16 @@ export default function Dashboard() {
               </span>
             </div>
           </section>
+
+          <StripSelector
+            items={reportingIncs.map((i) => ({
+              id: i.id,
+              name: i.name,
+              fresh: isFresh(i.latestTelemetry!.ts),
+            }))}
+            selectedId={liveInc?.id}
+            onSelect={setSelectedIncId}
+          />
 
           {!incFresh && (
             <p className="stale-note">

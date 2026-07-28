@@ -262,6 +262,32 @@ a.card:hover { text-decoration: none; box-shadow: var(--shadow-md); }
 .sim-note code { font-size: 0.78rem; }
 .sensor-grid.simulated .sensor-tile { border-style: dashed; border-color: #e0a9a4; }
 
+/* Machine picker above a live strip. Horizontally scrollable rather than
+   wrapping, so a farm with many machines doesn't push the tiles down the
+   page as the row grows. */
+.strip-tabs {
+  display: flex; gap: 0.4rem; margin: 0.9rem 0 0;
+  overflow-x: auto; padding-bottom: 0.25rem;
+}
+.strip-tab {
+  display: flex; align-items: center; gap: 0.45rem; white-space: nowrap;
+  padding: 0.4rem 0.8rem; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--muted); font: inherit; font-size: 0.82rem; cursor: pointer;
+}
+.strip-tab:hover { color: var(--text); border-color: var(--accent-soft); }
+.strip-tab.active {
+  background: var(--accent-soft); border-color: var(--accent);
+  color: var(--accent-dark); font-weight: 700;
+}
+.strip-dot {
+  width: 7px; height: 7px; border-radius: 999px; flex-shrink: 0;
+  background: var(--ok);
+}
+/* Amber, not hidden: a machine that stopped reporting must stay visible
+   in the picker — that is exactly when you need to see it. */
+.strip-dot.stale { background: var(--warn-text); }
+
 /* Stale readings. The values were true once, so they aren't hidden — but a
    crisp "Heater ON" tile from days ago reads as current state, which is a
    different and false claim. Dimmed, with the age stated above the grid. */
