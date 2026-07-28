@@ -11,18 +11,20 @@
 // and never in the compiled image.
 
 // Call once from setup(), before anything that needs the network.
-// Reads the BOOT button first: held at power-on, it forces the portal even
-// when a good network is already stored. Otherwise it joins the stored
-// network, and only raises the portal if that fails.
+//
+// BLOCKS until the node is on a network. It first offers a short window to
+// press BOOT (which forces the setup portal even when a good network is
+// stored), then joins the stored network, raising the captive portal if
+// there is none or it is unreachable — retrying forever.
+//
+// Blocking is intentional: a coop node has nothing useful to do without a
+// network, and the non-blocking portal needs process() pumped from loop()
+// on a tight cadence, which makes the setup form unreliable to submit.
 void wifiManagerBegin(void);
 
-// Call every loop(). Services the non-blocking portal when it is open and
-// reconnects with back-off when the link drops. Returns true when the node
-// is associated and has an IP.
+// Call every loop(). Reconnects with back-off if the link drops. Returns
+// true when the node is associated and has an IP. Never reopens the
+// portal by itself — only the BOOT button at startup does that.
 bool wifiManagerLoop(void);
-
-// True while the captive portal is being served. Publishing is skipped in
-// this state — the radio is running an AP, not a station.
-bool wifiPortalIsActive(void);
 
 #endif // WIFI_MANAGER_H

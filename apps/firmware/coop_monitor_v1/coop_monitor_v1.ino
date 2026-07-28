@@ -13,9 +13,10 @@
 //
 // WiFi is provisioned from a phone: on first boot the node raises a
 // "COOP_SETUP" access point serving a captive portal, and the chosen
-// network is stored in NVS (wifi_manager.cpp). To switch networks later,
-// power on then press and hold BOOT within the first few seconds — no
-// reflash needed.
+// network is stored in NVS (wifi_manager.cpp). setup() blocks there until
+// a connection succeeds, so loop() only ever runs with WiFi up. To switch
+// networks later, power on then press and hold BOOT within the first few
+// seconds — no reflash needed.
 //
 // Broker credentials live in secrets.h, which is gitignored — copy
 // secrets.h.example and fill it in. WiFi credentials are deliberately NOT
@@ -104,9 +105,9 @@ void setup(void) {
     snprintf(telemetryTopic, sizeof(telemetryTopic), "%s/%s/telemetry", MQTT_TOPIC_PREFIX, DEVICE_ID);
 
     sensorsBegin();
-    // Raises the captive portal if there is no reachable stored network,
-    // or if the BOOT button is held. Non-blocking either way — loop()
-    // services it, so sampling continues while it's open.
+    // BLOCKS until the node is on a network — raising the captive portal
+    // if there is no reachable stored one, or if BOOT is pressed during
+    // the startup window. loop() therefore only ever runs with WiFi up.
     wifiManagerBegin();
 
     mqttClient.setBufferSize(MQTT_BUFFER_SIZE);
@@ -126,8 +127,8 @@ void loop(void) {
         sensorsRead(&readings);
     }
 
-    // Services the portal when open, reconnects with back-off otherwise.
-    // False means no usable link yet — keep sampling, publish nothing.
+    // Setup guaranteed a connection, so this only handles a later drop:
+    // reconnect with back-off, and publish nothing until the link is back.
     if (!wifiManagerLoop()) {
         delay(50);
         return;

@@ -32,20 +32,30 @@ PubSubClient are needed.
 ## Connecting it to WiFi from a phone
 
 On first boot there is no stored network, so the node raises its own
-access point:
+access point. `setup()` **blocks here until a connection succeeds** — the
+sketch does not start publishing, or run `loop()` at all, until it is on
+a network.
 
 1. On the phone, join the WiFi network **`COOP_SETUP`** (open, no
    password by default).
-2. A setup page opens automatically. If it doesn't, browse to
+2. **If Android warns "no internet access", choose to stay connected.**
+   Otherwise it silently drops back to mobile data and the setup page
+   will never load — this is the most common reason the form appears
+   unreachable.
+3. A setup page opens automatically. If it doesn't, browse to
    `http://192.168.4.1`.
-3. Tap **Configure WiFi**, pick your network, enter its password, save.
-4. The node reboots into your network. The AP disappears — that is the
-   success signal.
+4. Tap **Configure WiFi**, pick your network, enter its password, save.
+5. The node connects and the AP disappears — that is the success signal.
+   The serial log prints the assigned IP.
 
-The portal times out after 3 minutes (`WIFI_PORTAL_TIMEOUT_SEC`). On
-timeout the node goes back to retrying its stored network rather than
-sitting in AP mode, since the usual cause is a router that was slow
-returning after a power cut.
+The portal lapses after 5 minutes (`WIFI_PORTAL_TIMEOUT_SEC`), then the
+node retries the stored network and reopens the portal, over and over.
+Nothing is lost by letting it time out — it is a retry cadence, not a
+deadline. That loop also means a router which was merely slow returning
+after a power cut recovers on its own, with nobody touching the device.
+
+Watch the serial monitor at 115200 baud during setup; it prints the AP
+name, the portal URL and each connection attempt.
 
 ### Changing networks later
 

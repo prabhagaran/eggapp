@@ -38,8 +38,13 @@
 // AP password mainly adds a second thing to lose. Set one if the site is
 // contested.
 #define WIFI_PORTAL_AP_PASSWORD   ""
-#define WIFI_PORTAL_TIMEOUT_SEC   180    // 3 min, matching the incubator
-#define WIFI_CONNECT_TIMEOUT_SEC  20     // per attempt before falling back
+// 5 min — long enough to find the phone, join the AP, dismiss Android's
+// "no internet" prompt and type a password without being rushed. On
+// timeout the node retries the stored network and reopens the portal, so
+// nothing is lost by letting it lapse; it is a retry cadence, not a
+// deadline.
+#define WIFI_PORTAL_TIMEOUT_SEC   300
+#define WIFI_CONNECT_TIMEOUT_SEC  20     // per attempt before raising the portal
 
 // Press-and-hold this AFTER power-on to force the config portal. GPIO0 is
 // the BOOT button on essentially every ESP32 devkit, so a sensor-only node
