@@ -158,6 +158,62 @@ export default function Dashboard() {
       <h1>Dashboard</h1>
       <p className="muted">Plan, monitor, and act on your farm with ease.</p>
 
+      <h2 className="section-rule">Farm Overview</h2>
+      <div className="stat-row">
+        <div className="card dark stat-card">
+          <div className="stat-top">
+            <span className="stat-label">Total Birds</span>
+            <span className="stat-icon"><Bird /></span>
+          </div>
+          <span className="stat-value">{flocks ? birds : "—"}</span>
+          <span className="muted">across {flocks?.length ?? 0} flocks</span>
+        </div>
+        <div className="card stat-card">
+          <div className="stat-top">
+            <span className="stat-label">Active Batches</span>
+            <span className="stat-icon"><Egg /></span>
+          </div>
+          <span className="stat-value">{batches ? active.length : "—"}</span>
+          <span className="muted">of {batches?.length ?? 0} total</span>
+          {batches && batchTrend.some((b) => b.value > 0) && <Sparkline data={batchTrend} />}
+        </div>
+        <div className="card stat-card">
+          <div className="stat-top">
+            <span className="stat-label">Incubators Online</span>
+            <span className="stat-icon"><Thermometer /></span>
+          </div>
+          <span className="stat-value">{incubators ? devicesOnline : "—"}</span>
+          <span className="muted">of {incubators?.length ?? 0} total</span>
+        </div>
+        <div className="card stat-card">
+          <div className="stat-top">
+            <span className="stat-label">Open Alerts</span>
+            <span className="stat-icon"><BellRing /></span>
+          </div>
+          <span className="stat-value">{alerts ? alerts.length : "—"}</span>
+          <span className="muted">
+            <Link href="/alerts">review →</Link>
+          </span>
+        </div>
+      </div>
+
+      <div className="grid-2">
+        <div className="card">
+          <b>Batch pipeline</b>
+          <p className="muted" style={{ marginTop: "0.15rem" }}>Where every batch sits right now</p>
+          {batches ? <BatchPipelineChart counts={pipelineCounts} /> : <p className="muted">Loading…</p>}
+        </div>
+        <div className="card">
+          <b>Open alerts by severity</b>
+          <p className="muted" style={{ marginTop: "0.15rem" }}>{alerts ? alerts.length : "—"} open right now</p>
+          {alerts && (
+            <div style={{ marginTop: "1rem" }}>
+              <AlertsSeverityBars warning={warningAlerts} critical={criticalAlerts} />
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* A farm with no coop monitor gets no tiles at all — the correct
           empty state. Rendering the grid with every value dashed would
           imply broken sensors rather than "you haven't set this up". */}
@@ -282,62 +338,6 @@ export default function Dashboard() {
           </div>
         </>
       )}
-
-      <h2 className="section-rule">Farm Overview</h2>
-      <div className="stat-row">
-        <div className="card dark stat-card">
-          <div className="stat-top">
-            <span className="stat-label">Total Birds</span>
-            <span className="stat-icon"><Bird /></span>
-          </div>
-          <span className="stat-value">{flocks ? birds : "—"}</span>
-          <span className="muted">across {flocks?.length ?? 0} flocks</span>
-        </div>
-        <div className="card stat-card">
-          <div className="stat-top">
-            <span className="stat-label">Active Batches</span>
-            <span className="stat-icon"><Egg /></span>
-          </div>
-          <span className="stat-value">{batches ? active.length : "—"}</span>
-          <span className="muted">of {batches?.length ?? 0} total</span>
-          {batches && batchTrend.some((b) => b.value > 0) && <Sparkline data={batchTrend} />}
-        </div>
-        <div className="card stat-card">
-          <div className="stat-top">
-            <span className="stat-label">Incubators Online</span>
-            <span className="stat-icon"><Thermometer /></span>
-          </div>
-          <span className="stat-value">{incubators ? devicesOnline : "—"}</span>
-          <span className="muted">of {incubators?.length ?? 0} total</span>
-        </div>
-        <div className="card stat-card">
-          <div className="stat-top">
-            <span className="stat-label">Open Alerts</span>
-            <span className="stat-icon"><BellRing /></span>
-          </div>
-          <span className="stat-value">{alerts ? alerts.length : "—"}</span>
-          <span className="muted">
-            <Link href="/alerts">review →</Link>
-          </span>
-        </div>
-      </div>
-
-      <div className="grid-2">
-        <div className="card">
-          <b>Batch pipeline</b>
-          <p className="muted" style={{ marginTop: "0.15rem" }}>Where every batch sits right now</p>
-          {batches ? <BatchPipelineChart counts={pipelineCounts} /> : <p className="muted">Loading…</p>}
-        </div>
-        <div className="card">
-          <b>Open alerts by severity</b>
-          <p className="muted" style={{ marginTop: "0.15rem" }}>{alerts ? alerts.length : "—"} open right now</p>
-          {alerts && (
-            <div style={{ marginTop: "1rem" }}>
-              <AlertsSeverityBars warning={warningAlerts} critical={criticalAlerts} />
-            </div>
-          )}
-        </div>
-      </div>
 
       <h2>Active batches</h2>
       {batches && active.length === 0 && (
