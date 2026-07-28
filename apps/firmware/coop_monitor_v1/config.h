@@ -18,6 +18,42 @@
 #define DEVICE_ID             "COOP_01"
 
 // ─────────────────────────────────────────────────────────────────────────────
+// WIFI PROVISIONING
+//
+// Credentials are NOT compiled in. On first boot (or when no stored
+// network is reachable) the node raises a WiFi access point and serves a
+// captive portal — connect a phone to it and pick the network there.
+// WiFiManager persists the choice in its own NVS namespace, so it
+// survives reboots and reflashes of the sketch.
+//
+// To change networks later: power on, then press and hold the BOOT button
+// during the first few seconds (see PORTAL_TRIGGER_PIN below). The portal
+// is never opened automatically on a running device — a node that silently
+// dropped into AP mode in the field would stop publishing and look
+// identical to one that had died.
+// ─────────────────────────────────────────────────────────────────────────────
+#define WIFI_PORTAL_AP_NAME       "COOP_SETUP"
+// Blank = open network. The portal only ever carries the WiFi credentials
+// the user is entering, on a link that exists for a couple of minutes; an
+// AP password mainly adds a second thing to lose. Set one if the site is
+// contested.
+#define WIFI_PORTAL_AP_PASSWORD   ""
+#define WIFI_PORTAL_TIMEOUT_SEC   180    // 3 min, matching the incubator
+#define WIFI_CONNECT_TIMEOUT_SEC  20     // per attempt before falling back
+
+// Press-and-hold this AFTER power-on to force the config portal. GPIO0 is
+// the BOOT button on essentially every ESP32 devkit, so a sensor-only node
+// with no buttons of its own needs no extra hardware.
+//
+// It must be pressed *after* startup, not held through it: GPIO0 is a
+// strapping pin, and pulling it low at reset puts the ESP32 into serial
+// download mode, where the sketch never runs. Hence the post-boot window
+// below rather than a check at reset.
+#define PORTAL_TRIGGER_PIN        0
+#define PORTAL_TRIGGER_WINDOW_MS  5000   // how long after boot the press is accepted
+#define PORTAL_TRIGGER_HOLD_MS    2000   // how long it must be held
+
+// ─────────────────────────────────────────────────────────────────────────────
 // MQTT — same broker, same topic shape as the incubator (mqtt-topics.md)
 // ─────────────────────────────────────────────────────────────────────────────
 // MQTT_BROKER_HOST/PORT/USERNAME/PASSWORD come from secrets.h (gitignored),

@@ -11,8 +11,15 @@
 // ceremony without benefit. If actuator control ever lands on a coop node,
 // revisit that.
 //
-// Secrets (WiFi + broker credentials) live in secrets.h, which is
-// gitignored — copy secrets.example.h and fill it in.
+// WiFi is provisioned from a phone: on first boot the node raises a
+// "COOP_SETUP" access point serving a captive portal, and the chosen
+// network is stored in NVS (wifi_manager.cpp). To switch networks later,
+// power on then press and hold BOOT within the first few seconds — no
+// reflash needed.
+//
+// Broker credentials live in secrets.h, which is gitignored — copy
+// secrets.h.example and fill it in. WiFi credentials are deliberately NOT
+// there, so the same image works on any site.
 // ─────────────────────────────────────────────────────────────────────────────
 #include <Arduino.h>
 #include <WiFi.h>
@@ -21,6 +28,7 @@
 #include "config.h"
 #include "secrets.h"
 #include "sensors.h"
+#include "wifi_manager.h"
 
 static WiFiClient   wifiClient;
 static PubSubClient mqttClient(wifiClient);
@@ -43,18 +51,6 @@ static void appendField(char* buf, size_t bufSize, const char* key,
     if (valid) snprintf(one, sizeof(one), ",\"%s\":%.*f", key, decimals, value);
     else       snprintf(one, sizeof(one), ",\"%s\":null", key);
     strncat(buf, one, bufSize - strlen(buf) - 1);
-}
-
-static void connectWifi(void) {
-    if (WiFi.status() == WL_CONNECTED) return;
-    Serial.printf("[WiFi] Connecting to %s...\n", WIFI_SSID);
-    WiFi.mode(WIFI_STA);
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-    // Bounded wait — loop() retries, so a failure here must not block
-    // sensor reads or spin forever.
-    unsigned long deadline = millis() + 15000;
-    while (WiFi.status() != WL_CONNECTED && millis() < deadline) delay(250);
-    Serial.println(WiFi.status() == WL_CONNECTED ? "[WiFi] Connected" : "[WiFi] Failed");
 }
 
 static void publishTelemetry(void) {
@@ -108,7 +104,10 @@ void setup(void) {
     snprintf(telemetryTopic, sizeof(telemetryTopic), "%s/%s/telemetry", MQTT_TOPIC_PREFIX, DEVICE_ID);
 
     sensorsBegin();
-    connectWifi();
+    // Raises the captive portal if there is no reachable stored network,
+    // or if the BOOT button is held. Non-blocking either way — loop()
+    // services it, so sampling continues while it's open.
+    wifiManagerBegin();
 
     mqttClient.setBufferSize(MQTT_BUFFER_SIZE);
     mqttClient.setKeepAlive(MQTT_KEEPALIVE_SEC);
@@ -127,8 +126,10 @@ void loop(void) {
         sensorsRead(&readings);
     }
 
-    if (WiFi.status() != WL_CONNECTED) {
-        connectWifi();
+    // Services the portal when open, reconnects with back-off otherwise.
+    // False means no usable link yet — keep sampling, publish nothing.
+    if (!wifiManagerLoop()) {
+        delay(50);
         return;
     }
 
