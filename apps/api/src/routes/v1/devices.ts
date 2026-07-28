@@ -11,7 +11,13 @@ const registerSchema = z.object({
   name: z.string().max(120).optional(),
 });
 
-const bindSchema = z.object({ incubatorId: z.uuid() });
+// A device binds to exactly one of an incubator or a coop (ADR 0009).
+// Modelled as a union so "neither" and "both" are rejected by the schema
+// rather than needing a runtime check in the handler.
+const bindSchema = z.union([
+  z.object({ incubatorId: z.uuid(), coopId: z.undefined().optional() }),
+  z.object({ coopId: z.uuid(), incubatorId: z.undefined().optional() }),
+]);
 
 export async function deviceRoutes(app: FastifyInstance) {
   app.post("/farms/:farmId/devices", { preHandler: [app.authenticate] }, async (req, reply) => {
@@ -32,7 +38,9 @@ export async function deviceRoutes(app: FastifyInstance) {
     const { farmId, id } = deviceParams.parse(req.params);
     await requireMembership(req.user.sub, farmId, "manager");
     const body = bindSchema.parse(req.body);
-    return devices.bindDevice(farmId, id, body.incubatorId);
+    return body.incubatorId
+      ? devices.bindDevice(farmId, id, body.incubatorId)
+      : devices.bindDeviceToCoop(farmId, id, body.coopId!);
   });
 
   app.post("/farms/:farmId/devices/:id/unbind", { preHandler: [app.authenticate] }, async (req) => {

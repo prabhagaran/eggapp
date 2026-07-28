@@ -29,10 +29,15 @@ const cmdAckSchema = z.object({
 // (pre US-INC-003) won't send the hysteresis fields.
 const telemetrySchema = z.object({
   id: z.string(),
-  profile: z.enum(["EGG", "CLIMATE"]),
+  // COOP (ADR 0009) is a sensor-only node in the bird house — it drives no
+  // relays and runs no control loop, so every actuator/setpoint field
+  // below is absent from its payloads. They're already optional for
+  // older-firmware reasons, which makes COOP fit without further change.
+  profile: z.enum(["EGG", "CLIMATE", "COOP"]),
   temp: z.number().nullable(),
   hum: z.number().nullable(),
-  turner: z.union([z.literal(0), z.literal(1)]),
+  // Optional so COOP payloads validate — a coop node has no turner.
+  turner: z.union([z.literal(0), z.literal(1)]).optional(),
   // Optional — older firmware (pre actuator-control increment) won't send
   // these yet, same reasoning as the setpoint hysteresis fields below.
   heater: z.union([z.literal(0), z.literal(1)]).optional(),
@@ -48,6 +53,16 @@ const telemetrySchema = z.object({
   setHum: z.number().optional(),
   setTempHyst: z.number().optional(),
   setHumHyst: z.number().optional(),
+  // COOP-profile sensor channels (ADR 0009). Absent = no such sensor
+  // fitted; present-but-null = sensor fitted, reading faulted. Both land
+  // as null in the column (telemetry-contract.md explains why the row
+  // doesn't try to distinguish them). Rejected on non-COOP profiles —
+  // see the guard in handleTelemetry.
+  co2: z.number().nullable().optional(),
+  nh3: z.number().nullable().optional(),
+  lux: z.number().nullable().optional(),
+  feed: z.number().nullable().optional(),
+  water: z.number().nullable().optional(),
   // EGG profile only — the device's own incubation-day counter and
   // expected-hatch clock. /batches/:id/set best-effort seeds the
   // device's startEpoch (task_mqtt.cpp) so these normally track the
@@ -80,6 +95,18 @@ async function handleTelemetry(log: FastifyBaseLogger, deviceId: string, raw: Bu
     log.warn({ deviceId, issues: parsed.error.issues }, "[mqtt] malformed telemetry payload");
     return;
   }
+  // The coop channels are meaningless on an incubator — ammonia and feed
+  // level inside a sealed egg cabinet measure nothing. Drop them rather
+  // than persist a value whose provenance we don't believe; the rest of
+  // the payload is still good and is stored normally.
+  const isCoop = parsed.data.profile === "COOP";
+  if (!isCoop && ["co2", "nh3", "lux", "feed", "water"].some((k) => k in parsed.data)) {
+    log.warn(
+      { deviceId, profile: parsed.data.profile },
+      "[mqtt] coop-only sensor fields on a non-COOP payload — fields ignored",
+    );
+  }
+
   const prisma = getPrisma();
   // BR-007: unmatched device id is logged and dropped, never auto-created.
   const device = await prisma.device.findUnique({
@@ -97,12 +124,21 @@ async function handleTelemetry(log: FastifyBaseLogger, deviceId: string, raw: Bu
         ts: new Date(),
         tempC: parsed.data.temp,
         humidityPct: parsed.data.hum,
-        turnerOn: parsed.data.turner === 1,
+        ...(parsed.data.turner != null ? { turnerOn: parsed.data.turner === 1 } : {}),
         ...(parsed.data.heater != null ? { heaterOn: parsed.data.heater === 1 } : {}),
         ...(parsed.data.cooler != null ? { coolerOn: parsed.data.cooler === 1 } : {}),
         ...(parsed.data.humidifier != null ? { humidifierOn: parsed.data.humidifier === 1 } : {}),
         ...(parsed.data.fan != null ? { fanOn: parsed.data.fan === 1 } : {}),
         ...(parsed.data.pump != null ? { pumpOn: parsed.data.pump === 1 } : {}),
+        // COOP only, and spread only when the key is present — a node
+        // without the sensor writes no value at all rather than an
+        // explicit null. Same result in the row, but it keeps "field
+        // omitted" distinguishable from "field sent as null" here.
+        ...(isCoop && "co2" in parsed.data ? { co2Ppm: parsed.data.co2 } : {}),
+        ...(isCoop && "nh3" in parsed.data ? { ammoniaPpm: parsed.data.nh3 } : {}),
+        ...(isCoop && "lux" in parsed.data ? { lightLux: parsed.data.lux } : {}),
+        ...(isCoop && "feed" in parsed.data ? { feedLevelPct: parsed.data.feed } : {}),
+        ...(isCoop && "water" in parsed.data ? { waterLevelPct: parsed.data.water } : {}),
         source: "mqtt",
       },
     });

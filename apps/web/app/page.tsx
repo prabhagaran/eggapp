@@ -1,13 +1,37 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Egg, Bird, Thermometer, BellRing } from "lucide-react";
+import {
+  Egg,
+  Bird,
+  Thermometer,
+  BellRing,
+  Droplets,
+  Wind,
+  Gauge,
+  Sun,
+  Wheat,
+  Droplet,
+} from "lucide-react";
 import { api } from "../lib/api";
 import { AlertsSeverityBars, BatchPipelineChart, IncubatorEnvChart, Sparkline } from "../components/DashboardCharts";
-import type { Alert, Batch, Flock, Incubator, IncubatorHistory } from "../lib/types";
+import { SensorTile } from "../components/SensorTile";
+import type { Alert, Batch, Coop, Flock, Incubator, IncubatorHistory } from "../lib/types";
 import { dayOf, fmtAge, isFresh, useAuthedFarm } from "../lib/useAuthedFarm";
 
 const ACTIVE: Batch["status"][] = ["planned", "setting", "incubating", "lockdown", "hatching"];
+
+// Optimal bands for the coop's live tiles (ADR 0009). Unlike an incubator
+// — whose correct temperature depends on the species profile it's running,
+// so its band comes from the device's own setpoints — a bird house has
+// genuine species-independent comfort and welfare ranges, so fixed bands
+// are right here.
+const COOP_TEMP_RANGE = { min: 18, max: 30, warnBand: 4 };
+const COOP_HUM_RANGE = { min: 50, max: 70, warnBand: 10 };
+const CO2_RANGE = { max: 450, warnBand: 550 };      // >1000 ppm = critical
+const NH3_RANGE = { max: 10, warnBand: 10 };        // >20 ppm = critical
+const FEED_RANGE = { min: 20, warnBand: 10 };       // <10% = critical
+const WATER_RANGE = { min: 25, warnBand: 15 };      // <10% = critical
 
 // Last 8 ISO week buckets (Mon–Sun), oldest first — enough to show a
 // meaningful trend without the sparkline turning into a full chart.
@@ -44,6 +68,7 @@ export default function Dashboard() {
   const [batches, setBatches] = useState<Batch[] | null>(null);
   const [flocks, setFlocks] = useState<Flock[] | null>(null);
   const [alerts, setAlerts] = useState<Alert[] | null>(null);
+  const [coops, setCoops] = useState<Coop[] | null>(null);
   const [envHistory, setEnvHistory] = useState<Record<string, IncubatorHistory>>({});
 
   useEffect(() => {
@@ -53,6 +78,7 @@ export default function Dashboard() {
       api<Batch[]>(`/v1/farms/${farmId}/batches`).then(setBatches);
       api<Flock[]>(`/v1/farms/${farmId}/flocks`).then(setFlocks);
       api<Alert[]>(`/v1/farms/${farmId}/alerts?state=open`).then(setAlerts);
+      api<Coop[]>(`/v1/farms/${farmId}/coops`).then(setCoops);
     };
     reload();
     // Telemetry lands every ~60s; poll a bit faster so live readings
@@ -87,11 +113,82 @@ export default function Dashboard() {
     return acc;
   }, {});
 
+  // The live-monitoring band shows one coop at a time (ADR 0009 — these
+  // are house measurements, not incubator ones). Pick the coop with the
+  // freshest reading rather than the first in the list, so a stale or
+  // offline node doesn't mask a live one.
+  const monitored = (coops ?? [])
+    .filter((c) => c.latestTelemetry)
+    .sort((a, b) => Date.parse(b.latestTelemetry!.ts) - Date.parse(a.latestTelemetry!.ts))[0];
+  const t = monitored?.latestTelemetry;
+  const live = t ? isFresh(t.ts) : false;
+
   return (
     <>
       <h1>Dashboard</h1>
       <p className="muted">Plan, monitor, and act on your farm with ease.</p>
 
+      {/* A farm with no coop monitor gets no tiles at all — the correct
+          empty state. Rendering the grid with every value dashed would
+          imply broken sensors rather than "you haven't set this up". */}
+      {monitored ? (
+        <>
+          <section className="live-band">
+            <div>
+              <b>Real-Time Coop Monitoring</b>
+              <span>
+                Live data from {monitored.device?.name ?? monitored.device?.hardwareId ?? "device"} — {monitored.name}
+              </span>
+            </div>
+            <div className={`live-chip${live ? "" : " stale"}`}>
+              <span className="dot" />
+              <span>
+                <b>{live ? "Connected" : "No recent data"}</b>
+                <span>Last update: {fmtAge(t!.ts)}</span>
+              </span>
+            </div>
+          </section>
+
+          <h2 className="section-rule">Environmental Conditions</h2>
+          <div className="sensor-grid">
+            <SensorTile icon={<Thermometer />} label="Temperature" value={t!.tempC} unit="°C" range={COOP_TEMP_RANGE} />
+            <SensorTile icon={<Droplets />} label="Humidity" value={t!.humidityPct} unit="%" range={COOP_HUM_RANGE}
+              decimals={0} />
+            <SensorTile icon={<Wind />} label="CO₂ Level" value={t!.co2Ppm} unit="ppm" range={CO2_RANGE} decimals={0} />
+            <SensorTile icon={<Gauge />} label="Ammonia" value={t!.ammoniaPpm} unit="ppm" range={NH3_RANGE} />
+          </div>
+
+          <h2 className="section-rule">Resource Management</h2>
+          <div className="sensor-grid">
+            <SensorTile icon={<Sun />} label="Light Intensity" value={t!.lightLux} unit="lux" decimals={0}
+              hint="Ambient light" />
+            <SensorTile icon={<Wheat />} label="Feed Level" value={t!.feedLevelPct} unit="%" range={FEED_RANGE}
+              hint="Refill at <20%" />
+            <SensorTile icon={<Droplet />} label="Water Level" value={t!.waterLevelPct} unit="%" range={WATER_RANGE}
+              hint="Refill at <25%" />
+          </div>
+        </>
+      ) : (
+        coops != null && (
+          <section className="live-band">
+            <div>
+              <b>Real-Time Coop Monitoring</b>
+              <span>
+                {coops.length === 0
+                  ? "No coops yet — add one to monitor house conditions"
+                  : "No coop is reporting telemetry yet — bind a monitor device"}
+              </span>
+            </div>
+            <Link href="/coops" className="live-chip">
+              <span>
+                <b>{coops.length === 0 ? "Add a coop →" : "Set up monitoring →"}</b>
+              </span>
+            </Link>
+          </section>
+        )
+      )}
+
+      <h2 className="section-rule">Farm Overview</h2>
       <div className="stat-row">
         <div className="card dark stat-card">
           <div className="stat-top">

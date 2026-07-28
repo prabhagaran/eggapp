@@ -1,19 +1,21 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../../lib/api";
-import type { Device, Incubator } from "../../lib/types";
+import type { Coop, Device, Incubator } from "../../lib/types";
 import { fmtDate, useAuthedFarm } from "../../lib/useAuthedFarm";
 
 export default function DevicesPage() {
   const farmId = useAuthedFarm();
   const [rows, setRows] = useState<Device[] | null>(null);
   const [incubators, setIncubators] = useState<Incubator[]>([]);
+  const [coops, setCoops] = useState<Coop[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(() => {
     if (!farmId) return;
     api<Device[]>(`/v1/farms/${farmId}/devices`).then(setRows);
     api<Incubator[]>(`/v1/farms/${farmId}/incubators`).then(setIncubators);
+    api<Coop[]>(`/v1/farms/${farmId}/coops`).then(setCoops);
   }, [farmId]);
   useEffect(reload, [reload]);
 
@@ -40,6 +42,7 @@ export default function DevicesPage() {
 
   if (!farmId) return null;
   const freeIncubators = incubators.filter((i) => !i.deviceId);
+  const freeCoops = coops.filter((c) => !c.deviceId);
 
   return (
     <>
@@ -91,11 +94,21 @@ export default function DevicesPage() {
                   </span>
                 </td>
                 <td className="muted">{fmtDate(d.lastSeenAt)}</td>
-                <td>{d.incubator?.name ?? <span className="muted">—</span>}</td>
+                <td>
+                  {d.incubator ? (
+                    d.incubator.name
+                  ) : d.coop ? (
+                    <>
+                      {d.coop.name} <span className="muted">(coop)</span>
+                    </>
+                  ) : (
+                    <span className="muted">—</span>
+                  )}
+                </td>
                 <td>
                   {d.status !== "decommissioned" && (
                     <div className="row">
-                      {d.incubator ? (
+                      {d.incubator || d.coop ? (
                         <button
                           className="secondary"
                           onClick={() => call(`/v1/farms/${farmId}/devices/${d.id}/unbind`)}
@@ -103,22 +116,41 @@ export default function DevicesPage() {
                           Unbind
                         </button>
                       ) : (
-                        freeIncubators.length > 0 && (
+                        (freeIncubators.length > 0 || freeCoops.length > 0) && (
+                          // One select for both target types (ADR 0009: a
+                          // device binds to an incubator OR a coop, never
+                          // both). The value carries which kind it is, so
+                          // the two groups can't be confused.
                           <select
                             defaultValue=""
                             onChange={(e) => {
-                              if (e.target.value)
-                                call(`/v1/farms/${farmId}/devices/${d.id}/bind`, {
-                                  incubatorId: e.target.value,
-                                });
+                              if (!e.target.value) return;
+                              const [kind, id] = e.target.value.split(":");
+                              call(
+                                `/v1/farms/${farmId}/devices/${d.id}/bind`,
+                                kind === "coop" ? { coopId: id } : { incubatorId: id },
+                              );
                             }}
                           >
                             <option value="">Bind to…</option>
-                            {freeIncubators.map((i) => (
-                              <option key={i.id} value={i.id}>
-                                {i.name}
-                              </option>
-                            ))}
+                            {freeIncubators.length > 0 && (
+                              <optgroup label="Incubators">
+                                {freeIncubators.map((i) => (
+                                  <option key={i.id} value={`incubator:${i.id}`}>
+                                    {i.name}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            )}
+                            {freeCoops.length > 0 && (
+                              <optgroup label="Coops">
+                                {freeCoops.map((c) => (
+                                  <option key={c.id} value={`coop:${c.id}`}>
+                                    {c.name}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            )}
                           </select>
                         )
                       )}

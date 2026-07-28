@@ -3,8 +3,7 @@ import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { hasToken } from "../lib/api";
-import { Sidebar } from "./Sidebar";
-import { Topbar } from "./Topbar";
+import { TopTabs } from "./TopTabs";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -19,11 +18,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="app-shell">
-      <Sidebar />
-      <div className="app-content">
-        <Topbar />
-        <main className="app-main">{children}</main>
-      </div>
+      <TopTabs />
+      <main className="app-main">{children}</main>
     </div>
   );
 }

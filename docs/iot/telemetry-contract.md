@@ -1,8 +1,11 @@
 # Telemetry Contract
 
 - **Owner agent:** iot-integration-architect
-- **Status:** v1 (2026-07-17) — exact schema published by `task_mqtt.cpp`,
-  captured live from the real device (see field-by-field notes below).
+- **Status:** v1.1 (2026-07-28) — v1 (2026-07-17) captured live from the
+  real device; v1.1 adds the optional air-quality/resource channels
+  (`co2`/`nh3`/`lux`/`feed`/`water`), which are **additive and
+  unverified against hardware** — no such sensor is fitted to the
+  current device, so those fields have not yet been seen on the wire.
 
 ## `eggapp/devices/<id>/telemetry` payload
 
@@ -33,9 +36,67 @@ wire order. Example, captured live:
 | `mode` | string | — | `"AUTO"` or `"MANUAL"` |
 | `heater`,`cooler`,`humidifier`,`fan`,`pump`,`turner` | 0 \| 1 | — | Relay states at publish time |
 | `fanOverride`,`turnerOverride`,`humidifierOverride`,`pumpOverride` | 0 \| 1 | — | `1` = that actuator is under remote manual override (see "Commands" in `mqtt-topics.md`) and its `*On` field above reflects the override value, not automatic control-loop output |
+| `co2` | number \| `null` | ppm | MH-Z19B NDIR. **COOP profile only** — see below |
+| `nh3` | number \| `null` | ppm | MQ-137 ammonia. **COOP only** |
+| `lux` | number \| `null` | lux | BH1750 ambient light. **COOP only** |
+| `feed` | number \| `null` | % | Feed hopper fill, HC-SR04 ultrasonic distance → percent. **COOP only** |
+| `water` | number \| `null` | % | Water reservoir fill, same method. **COOP only** |
 | `day` | int | — | Incubation day. **Only present when `profile:"EGG"`.** |
 | `daysLeft` | int | — | Days to expected hatch. **EGG only.** |
 | `hatchEpoch` | int | unix seconds | Expected hatch time. **EGG only.** |
+
+## `profile:"COOP"` — coop monitoring nodes (v1.1, 2026-07-28)
+
+Per **ADR 0009**, a coop monitoring controller is a second device
+profile on the *same* topic tree, not a new protocol. It is a physically
+separate box (`apps/firmware/coop_monitor_v1/`) in the bird house, bound
+to a `Coop`, not an `Incubator`.
+
+A COOP payload carries `id`, `fw`, `profile`, `temp`, `hum`, plus
+whichever of the five sensor channels are fitted:
+
+```json
+{"id":"COOP_01","fw":"1.0.0","profile":"COOP","temp":28.7,"hum":63.7,
+ "co2":408,"nh3":8.9,"lux":475,"feed":74.5,"water":81.4}
+```
+
+It **omits** everything that belongs to an incubator: no
+`heater`/`cooler`/`humidifier`/`fan`/`pump`/`turner` or their overrides
+(a coop node drives no relays), no setpoint/hysteresis fields (no
+control loop), and no `day`/`daysLeft`/`hatchEpoch`.
+
+Conversely an EGG payload never carries the five sensor channels.
+Ammonia and feed level are not merely unmeasured inside a sealed
+incubator cabinet — they are meaningless there. An earlier draft of this
+contract (same day, superseded by ADR 0009) put them on the EGG profile;
+that was wrong and no hardware ever shipped with it.
+
+### The five channels are optional fields, not optional values
+
+The distinction matters and the two states are deliberately different:
+
+- **Field absent from the payload** = this device has no such sensor
+  fitted. The build-time flags in the coop sketch's `config.h`
+  (`HAS_CO2_SENSOR` etc.) gate whether the field is emitted at all.
+  Consumers render this as "no sensor", not as a missing reading.
+- **Field present but `null`** = the sensor is fitted but its current
+  reading failed or fell outside the plausible range (same convention
+  `temp`/`hum` already use). Consumers render this as a fault.
+
+Both persist as `null` in `TelemetryReading` — the column cannot
+distinguish them, and deliberately doesn't try. "Is this device supposed
+to have a CO₂ sensor?" is device-capability metadata, not a property of
+one reading; if that question ever needs answering after the fact, it
+belongs on `Device`, not on every row of a telemetry table. Until then,
+the live UI answers it from the most recent reading.
+
+Payload size: all five fields present adds ~60 bytes, well inside
+`MQTT_BUFFER_SIZE`.
+
+**Backward compatibility runs both ways.** Old firmware against new
+ingest: fields absent, columns stay null, nothing breaks. New firmware
+against old ingest: unknown fields are ignored by the Zod schema, which
+is non-strict. So firmware and API can be deployed in either order.
 
 **Known gap:** when `profile:"CLIMATE"`, the firmware's Google Sheets
 path sends a `phase` field (`HEAT`/`COOL`/`IDLE`) that `task_mqtt.cpp`
@@ -61,6 +122,9 @@ app (it currently isn't — see domain-model.md, no such entity).
   coolerOn, humidifierOn, fanOn, pumpOn, turnerOn, source: "mqtt" }`
   (each `*On` mapped from the matching 0|1 field); `null` sensor values
   stored as `null`, not coerced to 0.
+- The v1.1 optional channels map `co2 → co2Ppm`, `nh3 → ammoniaPpm`,
+  `lux → lightLux`, `feed → feedLevelPct`, `water → waterLevelPct`,
+  under the same never-coerce-null rule.
 - `fanOverride`/`turnerOverride`/`humidifierOverride`/`pumpOverride` and
   the actuator on/off fields are mirrored onto `Device.currentFanOn` /
   `currentFanOverride` / etc. (same snapshot pattern as `currentTempSetpoint`

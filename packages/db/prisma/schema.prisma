@@ -52,6 +52,7 @@ model Farm {
   alertRules               AlertRule[]
   alerts                   Alert[]
   flocks                   Flock[]
+  coops                    Coop[]
   vaccinationTemplateItems VaccinationTemplateItem[]
   inventoryItems           InventoryItem[]
 }
@@ -150,7 +151,13 @@ model Device {
   currentPumpOverride       Boolean?
   createdAt                 DateTime           @default(now())
   farm                      Farm               @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  // A device binds to an Incubator OR a Coop, never both (ADR 0009).
+  // Mutual exclusion is enforced in device.service.ts at bind time —
+  // expressing "exactly one of two optional inverse relations" in
+  // Postgres needs a trigger or denormalised check columns, both worse
+  // than one guard at the single point where binding happens.
   incubator                 Incubator? // set via Incubator.deviceId (BR-007: 0..1)
+  coop                      Coop? // set via Coop.deviceId (0..1)
   events                    DeviceEvent[]
   configs                   DeviceConfig[]
   telemetry                 TelemetryReading[]
@@ -174,6 +181,24 @@ model Incubator {
   @@index([farmId])
 }
 
+// The physical house/shed birds live in (ADR 0009). Environmental
+// telemetry binds here rather than to Flock: a coop outlives the cohorts
+// that pass through it, so per-house history survives a flock ending,
+// and two flocks sharing a shed can share one sensor.
+model Coop {
+  id        String   @id @default(uuid())
+  farmId    String
+  name      String
+  capacity  Int? // birds; optional — not every keeper tracks it
+  deviceId  String?  @unique // a device binds to at most one coop (mirrors Incubator)
+  createdAt DateTime @default(now())
+  farm      Farm     @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  device    Device?  @relation(fields: [deviceId], references: [id])
+  flocks    Flock[]
+
+  @@index([farmId])
+}
+
 // Append-only time series (NFR: plain table + index is sufficient at scale)
 model TelemetryReading {
   id           BigInt          @id @default(autoincrement())
@@ -181,6 +206,16 @@ model TelemetryReading {
   ts           DateTime
   tempC        Float?
   humidityPct  Float?
+  // Air-quality / resource channels (US-ENV expansion). All nullable and
+  // all optional on the wire: a device without the corresponding sensor
+  // fitted simply omits the field, and the reading row keeps null rather
+  // than a fabricated zero — `null` here means "not measured", which the
+  // UI renders as "no sensor" instead of a value.
+  co2Ppm         Float?
+  ammoniaPpm     Float?
+  lightLux       Float?
+  feedLevelPct   Float?
+  waterLevelPct  Float?
   heaterOn     Boolean?
   coolerOn     Boolean?
   humidifierOn Boolean?
@@ -438,8 +473,12 @@ model Flock {
   // reality — age/origin data entered wrong at creation, etc. Null means
   // "derive from age" (the default); set means "use this instead."
   stageOverride      FlockStage?
+  // Where the birds are housed (ADR 0009). Nullable: free-range birds
+  // and every flock predating this change legitimately have no coop.
+  coopId             String?
   createdAt          DateTime            @default(now())
   farm               Farm                @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  coop               Coop?               @relation(fields: [coopId], references: [id], onDelete: SetNull)
   species            Species             @relation(fields: [speciesId], references: [id])
   hatchEvent         HatchEvent?         @relation(fields: [hatchEventId], references: [id])
   mortalityRecords   MortalityRecord[]

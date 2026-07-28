@@ -86,6 +86,33 @@ export interface LatestTelemetry {
   source: "mqtt" | "ble";
 }
 
+// A coop's reading set (ADR 0009). No setpoint/actuator fields — a coop
+// node drives no relays, so there is nothing to control from here.
+// null on a channel = no such sensor fitted, or its reading faulted;
+// either way there is no value to show, and the tile says so rather
+// than rendering 0.
+export interface CoopTelemetry {
+  ts: string;
+  tempC: number | null;
+  humidityPct: number | null;
+  co2Ppm: number | null;
+  ammoniaPpm: number | null;
+  lightLux: number | null;
+  feedLevelPct: number | null;
+  waterLevelPct: number | null;
+  source: "mqtt" | "ble";
+}
+
+export interface Coop {
+  id: string;
+  name: string;
+  capacity: number | null;
+  deviceId: string | null;
+  device: Pick<DeviceSummary, "id" | "hardwareId" | "name" | "status" | "lastSeenAt"> | null;
+  flocks: { id: string; name: string }[];
+  latestTelemetry: CoopTelemetry | null;
+}
+
 export interface Incubator {
   id: string;
   name: string;
@@ -98,7 +125,9 @@ export interface Incubator {
 
 export interface Device extends DeviceSummary {
   firmwareVersion: string | null;
+  // A device binds to an incubator OR a coop, never both (ADR 0009).
   incubator: { id: string; name: string } | null;
+  coop: { id: string; name: string } | null;
 }
 
 export interface EggCollection {
