@@ -247,6 +247,9 @@ a.card:hover { text-decoration: none; box-shadow: var(--shadow-md); }
   border-radius: 4px; padding: 0.15rem 0.45rem;
 }
 .sim-badge.inline { margin-left: 0.5rem; }
+/* A band whose device has gone quiet — muted rather than alarming green,
+   so a stale strip doesn't read as a healthy one at a glance. */
+.live-band.stale-band { background: linear-gradient(100deg, #3f4a43, #5b6b60); }
 .live-band.simulated {
   background: linear-gradient(100deg, #5c1d18, #8a2d24);
   outline: 2px dashed rgba(255, 255, 255, 0.35); outline-offset: -6px;
@@ -258,6 +261,16 @@ a.card:hover { text-decoration: none; box-shadow: var(--shadow-md); }
 }
 .sim-note code { font-size: 0.78rem; }
 .sensor-grid.simulated .sensor-tile { border-style: dashed; border-color: #e0a9a4; }
+
+/* Stale readings. The values were true once, so they aren't hidden — but a
+   crisp "Heater ON" tile from days ago reads as current state, which is a
+   different and false claim. Dimmed, with the age stated above the grid. */
+.stale-note {
+  background: var(--warn-bg); color: var(--warn-text);
+  border-radius: var(--radius-sm); padding: 0.6rem 0.85rem;
+  font-size: 0.8rem; margin: 1rem 0 0;
+}
+.sensor-grid.stale .sensor-tile { opacity: 0.6; }
 
 .sensor-label { font-size: 0.85rem; color: var(--muted); margin-top: 0.35rem; }
 .sensor-value { display: flex; align-items: baseline; gap: 0.3rem; }

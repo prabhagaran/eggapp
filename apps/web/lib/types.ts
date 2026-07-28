@@ -83,6 +83,13 @@ export interface LatestTelemetry {
   tempC: number | null;
   humidityPct: number | null;
   turnerOn: boolean | null;
+  // Relay states at the moment of this reading. null = firmware predating
+  // the actuator fields, not "off" — rendered as "—", never as OFF.
+  heaterOn: boolean | null;
+  coolerOn: boolean | null;
+  humidifierOn: boolean | null;
+  fanOn: boolean | null;
+  pumpOn: boolean | null;
   source: "mqtt" | "ble";
 }
 

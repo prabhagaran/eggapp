@@ -12,10 +12,15 @@ import {
   Sun,
   Wheat,
   Droplet,
+  Flame,
+  Snowflake,
+  Fan,
+  RotateCw,
+  Waves,
 } from "lucide-react";
 import { api } from "../lib/api";
 import { AlertsSeverityBars, BatchPipelineChart, IncubatorEnvChart, Sparkline } from "../components/DashboardCharts";
-import { SensorTile } from "../components/SensorTile";
+import { SensorTile, StateTile } from "../components/SensorTile";
 import type { Alert, Batch, Coop, Flock, Incubator, IncubatorHistory } from "../lib/types";
 import { dayOf, fmtAge, isFresh, useAuthedFarm } from "../lib/useAuthedFarm";
 
@@ -123,6 +128,31 @@ export default function Dashboard() {
   const t = monitored?.latestTelemetry;
   const live = t ? isFresh(t.ts) : false;
 
+  // Same "freshest wins" rule for the incubator strip.
+  const liveInc = (incubators ?? [])
+    .filter((i) => i.latestTelemetry)
+    .sort((a, b) => Date.parse(b.latestTelemetry!.ts) - Date.parse(a.latestTelemetry!.ts))[0];
+  const it = liveInc?.latestTelemetry;
+  const incFresh = it ? isFresh(it.ts) : false;
+
+  // Bands from the machine's own setpoints, not a fixed comfort range: the
+  // correct temperature depends on the species profile it's running, so a
+  // hardcoded band would flag a correctly-set duck incubator as abnormal.
+  // Hysteresis is the control loop's own "close enough", so inside it is
+  // normal by definition.
+  const incTempSp = liveInc?.device?.currentTempSetpoint;
+  const incTempHyst = liveInc?.device?.currentTempHysteresis ?? 0.5;
+  const incHumSp = liveInc?.device?.currentHumSetpoint;
+  const incHumHyst = liveInc?.device?.currentHumHysteresis ?? 5;
+  const incTempRange =
+    incTempSp != null
+      ? { min: incTempSp - incTempHyst, max: incTempSp + incTempHyst, warnBand: incTempHyst * 2 }
+      : undefined;
+  const incHumRange =
+    incHumSp != null
+      ? { min: incHumSp - incHumHyst, max: incHumSp + incHumHyst, warnBand: incHumHyst * 2 }
+      : undefined;
+
   return (
     <>
       <h1>Dashboard</h1>
@@ -157,8 +187,15 @@ export default function Dashboard() {
             </div>
           </section>
 
+          {!live && (
+            <p className="stale-note">
+              Last reading was <b>{fmtAge(t!.ts)}</b>. These values were true then, not now — the coop node has stopped
+              reporting, so treat every tile below as history rather than current state.
+            </p>
+          )}
+
           <h2 className="section-rule">Environmental Conditions</h2>
-          <div className="sensor-grid">
+          <div className={`sensor-grid${live ? "" : " stale"}`}>
             <SensorTile icon={<Thermometer />} label="Temperature" value={t!.tempC} unit="°C" range={COOP_TEMP_RANGE} />
             <SensorTile icon={<Droplets />} label="Humidity" value={t!.humidityPct} unit="%" range={COOP_HUM_RANGE}
               decimals={0} />
@@ -167,7 +204,7 @@ export default function Dashboard() {
           </div>
 
           <h2 className="section-rule">Resource Management</h2>
-          <div className="sensor-grid">
+          <div className={`sensor-grid${live ? "" : " stale"}`}>
             <SensorTile icon={<Sun />} label="Light Intensity" value={t!.lightLux} unit="lux" decimals={0}
               hint="Ambient light" />
             <SensorTile icon={<Wheat />} label="Feed Level" value={t!.feedLevelPct} unit="%" range={FEED_RANGE}
@@ -177,6 +214,7 @@ export default function Dashboard() {
           </div>
         </>
       ) : (
+
         coops != null && (
           <section className="live-band">
             <div>
@@ -194,6 +232,55 @@ export default function Dashboard() {
             </Link>
           </section>
         )
+      )}
+
+      {/* Incubator strip — same tile system as the coop, but a different
+          machine with different semantics: bands come from its setpoints,
+          and it has relays worth showing. */}
+      {liveInc && (
+        <>
+          <section className={`live-band${incFresh ? "" : " stale-band"}`}>
+            <div>
+              <b>Incubator Conditions</b>
+              <span>
+                {liveInc.device?.name ?? liveInc.device?.hardwareId ?? "device"} — {liveInc.name}
+                {incTempSp != null && ` · target ${incTempSp}°C / ${incHumSp}%`}
+              </span>
+            </div>
+            <div className={`live-chip${incFresh ? "" : " stale"}`}>
+              <span className="dot" />
+              <span>
+                <b>{incFresh ? "Connected" : "No recent data"}</b>
+                <span>Last update: {fmtAge(it!.ts)}</span>
+              </span>
+            </div>
+          </section>
+
+          {!incFresh && (
+            <p className="stale-note">
+              Last reading was <b>{fmtAge(it!.ts)}</b>. These values were true then, not now — the device has stopped
+              reporting, so treat every tile below as history rather than current state.
+            </p>
+          )}
+
+          <div className={`sensor-grid${incFresh ? "" : " stale"}`}>
+            <SensorTile icon={<Thermometer />} label="Temperature" value={it!.tempC} unit="°C" range={incTempRange}
+              hint={incTempSp != null ? `Setpoint ${incTempSp}°C ±${incTempHyst}` : "No setpoint reported yet"} />
+            <SensorTile icon={<Droplets />} label="Humidity" value={it!.humidityPct} unit="%" range={incHumRange}
+              decimals={0}
+              hint={incHumSp != null ? `Setpoint ${incHumSp}% ±${incHumHyst}` : "No setpoint reported yet"} />
+            <StateTile icon={<Flame />} label="Heater" state={it!.heaterOn} hint="Warms to setpoint" />
+            <StateTile icon={<Snowflake />} label="Cooler" state={it!.coolerOn} hint="Vents above setpoint" />
+          </div>
+
+          <h2 className="section-rule">Incubator Actuators</h2>
+          <div className={`sensor-grid${incFresh ? "" : " stale"}`}>
+            <StateTile icon={<Droplets />} label="Humidifier" state={it!.humidifierOn} hint="Raises humidity" />
+            <StateTile icon={<Fan />} label="Fan" state={it!.fanOn} hint="Circulates air" />
+            <StateTile icon={<RotateCw />} label="Egg Turner" state={it!.turnerOn} hint="Rotates trays on schedule" />
+            <StateTile icon={<Waves />} label="Pump" state={it!.pumpOn} hint="Refills the water tray" />
+          </div>
+        </>
       )}
 
       <h2 className="section-rule">Farm Overview</h2>

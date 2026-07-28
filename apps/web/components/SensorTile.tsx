@@ -39,6 +39,48 @@ export function rangeHint(range?: Range, unit?: string): string | null {
   return null;
 }
 
+/**
+ * On/off actuator tile — same shell as SensorTile so a mixed grid reads as
+ * one system. `state` of null means the device never reported this relay
+ * (firmware predating the actuator fields); that renders as "—", never as
+ * OFF, since "we don't know" and "it is off" are different claims about
+ * hardware.
+ */
+export function StateTile({
+  icon,
+  label,
+  state,
+  hint,
+  activeIsGood = true,
+}: {
+  icon: ReactNode;
+  label: string;
+  state: boolean | null | undefined;
+  hint?: string;
+  activeIsGood?: boolean;
+}) {
+  const unknown = state == null;
+  // An actuator being on isn't inherently good or bad — a running heater is
+  // normal mid-cycle. Colour by "is it doing something", not by alarm.
+  const tone: TileStatus = unknown ? "unavailable" : state && !activeIsGood ? "warn" : "normal";
+
+  return (
+    <div className={`sensor-tile${unknown ? " is-unavailable" : ""}`}>
+      <div className="sensor-tile-top">
+        <span className={`sensor-icon ${state && !unknown ? tone : "unavailable"}`}>{icon}</span>
+        <span className={`sensor-pill ${state && !unknown ? tone : "unavailable"}`}>
+          {unknown ? "NO DATA" : state ? "ACTIVE" : "IDLE"}
+        </span>
+      </div>
+      <div className="sensor-label">{label}</div>
+      <div className="sensor-value">
+        {unknown ? <b className="na">—</b> : <b className={state ? "" : "na"}>{state ? "ON" : "OFF"}</b>}
+      </div>
+      <div className="sensor-hint">{unknown ? "Not reported by this device" : (hint ?? " ")}</div>
+    </div>
+  );
+}
+
 export function SensorTile({
   icon,
   label,
