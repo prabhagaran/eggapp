@@ -101,6 +101,9 @@ export interface CoopTelemetry {
   feedLevelPct: number | null;
   waterLevelPct: number | null;
   source: "mqtt" | "ble";
+  // Device fabricated this reading (SIMULATE_SENSORS firmware). Always
+  // surfaced in the UI — simulated values must never look like measurements.
+  simulated: boolean;
 }
 
 export interface Coop {

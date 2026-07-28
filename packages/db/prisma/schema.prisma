@@ -216,6 +216,12 @@ model TelemetryReading {
   lightLux       Float?
   feedLevelPct   Float?
   waterLevelPct  Float?
+  // True when the device fabricated this reading (firmware built with
+  // SIMULATE_SENSORS, payload carries "sim":1) rather than measuring it.
+  // Persisted rather than inferred so simulated rows stay identifiable
+  // in stored history forever — otherwise a demo run is indistinguishable
+  // from real welfare data the moment it scrolls off the screen.
+  simulated      Boolean         @default(false)
   heaterOn     Boolean?
   coolerOn     Boolean?
   humidifierOn Boolean?

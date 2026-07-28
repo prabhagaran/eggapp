@@ -133,11 +133,19 @@ export default function Dashboard() {
           imply broken sensors rather than "you haven't set this up". */}
       {monitored ? (
         <>
-          <section className="live-band">
+          <section className={`live-band${t!.simulated ? " simulated" : ""}`}>
             <div>
-              <b>Real-Time Coop Monitoring</b>
+              <b>
+                Real-Time Coop Monitoring
+                {/* Never hide this. These numbers are invented by firmware
+                    built with SIMULATE_SENSORS — without the badge they are
+                    indistinguishable from real welfare readings. */}
+                {t!.simulated && <span className="sim-badge">SIMULATED DATA</span>}
+              </b>
               <span>
-                Live data from {monitored.device?.name ?? monitored.device?.hardwareId ?? "device"} — {monitored.name}
+                {t!.simulated ? "Fabricated by " : "Live data from "}
+                {monitored.device?.name ?? monitored.device?.hardwareId ?? "device"} — {monitored.name}
+                {t!.simulated && " · no sensors connected"}
               </span>
             </div>
             <div className={`live-chip${live ? "" : " stale"}`}>

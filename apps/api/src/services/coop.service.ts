@@ -28,6 +28,9 @@ interface CoopTelemetry {
   feedLevelPct: number | null;
   waterLevelPct: number | null;
   source: string;
+  // Fabricated by SIMULATE_SENSORS firmware. Surfaced so the UI can badge
+  // it — fake readings must never be presented as measurements.
+  simulated: boolean;
 }
 
 async function attachLatestTelemetry<T extends { deviceId: string | null }>(
@@ -52,6 +55,7 @@ async function attachLatestTelemetry<T extends { deviceId: string | null }>(
           feedLevelPct: true,
           waterLevelPct: true,
           source: true,
+          simulated: true,
         },
       });
       return { ...coop, latestTelemetry: reading };
@@ -138,6 +142,7 @@ export async function getCoopHistory(farmId: string, id: string, hours: number) 
       lightLux: true,
       feedLevelPct: true,
       waterLevelPct: true,
+      simulated: true,
     },
   });
   return { readings };

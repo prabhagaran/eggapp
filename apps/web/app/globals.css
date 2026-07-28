@@ -237,6 +237,28 @@ a.card:hover { text-decoration: none; box-shadow: var(--shadow-md); }
 .sensor-pill.warn { background: var(--warn-bg); color: var(--warn-text); }
 .sensor-pill.critical { background: var(--danger-bg); color: var(--danger-text); }
 .sensor-pill.unavailable { background: var(--neutral-bg); color: var(--neutral-text); }
+/* Simulated data — deliberately conspicuous. These readings are invented
+   by firmware, and the styling must make that impossible to miss at a
+   glance or in a screenshot. */
+.sim-badge {
+  display: inline-block; margin-left: 0.6rem; vertical-align: middle;
+  background: #b3261e; color: #fff;
+  font-size: 0.62rem; font-weight: 800; letter-spacing: 0.07em;
+  border-radius: 4px; padding: 0.15rem 0.45rem;
+}
+.sim-badge.inline { margin-left: 0.5rem; }
+.live-band.simulated {
+  background: linear-gradient(100deg, #5c1d18, #8a2d24);
+  outline: 2px dashed rgba(255, 255, 255, 0.35); outline-offset: -6px;
+}
+.sim-note {
+  background: var(--danger-bg); color: var(--danger-text);
+  border-radius: var(--radius-sm); padding: 0.6rem 0.85rem;
+  font-size: 0.8rem; margin: 1rem 0 0;
+}
+.sim-note code { font-size: 0.78rem; }
+.sensor-grid.simulated .sensor-tile { border-style: dashed; border-color: #e0a9a4; }
+
 .sensor-label { font-size: 0.85rem; color: var(--muted); margin-top: 0.35rem; }
 .sensor-value { display: flex; align-items: baseline; gap: 0.3rem; }
 .sensor-value b { font-size: 1.85rem; font-weight: 700; letter-spacing: -0.02em; color: var(--accent-dark); }

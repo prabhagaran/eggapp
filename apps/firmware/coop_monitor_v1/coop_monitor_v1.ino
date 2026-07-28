@@ -63,25 +63,34 @@ static void publishTelemetry(void) {
              "{\"id\":\"%s\",\"fw\":\"%s\",\"profile\":\"COOP\"",
              DEVICE_ID, FW_VERSION);
 
-#if HAS_TEMP_HUM
+    // In simulation mode every channel is emitted regardless of the HAS_*
+    // flags — the whole point is to exercise the full dashboard with no
+    // hardware attached.
+#if HAS_TEMP_HUM || SIMULATE_SENSORS
     appendField(payload, sizeof(payload), "temp",  readings.temp_valid,  readings.temp_c,       1);
     appendField(payload, sizeof(payload), "hum",   readings.hum_valid,   readings.humidity_pct, 1);
 #endif
-#if HAS_CO2_SENSOR
+#if HAS_CO2_SENSOR || SIMULATE_SENSORS
     appendField(payload, sizeof(payload), "co2",   readings.co2_valid,   readings.co2_ppm,      0);
 #endif
-#if HAS_NH3_SENSOR
+#if HAS_NH3_SENSOR || SIMULATE_SENSORS
     appendField(payload, sizeof(payload), "nh3",   readings.nh3_valid,   readings.nh3_ppm,      1);
 #endif
-#if HAS_LIGHT_SENSOR
+#if HAS_LIGHT_SENSOR || SIMULATE_SENSORS
     appendField(payload, sizeof(payload), "lux",   readings.light_valid, readings.light_lux,    0);
 #endif
-#if HAS_FEED_LEVEL
+#if HAS_FEED_LEVEL || SIMULATE_SENSORS
     appendField(payload, sizeof(payload), "feed",  readings.feed_valid,  readings.feed_pct,     1);
 #endif
-#if HAS_WATER_LEVEL
+#if HAS_WATER_LEVEL || SIMULATE_SENSORS
     appendField(payload, sizeof(payload), "water", readings.water_valid, readings.water_pct,    1);
 #endif
+
+    // Emitted only when true, so a real device's payload is unchanged.
+    // Its presence is what marks the whole reading as fabricated.
+    if (readings.simulated) {
+        strncat(payload, ",\"sim\":1", sizeof(payload) - strlen(payload) - 1);
+    }
 
     strncat(payload, "}", sizeof(payload) - strlen(payload) - 1);
 

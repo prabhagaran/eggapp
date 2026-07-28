@@ -71,6 +71,28 @@ incubator cabinet — they are meaningless there. An earlier draft of this
 contract (same day, superseded by ADR 0009) put them on the EGG profile;
 that was wrong and no hardware ever shipped with it.
 
+### `sim` — fabricated readings
+
+A coop node built with `SIMULATE_SENSORS=1` (see the sketch's `config.h`)
+attaches `"sim":1` to every payload and emits **all** channels with
+plausible invented values, with no sensor hardware attached. This exists
+so the pipeline (device → broker → API → dashboard) can be brought up
+and demonstrated before any sensor is fitted.
+
+- Ingest persists it to `TelemetryReading.simulated`. It is recorded on
+  **every** profile, not just COOP — a fabricated payload must never be
+  storable as real from any device.
+- The dashboard and Coops page render a red **SIMULATED DATA** badge and
+  dashed tiles whenever the latest reading carries it.
+- Real firmware omits the field entirely, so a genuine payload is
+  unchanged and `simulated` defaults to `false`.
+
+The flag is not cosmetic. Invented ammonia and CO₂ values are
+indistinguishable from real welfare measurements once they are rows in a
+table — the column is what keeps a demo run identifiable months later.
+To stop producing simulated data, set `SIMULATE_SENSORS` to 0 and
+reflash; never strip the flag to tidy up the UI.
+
 ### The five channels are optional fields, not optional values
 
 The distinction matters and the two states are deliberately different:

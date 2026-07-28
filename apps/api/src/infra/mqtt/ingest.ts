@@ -63,6 +63,9 @@ const telemetrySchema = z.object({
   lux: z.number().nullable().optional(),
   feed: z.number().nullable().optional(),
   water: z.number().nullable().optional(),
+  // "sim":1 = the device fabricated this reading (firmware built with
+  // SIMULATE_SENSORS). Absent on real hardware.
+  sim: z.union([z.literal(0), z.literal(1)]).optional(),
   // EGG profile only — the device's own incubation-day counter and
   // expected-hatch clock. /batches/:id/set best-effort seeds the
   // device's startEpoch (task_mqtt.cpp) so these normally track the
@@ -139,6 +142,9 @@ async function handleTelemetry(log: FastifyBaseLogger, deviceId: string, raw: Bu
         ...(isCoop && "lux" in parsed.data ? { lightLux: parsed.data.lux } : {}),
         ...(isCoop && "feed" in parsed.data ? { feedLevelPct: parsed.data.feed } : {}),
         ...(isCoop && "water" in parsed.data ? { waterLevelPct: parsed.data.water } : {}),
+        // Recorded on every reading, not just coop ones — a simulated
+        // payload must never be storable as real from any profile.
+        simulated: parsed.data.sim === 1,
         source: "mqtt",
       },
     });

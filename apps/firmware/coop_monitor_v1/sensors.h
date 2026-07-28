@@ -22,6 +22,10 @@ typedef struct {
     bool  light_valid;
     bool  feed_valid;
     bool  water_valid;
+    // True when these values were fabricated by SIMULATE_SENSORS rather
+    // than measured. Travels with the payload as "sim":1 so stored history
+    // stays distinguishable from real readings — see config.h.
+    bool  simulated;
 } CoopReadings_t;
 
 void sensorsBegin(void);

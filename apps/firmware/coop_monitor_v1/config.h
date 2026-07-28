@@ -37,6 +37,24 @@
 // shows "no sensor" rather than a fault. Enable a flag only once the
 // hardware is physically attached.
 // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// SIMULATION MODE
+//
+// 1 = publish plausible made-up readings for every channel, with no sensor
+// hardware attached at all. For bringing the pipeline up (ESP32 -> broker ->
+// API -> dashboard) before any sensor exists.
+//
+// Simulated payloads carry "sim":1, which the API persists to
+// TelemetryReading.simulated and the dashboard renders as a SIMULATED
+// badge. That flag is not optional decoration: without it, made-up
+// ammonia readings are indistinguishable from real welfare data, both on
+// screen and in the stored history. Never remove the flag to make the UI
+// look cleaner — set SIMULATE_SENSORS to 0 instead.
+//
+// When 1, the HAS_* flags below are ignored and every channel is emitted.
+// ─────────────────────────────────────────────────────────────────────────────
+#define SIMULATE_SENSORS      1
+
 #define HAS_TEMP_HUM          1     // DHT22 — the one sensor assumed present
 #define HAS_CO2_SENSOR        0     // MH-Z19B NDIR, UART2
 #define HAS_NH3_SENSOR        0     // MQ-137, analog
@@ -83,5 +101,32 @@
 
 #define ULTRASONIC_TIMEOUT_US 25000UL   // ~4 m round trip; beyond = no echo
 #define SENSOR_INTERVAL_MS    5000      // sensor poll period
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Simulation baselines (SIMULATE_SENSORS only). Each channel random-walks
+// around its baseline within +/- the drift, so the dashboard looks alive
+// rather than frozen, and stays inside the normal band so it doesn't
+// generate spurious alerts. Feed and water instead decline slowly and
+// refill at the bottom, which is what a real hopper does and exercises
+// the warning/critical tiles on the way down.
+// ─────────────────────────────────────────────────────────────────────────────
+#define SIM_TEMP_BASE_C       28.5f
+#define SIM_TEMP_DRIFT        1.5f
+#define SIM_HUM_BASE_PCT      63.0f
+#define SIM_HUM_DRIFT         4.0f
+#define SIM_CO2_BASE_PPM      410.0f
+#define SIM_CO2_DRIFT         25.0f
+#define SIM_NH3_BASE_PPM      8.5f
+#define SIM_NH3_DRIFT         1.0f
+#define SIM_LUX_BASE          470.0f
+#define SIM_LUX_DRIFT         40.0f
+#define SIM_FEED_START_PCT    85.0f
+#define SIM_WATER_START_PCT   90.0f
+// Percent consumed per publish cycle. At the 60 s telemetry interval this
+// drains a full hopper over roughly 8 hours — slow enough to look real,
+// fast enough that the low-level tiles can be seen the same day.
+#define SIM_FEED_DRAIN_PCT    0.18f
+#define SIM_WATER_DRAIN_PCT   0.22f
+#define SIM_REFILL_AT_PCT     5.0f
 
 #endif // CONFIG_H

@@ -1,5 +1,37 @@
 #include "sensors.h"
 
+#if SIMULATE_SENSORS
+// ─────────────────────────────────────────────────────────────────────────────
+// Simulation. No hardware is read at all in this mode — every value below
+// is invented, which is exactly why sensorsRead sets `simulated` and the
+// payload carries "sim":1 all the way to the dashboard badge.
+//
+// Each channel random-walks around its baseline and is clamped to the
+// baseline +/- drift, so it stays inside the band the UI considers normal
+// and never fires an alert on fictional data.
+// ─────────────────────────────────────────────────────────────────────────────
+// Persistent across calls — the walk must continue from where it was, not
+// restart from the baseline each cycle (which would make every reading
+// identical and the dashboard look frozen).
+static float simTemp  = SIM_TEMP_BASE_C;
+static float simHum   = SIM_HUM_BASE_PCT;
+static float simCo2   = SIM_CO2_BASE_PPM;
+static float simNh3   = SIM_NH3_BASE_PPM;
+static float simLux   = SIM_LUX_BASE;
+static float simFeedPct  = SIM_FEED_START_PCT;
+static float simWaterPct = SIM_WATER_START_PCT;
+
+static float simWalk(float current, float base, float drift) {
+    // Step up to ~8% of the drift band per cycle, then pull gently back
+    // toward the baseline so it wanders without escaping.
+    float step = ((float)random(-100, 101) / 100.0f) * drift * 0.08f;
+    float next = current + step + (base - current) * 0.05f;
+    if (next < base - drift) next = base - drift;
+    if (next > base + drift) next = base + drift;
+    return next;
+}
+#endif
+
 #if HAS_TEMP_HUM
   #include <DHT.h>
   static DHT dht(DHT_PIN, DHT_TYPE);
@@ -95,6 +127,14 @@ static float readAmmoniaPpm(void) {
 #endif
 
 void sensorsBegin(void) {
+#if SIMULATE_SENSORS
+    // Seed from an unconnected ADC pin so two boards flashed identically
+    // don't produce the same "readings".
+    randomSeed(analogRead(NH3_ADC_PIN) ^ micros());
+    Serial.println("[SENSOR] SIMULATION MODE — all values are fabricated, "
+                   "published with sim:1");
+    return;   // no hardware to initialise
+#else
 #if HAS_TEMP_HUM
     dht.begin();
     delay(2000);   // DHT22 warm-up after power-on
@@ -115,10 +155,41 @@ void sensorsBegin(void) {
     pinMode(WATER_TRIG_PIN, OUTPUT);
     pinMode(WATER_ECHO_PIN, INPUT);
 #endif
+#endif // !SIMULATE_SENSORS
 }
 
 void sensorsRead(CoopReadings_t* out) {
     *out = CoopReadings_t{};   // every value 0, every validity bit false
+
+#if SIMULATE_SENSORS
+    out->simulated = true;
+
+    simTemp = simWalk(simTemp, SIM_TEMP_BASE_C,   SIM_TEMP_DRIFT);
+    simHum  = simWalk(simHum,  SIM_HUM_BASE_PCT,  SIM_HUM_DRIFT);
+    simCo2  = simWalk(simCo2,  SIM_CO2_BASE_PPM,  SIM_CO2_DRIFT);
+    simNh3  = simWalk(simNh3,  SIM_NH3_BASE_PPM,  SIM_NH3_DRIFT);
+    simLux  = simWalk(simLux,  SIM_LUX_BASE,      SIM_LUX_DRIFT);
+
+    out->temp_c       = simTemp;
+    out->humidity_pct = simHum;
+    out->co2_ppm      = simCo2;
+    out->nh3_ppm      = simNh3;
+    out->light_lux    = simLux;
+
+    // Consumables drain and refill, unlike the environment channels which
+    // just wander — this is what makes the low-level warning tiles
+    // reachable without waiting for real birds to eat.
+    simFeedPct  -= SIM_FEED_DRAIN_PCT;
+    simWaterPct -= SIM_WATER_DRAIN_PCT;
+    if (simFeedPct  < SIM_REFILL_AT_PCT) simFeedPct  = SIM_FEED_START_PCT;
+    if (simWaterPct < SIM_REFILL_AT_PCT) simWaterPct = SIM_WATER_START_PCT;
+    out->feed_pct  = simFeedPct;
+    out->water_pct = simWaterPct;
+
+    out->temp_valid = out->hum_valid = out->co2_valid = out->nh3_valid =
+        out->light_valid = out->feed_valid = out->water_valid = true;
+    return;
+#else
 
 #if HAS_TEMP_HUM
     float t = dht.readTemperature();
@@ -170,4 +241,6 @@ void sensorsRead(CoopReadings_t* out) {
                                     WATER_FULL_CM, WATER_EMPTY_CM);
     if (water >= 0.0f) { out->water_pct = water; out->water_valid = true; }
 #endif
+
+#endif // !SIMULATE_SENSORS
 }
