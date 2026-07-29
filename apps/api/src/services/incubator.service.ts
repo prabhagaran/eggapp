@@ -78,7 +78,23 @@ async function attachLatestTelemetry<T extends { deviceId: string | null }>(
       const reading = await prisma.telemetryReading.findFirst({
         where: { deviceId: inc.deviceId },
         orderBy: { ts: "desc" },
-        select: { ts: true, tempC: true, humidityPct: true, turnerOn: true, source: true },
+        // Relay states come from the reading rather than Device.current* —
+        // both are mirrored from the same payload, but the reading is the
+        // snapshot that actually goes with this timestamp, so the tiles
+        // can't show actuator state from a different moment than the
+        // temperature beside it.
+        select: {
+          ts: true,
+          tempC: true,
+          humidityPct: true,
+          turnerOn: true,
+          heaterOn: true,
+          coolerOn: true,
+          humidifierOn: true,
+          fanOn: true,
+          pumpOn: true,
+          source: true,
+        },
       });
       return { ...inc, latestTelemetry: reading };
     }),
@@ -90,6 +106,13 @@ interface LatestTelemetry {
   tempC: number | null;
   humidityPct: number | null;
   turnerOn: boolean | null;
+  // Relay states at the moment of this reading. null = firmware predating
+  // the actuator fields, not "off" — the UI must not render those as OFF.
+  heaterOn: boolean | null;
+  coolerOn: boolean | null;
+  humidifierOn: boolean | null;
+  fanOn: boolean | null;
+  pumpOn: boolean | null;
   source: string;
 }
 

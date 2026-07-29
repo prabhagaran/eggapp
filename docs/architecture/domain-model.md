@@ -11,7 +11,7 @@
 | **Farm & Access** | Farm, User, FarmMembership | Tenancy boundary (ADR 0003) |
 | **Incubation** | EggCollection, EggBatch, BatchEggSource, CandlingSession, HatchEvent, Incubator, Species (ref) | The core loop |
 | **Device & Telemetry** | Device, TelemetryReading, DeviceEvent, DeviceConfig | Adapts to firmware contract (ADR 0002) |
-| **Flock Operations** | Flock, VaccinationTemplate, VaccinationRecord, FeedLog, WaterLog, MortalityRecord | |
+| **Flock Operations** | Flock, Coop, VaccinationTemplate, VaccinationRecord, FeedLog, WaterLog, MortalityRecord | Coop added ADR 0009 |
 | **Alerting** | AlertRule, Alert, Notification | Consumes events from all contexts |
 | **Inventory** | InventoryItem, StockTransaction | Phase 3 |
 | **Reporting** | (read models only) | No entities of its own — views over the others (Phase 2/3) |
@@ -55,8 +55,13 @@ scope through their root's foreign key. Cross-context references
 ### Device & Telemetry
 - **Device** — hardware id (MAC), status ∈ {provisioned, active, offline,
   decommissioned}, last_seen, firmware_version, mqtt credential ref.
+  Binds to **either** an Incubator **or** a Coop, never both (ADR 0009);
+  which one it is determines the telemetry profile it publishes.
 - **TelemetryReading** (time-series, append-only) — device, ts, temp,
-  humidity, turner_state?, source ∈ {mqtt, ble}. Storage strategy per
+  humidity, turner_state?, source ∈ {mqtt, ble}, plus the coop-only
+  channels co2/ammonia/light/feed_level/water_level (ADR 0009, all
+  nullable). One table across both profiles — a reading's owner is
+  resolved through the device's binding. Storage strategy per
   database-architect + NFR.
 - **DeviceEvent** — device, ts, type ∈ {online, offline, provisioned,
   decommissioned, config_sent, config_received, config_applied}.
@@ -64,9 +69,16 @@ scope through their root's foreign key. Cross-context references
   received, applied, unconfirmed}, timestamps. Powers US-INC-003.
 
 ### Flock Operations
+- **Coop** (ADR 0009) — the physical house/shed birds live in. name,
+  capacity?, device (0..1). Holds 0..* Flocks. Environmental telemetry
+  attaches **here, not to Flock**: a coop outlives the cohorts that pass
+  through it, so per-house history survives a flock ending and two
+  flocks can share one sensor.
 - **Flock** — name, species, purpose ∈ {layer, broiler, breeder}, origin
-  (HatchEvent ref | acquisition {date, age}), placed_count. Stage and
-  current_count are **derived** (age → stage; ledger → count, BR-009).
+  (HatchEvent ref | acquisition {date, age}), placed_count, coop? (where
+  the birds are housed; nullable — free-range and pre-ADR-0009 flocks
+  have none). Stage and current_count are **derived** (age → stage;
+  ledger → count, BR-009).
 - **VaccinationTemplate** — species/purpose, items [{age_days_from,
   age_days_to, vaccine, disease, route}]. Seeded from domain-knowledge §6.
 - **VaccinationRecord** ⇅ — flock, template item?, date, vaccine, disease,

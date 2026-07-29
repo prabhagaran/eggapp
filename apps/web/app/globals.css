@@ -48,106 +48,120 @@ a:hover { text-decoration: underline; }
 h1 { font-size: 1.6rem; margin: 0 0 0.25rem; letter-spacing: -0.01em; }
 h2 { font-size: 1.05rem; margin: 1.75rem 0 0.6rem; letter-spacing: -0.01em; }
 
-/* ── App shell: sidebar + topbar + content ───────────────────────── */
+/* ── App shell: top nav + content ─────────────────────────────────── */
 .bare-main { max-width: 960px; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
 
-.app-shell {
-  display: flex;
-  align-items: flex-start;
-  gap: 1.25rem;
-  min-height: 100vh;
-  padding: 1.25rem;
-}
+.app-shell { min-height: 100vh; display: flex; flex-direction: column; }
 
-.sidebar {
-  flex: 0 0 250px;
-  position: sticky;
-  top: 1.25rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-  height: calc(100vh - 2.5rem);
+/* Header spans the full viewport width (edge to edge, like the reference)
+   while its inner rows align to the same 1280px column as .app-main. */
+.topnav {
+  position: sticky; top: 0; z-index: 40;
   background: var(--surface);
-  border-radius: var(--radius-lg);
+  border-bottom: 3px solid var(--accent);
   box-shadow: var(--shadow-sm);
-  padding: 1.5rem 1.1rem;
 }
-.sidebar .brand {
-  display: flex; align-items: center; gap: 0.55rem;
-  font-weight: 800; font-size: 1.15rem; color: var(--text); padding: 0 0.4rem;
+.topnav-bar,
+.topnav-tabs {
+  max-width: 1280px; margin: 0 auto; padding: 0 1.25rem;
 }
-.sidebar .brand .logo {
-  width: 2rem; height: 2rem; border-radius: 9px; display: grid; place-items: center;
-  background: var(--accent-dark); font-size: 1.1rem;
-}
-.sidebar-section { display: flex; flex-direction: column; gap: 0.15rem; }
-.sidebar-label {
-  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
-  color: var(--muted); padding: 0 0.6rem; margin-bottom: 0.3rem;
-}
-.sidebar-link {
-  display: flex; align-items: center; gap: 0.65rem;
-  padding: 0.55rem 0.65rem; border-radius: var(--radius-sm);
-  color: var(--muted); font-size: 0.9rem; font-weight: 500;
-  text-decoration: none; position: relative;
-}
-.sidebar-link:hover { background: var(--surface-muted); text-decoration: none; color: var(--text); }
-.sidebar-link.active {
-  background: var(--accent-soft); color: var(--accent-dark); font-weight: 700;
-}
-.sidebar-link svg { width: 18px; height: 18px; flex-shrink: 0; }
-.sidebar-link .count {
-  margin-left: auto; background: var(--accent); color: var(--accent-contrast);
-  font-size: 0.7rem; font-weight: 700; border-radius: 999px; padding: 0.1rem 0.45rem;
-}
-.sidebar-spacer { flex: 1; }
-.sidebar-logout {
-  display: flex; align-items: center; gap: 0.65rem; width: 100%; text-align: left;
-  padding: 0.55rem 0.65rem; border-radius: var(--radius-sm);
-  color: var(--muted); font-size: 0.9rem; font-weight: 500;
-  background: none; border: none; cursor: pointer; font: inherit;
-}
-.sidebar-logout:hover { background: var(--surface-muted); color: var(--danger-text); }
-.sidebar-logout svg { width: 18px; height: 18px; }
+.topnav-bar { display: flex; align-items: center; gap: 0.9rem; height: 4.25rem; }
 
-.app-content { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1.25rem; }
+.topnav-brand { display: flex; align-items: center; gap: 0.6rem; color: var(--text); }
+.topnav-brand:hover { text-decoration: none; }
+.topnav-brand .logo {
+  width: 2.2rem; height: 2.2rem; border-radius: 10px; display: grid; place-items: center;
+  background: var(--accent-dark); font-size: 1.15rem; flex-shrink: 0;
+}
+.topnav-brand-text { display: flex; flex-direction: column; line-height: 1.2; }
+.topnav-brand-text b { font-size: 1.05rem; letter-spacing: -0.01em; }
+.topnav-brand-text span { font-size: 0.75rem; color: var(--accent); font-weight: 500; }
 
-.topbar {
-  display: flex; align-items: center; gap: 0.9rem;
-  background: var(--surface); border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm); padding: 0.7rem 1.1rem;
+.topnav-spacer { flex: 1; }
+.topnav-farm {
+  font: inherit; font-size: 0.85rem; padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--text); max-width: 12rem;
 }
-.topbar-search {
-  flex: 1; display: flex; align-items: center; gap: 0.5rem;
-  background: var(--surface-muted); border-radius: var(--radius-md);
-  padding: 0.5rem 0.8rem; color: var(--muted); max-width: 340px;
-}
-.topbar-search svg { width: 16px; height: 16px; flex-shrink: 0; }
-.topbar-search input {
-  border: none; background: none; outline: none; color: var(--text); font: inherit; width: 100%;
-}
-.topbar-spacer { flex: 1; }
-.topbar-icon-btn {
-  display: grid; place-items: center; width: 2.3rem; height: 2.3rem;
-  border-radius: 999px; background: var(--surface-muted); color: var(--text);
-  border: none; cursor: pointer; position: relative; flex-shrink: 0;
-}
-.topbar-icon-btn svg { width: 18px; height: 18px; }
-.topbar-icon-btn .dot {
-  position: absolute; top: 0.35rem; right: 0.4rem; width: 8px; height: 8px;
-  border-radius: 999px; background: var(--danger-text);
-}
-.topbar-user { display: flex; align-items: center; gap: 0.6rem; padding-left: 0.3rem; }
-.topbar-user .avatar {
+.topnav-user { display: flex; align-items: center; gap: 0.6rem; }
+.topnav-user .avatar {
   width: 2.3rem; height: 2.3rem; border-radius: 999px; background: var(--accent-soft);
   color: var(--accent-dark); display: grid; place-items: center; font-weight: 700; font-size: 0.85rem;
   flex-shrink: 0;
 }
-.topbar-user .who { display: flex; flex-direction: column; line-height: 1.25; }
-.topbar-user .who b { font-size: 0.85rem; }
-.topbar-user .who span { font-size: 0.75rem; color: var(--muted); }
+.topnav-user .who { display: flex; flex-direction: column; line-height: 1.25; }
+.topnav-user .who b { font-size: 0.85rem; }
+.topnav-user .who span { font-size: 0.75rem; color: var(--muted); }
+.topnav-logout {
+  display: grid; place-items: center; width: 2.3rem; height: 2.3rem; flex-shrink: 0;
+  border-radius: 999px; background: var(--surface-muted); color: var(--muted);
+  border: none; cursor: pointer;
+}
+.topnav-logout:hover { color: var(--danger-text); }
+.topnav-logout svg { width: 18px; height: 18px; }
 
-.app-main { max-width: 1280px; width: 100%; margin: 0 auto; padding-bottom: 3rem; }
+.topnav-tabs { display: flex; align-items: stretch; gap: 0.15rem; }
+.topnav-tab {
+  display: flex; align-items: center; gap: 0.45rem; white-space: nowrap;
+  padding: 0.7rem 0.85rem; color: var(--muted);
+  font-size: 0.875rem; font-weight: 500;
+  border-bottom: 3px solid transparent; margin-bottom: -3px;
+  background: none; font-family: inherit; cursor: pointer;
+}
+.topnav-tab:hover { color: var(--text); text-decoration: none; background: var(--surface-muted); }
+.topnav-tab svg { width: 16px; height: 16px; flex-shrink: 0; }
+.topnav-tab.active {
+  color: var(--accent-dark); font-weight: 700;
+  border-bottom-color: var(--accent); background: var(--accent-soft);
+}
+.topnav-tab .count {
+  background: var(--danger-text); color: #fff;
+  font-size: 0.7rem; font-weight: 700; border-radius: 999px; padding: 0.05rem 0.4rem;
+}
+
+/* Overflow menu — hidden until a breakpoint actually needs it. */
+.topnav-more { position: relative; margin-left: auto; display: none; }
+.topnav-more-btn { border: none; }
+.topnav-more-menu {
+  position: absolute; right: 0; top: 100%; z-index: 50; min-width: 13rem;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-md);
+  padding: 0.35rem; display: flex; flex-direction: column;
+}
+.topnav-more-item {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.5rem 0.6rem; border-radius: var(--radius-sm);
+  color: var(--text); font-size: 0.875rem;
+}
+.topnav-more-item:hover { background: var(--surface-muted); text-decoration: none; }
+.topnav-more-item.active { background: var(--accent-soft); color: var(--accent-dark); font-weight: 700; }
+.topnav-more-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+.topnav-more-item .count {
+  margin-left: auto; background: var(--danger-text); color: #fff;
+  font-size: 0.7rem; font-weight: 700; border-radius: 999px; padding: 0.05rem 0.4rem;
+}
+
+/* 11 tabs stop fitting well before the 1280px column does. Past each
+   breakpoint the tail of the row is dropped and the More menu (which
+   always lists every destination) takes over, so nothing is unreachable
+   at any width. */
+@media (max-width: 1180px) {
+  .topnav-more { display: block; }
+  .topnav-tabs > .topnav-tab:nth-child(n + 9) { display: none; }
+}
+@media (max-width: 960px) {
+  .topnav-tabs > .topnav-tab:nth-child(n + 6) { display: none; }
+}
+@media (max-width: 700px) {
+  .topnav-tabs > .topnav-tab:nth-child(n + 4) { display: none; }
+  .topnav-user .who { display: none; }
+  .topnav-brand-text span { display: none; }
+}
+
+.app-main {
+  max-width: 1280px; width: 100%; margin: 0 auto;
+  padding: 1.5rem 1.25rem 3rem;
+}
 
 /* ── Cards, grids ─────────────────────────────────────────────────── */
 .card {
@@ -163,6 +177,133 @@ a.card:hover { text-decoration: none; box-shadow: var(--shadow-md); }
 .card.dark .muted { color: rgba(255, 255, 255, 0.75); }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; }
 .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; margin-bottom: 0.5rem; }
+
+/* ── Live sensor monitoring ───────────────────────────────────────── */
+.live-band {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+  background: linear-gradient(100deg, var(--hero-start), var(--hero-end));
+  color: #fff; border-radius: var(--radius-md);
+  padding: 1.1rem 1.35rem; margin: 1.25rem 0 0.5rem;
+}
+.live-band b { display: block; font-size: 1.05rem; }
+.live-band > div > span { font-size: 0.85rem; color: rgba(255, 255, 255, 0.8); }
+.live-chip {
+  display: flex; align-items: center; gap: 0.55rem;
+  background: rgba(255, 255, 255, 0.14); border-radius: 999px; padding: 0.45rem 0.9rem;
+}
+.live-chip .dot {
+  width: 9px; height: 9px; border-radius: 999px; background: #6ee7a0; flex-shrink: 0;
+  box-shadow: 0 0 0 3px rgba(110, 231, 160, 0.25);
+}
+.live-chip.stale .dot { background: #f0b429; box-shadow: 0 0 0 3px rgba(240, 180, 41, 0.25); }
+.live-chip > span { display: flex; flex-direction: column; line-height: 1.25; }
+.live-chip b { font-size: 0.85rem; }
+.live-chip > span > span { font-size: 0.72rem; color: rgba(255, 255, 255, 0.8); }
+
+/* Section heading with the small accent bar from the reference design. */
+.section-rule {
+  display: flex; align-items: center; gap: 0.55rem;
+  font-size: 0.95rem; margin: 1.5rem 0 0.75rem;
+}
+.section-rule::before {
+  content: ""; width: 4px; height: 1.05rem; border-radius: 2px;
+  background: var(--accent); flex-shrink: 0;
+}
+
+.sensor-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem;
+}
+.sensor-tile {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-sm);
+  padding: 1.1rem 1.15rem; display: flex; flex-direction: column; gap: 0.3rem;
+}
+.sensor-tile.is-unavailable { background: var(--surface-muted); border-style: dashed; }
+.sensor-tile-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.sensor-icon {
+  width: 2.5rem; height: 2.5rem; border-radius: var(--radius-sm);
+  display: grid; place-items: center; flex-shrink: 0;
+  background: var(--accent-soft); color: var(--accent);
+}
+.sensor-icon svg { width: 20px; height: 20px; }
+.sensor-icon.warn { background: var(--warn-bg); color: var(--warn-text); }
+.sensor-icon.critical { background: var(--danger-bg); color: var(--danger-text); }
+.sensor-icon.unavailable { background: var(--neutral-bg); color: var(--neutral-text); }
+.sensor-pill {
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em;
+  border-radius: 999px; padding: 0.2rem 0.6rem; white-space: nowrap;
+  background: var(--ok-bg); color: var(--ok-text);
+}
+.sensor-pill.warn { background: var(--warn-bg); color: var(--warn-text); }
+.sensor-pill.critical { background: var(--danger-bg); color: var(--danger-text); }
+.sensor-pill.unavailable { background: var(--neutral-bg); color: var(--neutral-text); }
+/* Simulated data — deliberately conspicuous. These readings are invented
+   by firmware, and the styling must make that impossible to miss at a
+   glance or in a screenshot. */
+.sim-badge {
+  display: inline-block; margin-left: 0.6rem; vertical-align: middle;
+  background: #b3261e; color: #fff;
+  font-size: 0.62rem; font-weight: 800; letter-spacing: 0.07em;
+  border-radius: 4px; padding: 0.15rem 0.45rem;
+}
+.sim-badge.inline { margin-left: 0.5rem; }
+/* A band whose device has gone quiet — muted rather than alarming green,
+   so a stale strip doesn't read as a healthy one at a glance. */
+.live-band.stale-band { background: linear-gradient(100deg, #3f4a43, #5b6b60); }
+.live-band.simulated {
+  background: linear-gradient(100deg, #5c1d18, #8a2d24);
+  outline: 2px dashed rgba(255, 255, 255, 0.35); outline-offset: -6px;
+}
+.sim-note {
+  background: var(--danger-bg); color: var(--danger-text);
+  border-radius: var(--radius-sm); padding: 0.6rem 0.85rem;
+  font-size: 0.8rem; margin: 1rem 0 0;
+}
+.sim-note code { font-size: 0.78rem; }
+.sensor-grid.simulated .sensor-tile { border-style: dashed; border-color: #e0a9a4; }
+
+/* Machine picker above a live strip. Horizontally scrollable rather than
+   wrapping, so a farm with many machines doesn't push the tiles down the
+   page as the row grows. */
+.strip-tabs {
+  display: flex; gap: 0.4rem; margin: 0.9rem 0 0;
+  overflow-x: auto; padding-bottom: 0.25rem;
+}
+.strip-tab {
+  display: flex; align-items: center; gap: 0.45rem; white-space: nowrap;
+  padding: 0.4rem 0.8rem; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--muted); font: inherit; font-size: 0.82rem; cursor: pointer;
+}
+.strip-tab:hover { color: var(--text); border-color: var(--accent-soft); }
+.strip-tab.active {
+  background: var(--accent-soft); border-color: var(--accent);
+  color: var(--accent-dark); font-weight: 700;
+}
+.strip-dot {
+  width: 7px; height: 7px; border-radius: 999px; flex-shrink: 0;
+  background: var(--ok);
+}
+/* Amber, not hidden: a machine that stopped reporting must stay visible
+   in the picker — that is exactly when you need to see it. */
+.strip-dot.stale { background: var(--warn-text); }
+
+/* Stale readings. The values were true once, so they aren't hidden — but a
+   crisp "Heater ON" tile from days ago reads as current state, which is a
+   different and false claim. Dimmed, with the age stated above the grid. */
+.stale-note {
+  background: var(--warn-bg); color: var(--warn-text);
+  border-radius: var(--radius-sm); padding: 0.6rem 0.85rem;
+  font-size: 0.8rem; margin: 1rem 0 0;
+}
+.sensor-grid.stale .sensor-tile { opacity: 0.6; }
+
+.sensor-label { font-size: 0.85rem; color: var(--muted); margin-top: 0.35rem; }
+.sensor-value { display: flex; align-items: baseline; gap: 0.3rem; }
+.sensor-value b { font-size: 1.85rem; font-weight: 700; letter-spacing: -0.02em; color: var(--accent-dark); }
+.sensor-value b.na { color: var(--neutral-text); }
+.sensor-unit { font-size: 0.8rem; color: var(--muted); }
+.sensor-hint { font-size: 0.75rem; color: var(--muted); min-height: 1.05rem; }
 
 .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 0.5rem; }
 .stat-card { display: flex; flex-direction: column; gap: 0.4rem; }

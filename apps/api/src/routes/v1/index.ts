@@ -3,6 +3,7 @@ import { alertRoutes } from "./alerts.js";
 import { authRoutes } from "./auth.js";
 import { batchRoutes } from "./batches.js";
 import { collectionRoutes } from "./collections.js";
+import { coopRoutes } from "./coops.js";
 import { deviceRoutes } from "./devices.js";
 import { farmRoutes } from "./farms.js";
 import { feedWaterRoutes } from "./feedwater.js";
@@ -21,6 +22,7 @@ export async function v1Routes(app: FastifyInstance) {
   app.register(speciesRoutes);
   app.register(farmRoutes);
   app.register(incubatorRoutes);
+  app.register(coopRoutes);
   app.register(deviceRoutes);
   app.register(collectionRoutes);
   app.register(batchRoutes);

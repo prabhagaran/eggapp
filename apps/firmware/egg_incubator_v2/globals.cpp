@@ -6,7 +6,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // SHARED STATE
 // ─────────────────────────────────────────────────────────────────────────────
-SensorData_t  gSensorData  = { 0.0f, 0.0f, false, false };
+// Value-initialised: every float 0.0f, every validity bit false. Spelling
+// out each member would drift out of sync with the struct as channels are
+// added (it already had, listing four values for six members), and no
+// member wants a non-zero start — the *_valid flags must all begin false
+// so nothing consumes an uninitialised reading before its task first runs.
+SensorData_t  gSensorData  = {};
 RtcTime_t     gRtcTime     = {};
 RelayState_t  gRelayState  = { false, false, false, false, false, false };
 Settings_t    gSettings    = {};
