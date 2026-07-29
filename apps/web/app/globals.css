@@ -32,6 +32,12 @@
   /* The hero card is always a dark-green surface with white text. */
   --hero-start: #123524;
   --hero-end: #1f7a4d;
+
+  /* Width of the shell column (header rows + main content). Wide screens
+     were leaving big empty gutters, so the column tracks the viewport and
+     only stops growing on very large displays. */
+  --shell-w: 1760px;
+  --shell-pad: clamp(1rem, 2.5vw, 2.5rem);
 }
 
 * { box-sizing: border-box; }
@@ -54,7 +60,7 @@ h2 { font-size: 1.05rem; margin: 1.75rem 0 0.6rem; letter-spacing: -0.01em; }
 .app-shell { min-height: 100vh; display: flex; flex-direction: column; }
 
 /* Header spans the full viewport width (edge to edge, like the reference)
-   while its inner rows align to the same 1280px column as .app-main. */
+   while its inner rows align to the same column as .app-main. */
 .topnav {
   position: sticky; top: 0; z-index: 40;
   background: var(--surface);
@@ -63,7 +69,7 @@ h2 { font-size: 1.05rem; margin: 1.75rem 0 0.6rem; letter-spacing: -0.01em; }
 }
 .topnav-bar,
 .topnav-tabs {
-  max-width: 1280px; margin: 0 auto; padding: 0 1.25rem;
+  max-width: var(--shell-w); margin: 0 auto; padding: 0 var(--shell-pad);
 }
 .topnav-bar { display: flex; align-items: center; gap: 0.9rem; height: 4.25rem; }
 
@@ -159,8 +165,8 @@ h2 { font-size: 1.05rem; margin: 1.75rem 0 0.6rem; letter-spacing: -0.01em; }
 }
 
 .app-main {
-  max-width: 1280px; width: 100%; margin: 0 auto;
-  padding: 1.5rem 1.25rem 3rem;
+  max-width: var(--shell-w); width: 100%; margin: 0 auto;
+  padding: 1.5rem var(--shell-pad) 3rem;
 }
 
 /* ── Cards, grids ─────────────────────────────────────────────────── */
