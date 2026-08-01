@@ -20,7 +20,7 @@ and `eggubator.PcbDoc`.
 
 | Block | Parts |
 |---|---|
-| MCU | `ESP32-WROOM-32E-N4`, 2× 19-pin header |
+| MCU | `ESP32-WROOM-32E-N4`, 2× 19-pin header, EN RC (10 kΩ + 100 nF), 2× 100 nF decoupling |
 | 3.3 V rail | `LM1117IMPX3.3`, 2× 22 µF 0805 |
 | **5 V rail** | `LM2596S-ADJ` buck, 330 µH `CDRH104RNP-331NC`, 2× 865060453007 polarised cap, `SS54` Schottky |
 | Actuators, ×6 identical channels | `AWHSH112D00G` relay, `APC-817C1-SL` optocoupler, `MMBT2222A-G` NPN, `1N4007` flyback, 1 k + 680 R, red LED |
@@ -47,15 +47,9 @@ panel-mounted SSR-40DA.
    rules and board region hold data, and `BOARDOUTLINE=FALSE`. No *Update PCB
    Document* has run. **Annotation is now done (71/71), so this is unblocked** —
    it is the next action.
-2. **No EN RC circuit on the sheet.** The ESP32 datasheet's *Peripheral
-   Schematics* section requires it — v2.0's revision history specifically
-   records an update to the RC note. Without it the module boots unreliably on
-   a slow-rising supply, which presents as an intermittent firmware fault. The
-   two 100 nF caps just added cover decoupling; the EN RC is a separate
-   resistor-plus-capacitor and is still missing.
-3. **Two capacitors are unannotated** (`C?`). Re-run *Tools → Annotate
-   Schematics* before the PCB import, or they arrive on the board without
-   designators.
+2. **Two parts are unannotated** (`C?`, `R?` — the EN RC pair). Re-run
+   *Tools → Annotate Schematics* before the PCB import, or they arrive on the
+   board without designators.
 
 Two things to verify rather than change: only **two** tactile switches are
 placed while the firmware expects three buttons plus a reset/boot pair, so
