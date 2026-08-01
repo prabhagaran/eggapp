@@ -52,7 +52,56 @@ data class LatestTelemetry(
     val tempC: Double?,
     val humidityPct: Double?,
     val turnerOn: Boolean?,
+    // Relay states at the moment of this reading. null = firmware predating
+    // the actuator fields, not "off" — rendered as "—", never as OFF.
+    val heaterOn: Boolean?,
+    val coolerOn: Boolean?,
+    val humidifierOn: Boolean?,
+    val fanOn: Boolean?,
+    val pumpOn: Boolean?,
     val source: String,
+)
+
+// A coop's reading set (ADR 0009). No setpoint/actuator fields — a coop node
+// drives no relays, so there is nothing to control from here. null on a
+// channel = no such sensor fitted, or its reading faulted; the tile says so
+// rather than rendering 0.
+data class CoopTelemetry(
+    val ts: String,
+    val tempC: Double?,
+    val humidityPct: Double?,
+    val co2Ppm: Double?,
+    val ammoniaPpm: Double?,
+    val lightLux: Double?,
+    val feedLevelPct: Double?,
+    val waterLevelPct: Double?,
+    val source: String,
+    // Device fabricated this reading (SIMULATE_SENSORS firmware). Always
+    // surfaced in the UI — simulated values must never look like measurements.
+    val simulated: Boolean = false,
+)
+
+data class CoopFlockRef(val id: String, val name: String)
+
+data class Coop(
+    val id: String,
+    val name: String,
+    val capacity: Int?,
+    val deviceId: String?,
+    val device: DeviceSummary?,
+    val flocks: List<CoopFlockRef> = emptyList(),
+    val latestTelemetry: CoopTelemetry?,
+)
+
+data class Alert(
+    val id: String,
+    val incubatorId: String?,
+    val severity: String, // "warning" | "critical"
+    val state: String,    // "open" | "acked" | "resolved"
+    val message: String,
+    val triggeredAt: String,
+    val ackedAt: String?,
+    val resolvedAt: String?,
 )
 
 data class Incubator(

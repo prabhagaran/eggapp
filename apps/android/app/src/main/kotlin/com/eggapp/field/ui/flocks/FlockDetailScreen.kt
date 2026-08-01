@@ -13,7 +13,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -23,7 +22,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -39,7 +37,9 @@ import com.eggapp.field.data.local.FeedLogEntity
 import com.eggapp.field.data.local.MortalityEntity
 import com.eggapp.field.data.local.VaccinationEntity
 import com.eggapp.field.data.local.WaterLogEntity
+import com.eggapp.field.ui.components.AppCard
 import com.eggapp.field.ui.components.DropdownField
+import com.eggapp.field.ui.components.EggAppSubBar
 import com.eggapp.field.ui.components.MutedText
 import com.eggapp.field.ui.components.PillTone
 import com.eggapp.field.ui.components.StatusPill
@@ -70,9 +70,9 @@ fun FlockDetailScreen(flockId: String, onBack: () -> Unit) {
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(state.flock?.name ?: "Flock") },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
+            EggAppSubBar(
+                title = state.flock?.name ?: "Flock",
+                onBack = onBack,
                 actions = {
                     TextButton(onClick = { editing = !editing }) { Text(if (editing) "Cancel" else "Edit") }
                     TextButton(
@@ -170,8 +170,8 @@ private fun FlockEditForm(
     var note by remember(flock.id) { mutableStateOf(flock.acquisitionNote ?: "") }
     var stageOverride by remember(flock.id) { mutableStateOf(flock.stageOverride ?: "") }
 
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    AppCard(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Edit flock", style = MaterialTheme.typography.titleMedium)
             OutlinedTextField(name, { name = it }, label = { Text("Name") }, modifier = Modifier.fillMaxWidth())
             DropdownField(
@@ -211,8 +211,8 @@ private fun MortalityForm(onSave: (String, Int, String, String?) -> Unit) {
     var cause by remember { mutableStateOf("death") }
     var notes by remember { mutableStateOf("") }
 
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    AppCard(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Mortality / cull / sale", style = MaterialTheme.typography.titleMedium)
             OutlinedTextField(date, { date = it }, label = { Text("Date (YYYY-MM-DD)") }, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(
@@ -249,8 +249,8 @@ private fun VaccinationForm(
     var count by remember { mutableStateOf("") }
     var administeredBy by remember { mutableStateOf("") }
 
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    AppCard(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Record vaccination", style = MaterialTheme.typography.titleMedium)
             complianceLabel?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             OutlinedTextField(date, { date = it }, label = { Text("Date (YYYY-MM-DD)") }, modifier = Modifier.fillMaxWidth())
@@ -280,8 +280,8 @@ private fun FeedWaterForm(onSaveFeed: (String, Double) -> Unit, onSaveWater: (Do
     var feedKg by remember { mutableStateOf("") }
     var waterL by remember { mutableStateOf("") }
 
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    AppCard(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Feed & water check", style = MaterialTheme.typography.titleMedium)
             OutlinedTextField(feedType, { feedType = it }, label = { Text("Feed type") }, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(

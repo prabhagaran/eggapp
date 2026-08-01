@@ -16,6 +16,7 @@ import {
   Users,
   LogOut,
   MoreHorizontal,
+  MoreVertical,
   Home,
 } from "lucide-react";
 import { api, clearAuth, getFarmId, setFarmId } from "../lib/api";
@@ -176,9 +177,15 @@ export function TopTabs() {
             onClick={() => setMoreOpen((v) => !v)}
             aria-expanded={moreOpen}
             aria-haspopup="menu"
+            aria-label="More"
           >
-            <MoreHorizontal />
-            More
+            {/* Both icons ship; CSS picks one. On phones the button
+                collapses to a kebab, which is where that pattern is
+                expected — swapping in JS would need a resize listener
+                and would mismatch on hydration. */}
+            <MoreHorizontal className="more-ellipsis" />
+            <MoreVertical className="more-kebab" />
+            <span className="more-label">More</span>
           </button>
           {moreOpen && (
             <div className="topnav-more-menu" role="menu">

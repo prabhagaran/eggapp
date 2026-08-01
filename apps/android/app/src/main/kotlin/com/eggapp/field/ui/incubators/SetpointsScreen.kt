@@ -11,7 +11,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -21,7 +20,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -35,7 +33,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.eggapp.field.data.SetpointRequest
+import com.eggapp.field.ui.components.AppCard
 import com.eggapp.field.ui.components.DropdownField
+import com.eggapp.field.ui.components.EggAppSubBar
 import com.eggapp.field.ui.components.MutedText
 import com.eggapp.field.ui.components.PillTone
 import com.eggapp.field.ui.components.StatusPill
@@ -72,10 +72,7 @@ fun SetpointsScreen(incubatorId: String, onBack: () -> Unit) {
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("${state.incubator?.name ?: "Incubator"} — setpoints") },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
-            )
+            EggAppSubBar(title = "${state.incubator?.name ?: "Incubator"} — setpoints", onBack = onBack)
         },
     ) { padding ->
         Column(
@@ -228,8 +225,8 @@ private fun IncubatorEditCard(
     var capacity by remember(incubator.id) { mutableStateOf(incubator.capacity.toString()) }
     var speciesId by remember(incubator.id) { mutableStateOf(incubator.defaultSpeciesId ?: "") }
 
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    AppCard(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Incubator settings", style = MaterialTheme.typography.titleMedium)
             OutlinedTextField(name, { name = it }, label = { Text("Name") }, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(

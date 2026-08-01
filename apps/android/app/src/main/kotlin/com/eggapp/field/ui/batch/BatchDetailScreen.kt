@@ -14,7 +14,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -29,7 +28,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TimePickerState
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
@@ -51,7 +49,9 @@ import com.eggapp.field.data.Collection
 import com.eggapp.field.data.Incubator
 import com.eggapp.field.data.Species
 import com.eggapp.field.data.local.CandlingEntity
+import com.eggapp.field.ui.components.AppCard
 import com.eggapp.field.ui.components.DropdownField
+import com.eggapp.field.ui.components.EggAppSubBar
 import com.eggapp.field.ui.components.MutedText
 import com.eggapp.field.ui.components.PillTone
 import com.eggapp.field.ui.components.StatusPill
@@ -82,12 +82,7 @@ fun BatchDetailScreen(batchId: String, onBack: () -> Unit) {
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(state.batch?.let { "${it.species?.name ?: it.speciesId}" } ?: "Batch") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
-                },
-            )
+            EggAppSubBar(title = state.batch?.let { "${it.species?.name ?: it.speciesId}" } ?: "Batch", onBack = onBack)
         },
     ) { padding ->
         LazyColumn(modifier = Modifier.padding(padding).padding(16.dp)) {
@@ -178,8 +173,8 @@ private fun SetIncubationCard(settingBatch: Boolean, onSet: (Long) -> Unit) {
     val zone = ZoneId.systemDefault()
     val displayFmt = remember { SimpleDateFormat("MMM d, yyyy 'at' h:mm a", Locale.getDefault()) }
 
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    AppCard(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Set at", style = MaterialTheme.typography.titleMedium)
             MutedText(displayFmt.format(java.util.Date(selectedMillis)))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -255,8 +250,8 @@ private fun EditDeleteCard(
 ) {
     var showConfirm by remember { mutableStateOf(false) }
 
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    AppCard(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (canEdit) {
                     OutlinedButton(onClick = onEdit) { Text("Edit batch") }
@@ -312,8 +307,8 @@ private fun EditBatchForm(
         }
     }
 
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    AppCard(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Edit batch", style = MaterialTheme.typography.titleMedium)
             DropdownField("Incubator", incubatorId, incubators.map { it.id to it.name }, { incubatorId = it }, Modifier.fillMaxWidth())
             DropdownField("Species", speciesId, species.map { it.id to it.name }, { speciesId = it }, Modifier.fillMaxWidth())
@@ -389,8 +384,8 @@ private fun CandlingForm(nextDay: Int, onSave: (Int, Int, Int, Int, Int, String?
     var unsure by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
 
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    AppCard(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Record candling", style = MaterialTheme.typography.titleMedium)
             NumberField("Day", day) { day = it }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -423,8 +418,8 @@ private fun HatchForm(onSave: (Int, Int, Int, Int, String?) -> Unit) {
     var unhatched by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
 
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    AppCard(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Record hatch outcome", style = MaterialTheme.typography.titleMedium)
             NumberField("Hatched", hatched) { hatched = it }
             NumberField("Pipped, died", pippedDead) { pippedDead = it }

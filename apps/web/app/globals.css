@@ -128,6 +128,7 @@ h2 { font-size: 1.05rem; margin: 1.75rem 0 0.6rem; letter-spacing: -0.01em; }
 /* Overflow menu — hidden until a breakpoint actually needs it. */
 .topnav-more { position: relative; margin-left: auto; display: none; }
 .topnav-more-btn { border: none; }
+.topnav-more-btn .more-kebab { display: none; }
 .topnav-more-menu {
   position: absolute; right: 0; top: 100%; z-index: 50; min-width: 13rem;
   background: var(--surface); border: 1px solid var(--border);
@@ -162,6 +163,21 @@ h2 { font-size: 1.05rem; margin: 1.75rem 0 0.6rem; letter-spacing: -0.01em; }
   .topnav-tabs > .topnav-tab:nth-child(n + 4) { display: none; }
   .topnav-user .who { display: none; }
   .topnav-brand-text span { display: none; }
+
+  /* On phones the overflow control becomes a kebab pinned to the right
+     edge of the row — the standard mobile affordance, and it frees the
+     width the "More" label was taking from the visible tabs. */
+  .topnav-more-btn { padding: 0.5rem; border-radius: 999px; margin-bottom: 0; }
+  .topnav-more-btn .more-label,
+  .topnav-more-btn .more-ellipsis { display: none; }
+  .topnav-more-btn .more-kebab { display: block; width: 20px; height: 20px; }
+  .topnav-more-btn.active {
+    background: var(--accent-soft); color: var(--accent-dark);
+    border-bottom-color: transparent;
+  }
+  /* Menu hangs off the right edge; cap it so a long label can't push it
+     off-screen on a narrow phone. */
+  .topnav-more-menu { max-width: calc(100vw - 2rem); }
 }
 
 .app-main {

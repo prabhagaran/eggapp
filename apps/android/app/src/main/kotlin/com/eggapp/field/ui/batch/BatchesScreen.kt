@@ -10,15 +10,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -28,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -36,9 +33,12 @@ import com.eggapp.field.data.BatchEggSourceInput
 import com.eggapp.field.data.Collection
 import com.eggapp.field.data.Incubator
 import com.eggapp.field.data.Species
+import com.eggapp.field.ui.components.AppCard
 import com.eggapp.field.ui.components.DropdownField
+import com.eggapp.field.ui.components.EmptyNote
 import com.eggapp.field.ui.components.MutedText
 import com.eggapp.field.ui.components.PillTone
+import com.eggapp.field.ui.components.SectionRule
 import com.eggapp.field.ui.components.StatusPill
 import java.time.Duration
 import java.time.Instant
@@ -52,62 +52,64 @@ private fun batchTone(status: String) = when (status) {
 private fun collectionAgeDays(collectedOn: String): Long =
     Duration.between(Instant.parse(collectedOn), Instant.now()).toDays()
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BatchesScreen(viewModel: BatchesViewModel = viewModel(), onOpenBatch: (Batch) -> Unit) {
     val state by viewModel.state.collectAsState()
     var showCreate by remember { mutableStateOf(false) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Batches") },
-                actions = { TextButton(onClick = { showCreate = !showCreate }) { Text(if (showCreate) "Cancel" else "Add") } },
-            )
-        },
-    ) { padding ->
-        LazyColumn(modifier = Modifier.padding(padding).padding(horizontal = 16.dp)) {
+    // No Scaffold here — this is a bottom-tab route, so the branded top bar
+    // in MainActivity is already above it. A second app bar would stack.
+    LazyColumn(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 18.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Batches", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                TextButton(onClick = { showCreate = !showCreate }) { Text(if (showCreate) "Cancel" else "Add") }
+            }
+            if (state.loading) CircularProgressIndicator(modifier = Modifier.padding(16.dp))
+            state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(vertical = 8.dp)) }
+        }
+        if (showCreate) {
             item {
-                if (state.loading) CircularProgressIndicator(modifier = Modifier.padding(16.dp))
-                state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(vertical = 8.dp)) }
+                CreateBatchForm(
+                    species = state.species,
+                    incubators = state.incubators,
+                    collections = state.collections,
+                    saving = state.saving,
+                    onSave = { incubatorId, speciesId, sources, note ->
+                        viewModel.createBatch(incubatorId, speciesId, sources, note) { showCreate = false }
+                    },
+                )
             }
-            if (showCreate) {
-                item {
-                    CreateBatchForm(
-                        species = state.species,
-                        incubators = state.incubators,
-                        collections = state.collections,
-                        saving = state.saving,
-                        onSave = { incubatorId, speciesId, sources, note ->
-                            viewModel.createBatch(incubatorId, speciesId, sources, note) { showCreate = false }
-                        },
-                    )
-                }
-            }
-            if (!state.loading && state.batches.isEmpty() && state.error == null) {
-                item { MutedText("No active batches — start one above.", modifier = Modifier.padding(vertical = 8.dp)) }
-            }
-            items(state.batches) { batch ->
-                Card(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                    onClick = { onOpenBatch(batch) },
+        }
+        item { SectionRule("All batches") }
+        if (!state.loading && state.batches.isEmpty() && state.error == null) {
+            item { EmptyNote("No active batches — start one with the Add button.") }
+        }
+        items(state.batches) { batch ->
+            AppCard(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                onClick = { onOpenBatch(batch) },
+            ) {
+                Text(
+                    "${batch.species?.name ?: batch.speciesId} — ${batch.incubator?.name ?: ""}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                Row(
+                    modifier = Modifier.padding(top = 10.dp).fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            "${batch.species?.name ?: batch.speciesId} — ${batch.incubator?.name ?: ""}",
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                        Row(
-                            modifier = Modifier.padding(top = 6.dp).fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                        ) {
-                            StatusPill(batch.status, batchTone(batch.status))
-                            MutedText("${batch.viableCount} viable")
-                        }
-                    }
+                    StatusPill(batch.status, batchTone(batch.status))
+                    MutedText("${batch.viableCount} viable")
                 }
             }
         }
+        item { Column(modifier = Modifier.padding(bottom = 24.dp)) {} }
     }
 }
 
@@ -124,9 +126,9 @@ private fun CreateBatchForm(
     var overrideNote by remember { mutableStateOf("") }
     val picked = remember { mutableStateMapOf<String, String>() }
 
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("New batch", style = MaterialTheme.typography.titleMedium)
+    AppCard(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("New batch", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             when {
                 collections.isEmpty() -> MutedText("No collections with available eggs — record one first.")
                 incubators.isEmpty() -> MutedText("No incubators yet — add one on the Home tab first.")

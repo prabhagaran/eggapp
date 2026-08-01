@@ -12,7 +12,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -22,7 +21,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -35,6 +33,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.eggapp.field.data.Collection
 import com.eggapp.field.data.local.CollectionEntity
+import com.eggapp.field.ui.components.AppCard
+import com.eggapp.field.ui.components.EggAppSubBar
 import com.eggapp.field.ui.components.MutedText
 import com.eggapp.field.ui.components.PillTone
 import com.eggapp.field.ui.components.StatusPill
@@ -51,10 +51,7 @@ fun CollectionsScreen(viewModel: CollectionsViewModel = viewModel(), onBack: () 
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Egg collections") },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
-            )
+            EggAppSubBar(title = "Egg collections", onBack = onBack)
         },
     ) { padding ->
         LazyColumn(modifier = Modifier.padding(padding).padding(16.dp)) {
@@ -100,8 +97,8 @@ private fun CollectionForm(onSave: (String, Int, Double?, String?) -> Unit) {
     var avgWeight by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
 
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    AppCard(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Record a collection", style = MaterialTheme.typography.titleMedium)
             OutlinedTextField(
                 value = collectedOn,
@@ -157,8 +154,8 @@ private fun ServerCollectionRow(c: Collection, onDiscard: () -> Unit) {
     val ageDays = ChronoUnit.DAYS.between(LocalDate.parse(c.collectedOn.take(10)), LocalDate.now())
     val stale = ageDays > STALE_STORAGE_DAYS
 
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-        Column(modifier = Modifier.padding(16.dp)) {
+    AppCard(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+        Column {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
