@@ -25,49 +25,46 @@ Module: **ESP32-WROOM-32E-N4** (PCB antenna, 4 MB flash), per
 | `RELAY_COOLER` | 27 | Cooler | config.h:35 | Active-LOW; climate-chamber profile only |
 | `RELAY_HUMIDIFIER` | 14 | Humidifier | config.h:36 | Active-LOW |
 | `RELAY_FAN` | 13 | Fan PWM | config.h:37 | **Not a relay.** LEDC PWM, inverted duty — 100 % speed = pin LOW. Drives IRL540N |
-| `RELAY_PUMP` | 12 | Pump | config.h:38 | ⚠ Strapping pin MTDI — see below |
-| `RELAY_TURNER` | 15 | Turner | config.h:39 | ⚠ Strapping pin MTDO — see below |
+| `RELAY_PUMP` | **16** | Pump | config.h:43 | Relocated from GPIO12 |
+| `RELAY_TURNER` | **17** | Turner | config.h:44 | Relocated from GPIO15 |
 
 Relay polarity: `RELAY_ON == LOW`
 ([config.h:42](../../../apps/firmware/egg_incubator_v2/config.h#L42)). Every
 actuator channel needs an external pull-up to 3.3 V so the load stays OFF while
 the ESP32 is in reset and its GPIOs float.
 
-## Strapping-pin conflicts
+## Strapping-pin conflicts — RESOLVED
 
-**These must be fixed in hardware before layout.** Logged as BUG-004 in
-[FIRMWARE_BUG_REVIEW.md](../../../apps/firmware/FIRMWARE_BUG_REVIEW.md).
+BUG-004 is fixed. Both actuator channels have been moved off strapping pins in
+`MCU.SchDoc` and in `config.h`, in the same change:
 
-**GPIO12 (MTDI) — `RELAY_PUMP`.** MTDI is the strapping pin for internal LDO
-(`VDD_SDIO`) voltage selection, sampled at reset. Datasheet v2.0 Table 4 gives
-its default configuration as **pull-down, bit value 0** — that default is what
-selects 3.3 V flash, and it is the state the module needs to boot.
-
-An active-LOW relay board pulls its input HIGH when idle, which is also exactly
-what the fail-safe pull-up above requires. Either one overrides the internal
-pull-down, flips the bit to 1, and the module selects 1.8 V flash and does not
-boot. This is not intermittent: it is a board that never starts once the relay
-is plugged in.
-
-**GPIO15 (MTDO) — `RELAY_TURNER`.** MTDO strapping controls U0TXD printing —
-and, together with GPIO5, SDIO slave timing. Datasheet default is **pull-up,
-bit value 1**. Less severe than GPIO12 because the pull-up matches the default,
-but it is still a strapping pin carrying an external pull-up on a channel that
-also drives a load, and getting it wrong silences the boot log that is the
-first thing anyone looks at when a unit will not start.
-
-**Fix:** move both to free, non-strapping pins. `pins.csv` already identifies
-the candidates:
-
-| Move | From | To (preferred) | Note |
+| Channel | Was | Now | Sheet location |
 |---|---|---|---|
-| `RELAY_PUMP` | 12 | **16** | Safe on WROOM; reserved for PSRAM only on WROVER |
-| `RELAY_TURNER` | 15 | **17** | Same |
+| `RELAY_PUMP` | 12 (MTDI) | **16** | relay block at (2270, 650) |
+| `RELAY_TURNER` | 15 (MTDO) | **17** | relay block at (1500, 670) |
 
-Spare non-strapping outputs if 16/17 are needed elsewhere: GPIO19, GPIO23.
-Avoid GPIO5 for anything that must not energise at power-on — it boots HIGH,
-which on an active-LOW channel means the load is briefly *off*, but it is a
-strapping pin regardless.
+### Why it mattered
+
+**MTDI (GPIO12)** is the strapping pin for internal LDO (`VDD_SDIO`) voltage
+selection, sampled at reset. Datasheet v2.0 Table 4 gives its default as
+**pull-down, bit value 0** — that default is what selects 3.3 V flash and lets
+the module boot. Anything holding it high at reset flips the bit, the module
+selects 1.8 V flash, and it does not start. Not intermittent: a board that
+never boots once the channel is populated.
+
+**MTDO (GPIO15)** controls U0TXD printing, and with GPIO5 the SDIO slave
+timing. Default **pull-up, bit value 1**. Less severe, but it silences the boot
+log — the first thing anyone looks at when a unit will not start.
+
+### Keep 12 and 15 free
+
+They are now unused, and they should stay that way for anything driven at
+reset. If more outputs are needed, take **GPIO19 and GPIO23** first — both safe
+and non-strapping.
+
+Avoid GPIO5 for anything that must not energise at power-on: it boots HIGH,
+which on an active-LOW channel leaves the load off, but it is a strapping pin
+regardless.
 
 Burning the flash-voltage eFuse is the other documented escape, but it is
 one-way, per-module, and easy to forget on the second unit. Choosing different

@@ -47,16 +47,15 @@ panel-mounted SSR-40DA.
    rules and board region hold data, and `BOARDOUTLINE=FALSE`. No *Update PCB
    Document* has run. **Annotation is now done (71/71), so this is unblocked** —
    it is the next action.
-2. **No EN RC circuit and no 3V3 decoupling visible on the sheet.** Both are
-   required by the ESP32 datasheet's *Peripheral Schematics* section — v2.0's
-   revision history specifically records an update to the RC note. Without the
-   EN RC the module boots unreliably on a slow-rising supply, which presents as
-   an intermittent firmware fault. The 22 µF caps are bulk, not the 100 nF at
-   the module pin.
-3. **`RELAY_PUMP` is still on GPIO12 and `RELAY_TURNER` on GPIO15.** The
-   strapping conflict is unresolved — see
-   [docs/pin-map.md](docs/pin-map.md#strapping-pin-conflicts). Fix it before
-   layout, not after.
+2. **No EN RC circuit on the sheet.** The ESP32 datasheet's *Peripheral
+   Schematics* section requires it — v2.0's revision history specifically
+   records an update to the RC note. Without it the module boots unreliably on
+   a slow-rising supply, which presents as an intermittent firmware fault. The
+   two 100 nF caps just added cover decoupling; the EN RC is a separate
+   resistor-plus-capacitor and is still missing.
+3. **Two capacitors are unannotated** (`C?`). Re-run *Tools → Annotate
+   Schematics* before the PCB import, or they arrive on the board without
+   designators.
 
 Two things to verify rather than change: only **two** tactile switches are
 placed while the firmware expects three buttons plus a reset/boot pair, so
@@ -80,14 +79,13 @@ The working system today is still a devkit with wired modules.
 These must be settled before layout starts. None of them are layout details —
 each changes the schematic.
 
-1. **The GPIO12 / GPIO15 strapping conflict.** `RELAY_PUMP` is on GPIO12
-   (MTDI) and `RELAY_TURNER` on GPIO15 (MTDO). An active-LOW relay board's
-   pull-up on GPIO12 at reset selects the wrong flash voltage and the module
-   does not boot. This is logged as BUG-004 in
-   [FIRMWARE_BUG_REVIEW.md](../../apps/firmware/FIRMWARE_BUG_REVIEW.md).
-   Designing the board around free pins costs nothing now and cannot be fixed
-   later without a spin. See
-   [docs/pin-map.md](docs/pin-map.md#strapping-pin-conflicts).
+1. **Actuator drive polarity.** Firmware is active-LOW
+   (`RELAY_ON == LOW`,
+   [config.h:47](../../apps/firmware/egg_incubator_v2/config.h#L47)), and the
+   channels are opto-isolated. Which way the `APC-817C1-SL` LED faces decides
+   whether the board matches that or inverts it — and an inverted channel
+   energises the heater when firmware means to switch it off. Verify on all six
+   channels; this is a hazard, not a nuisance.
 2. **Mains vs. low-voltage split.** Which loads are mains and which are DC. The
    fan is PWM-driven through a logic-level MOSFET, so it is DC. The turner is a
    slow AC gear motor in most builds. The relay contacts on the sheet can carry

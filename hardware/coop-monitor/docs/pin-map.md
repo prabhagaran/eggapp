@@ -102,7 +102,7 @@ therefore an installation constraint worth documenting on the connector.
 | 1, 3 | UART0 TX/RX — serial logging at 115200, used during provisioning |
 | 2 | Boot strapping; onboard LED on many devkits |
 | 6–11 | Internal SPI flash — never |
-| 12, 15 | Strapping (MTDI / MTDO). Free here, but avoid — see the incubator's [conflict](../../incubator/docs/pin-map.md#strapping-pin-conflicts) |
+| 12, 15 | Strapping (MTDI / MTDO). Free here, but avoid — see [why on the incubator](../../incubator/docs/pin-map.md#strapping-pin-conflicts--resolved) |
 
 ## Free
 
