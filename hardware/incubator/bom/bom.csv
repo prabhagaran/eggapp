@@ -1,0 +1,26 @@
+refdes,qty,part,value,package,manufacturer,mpn,supplier,supplier_pn,status,notes
+U1,1,ESP32-WROOM-32E,,module SMD,Espressif,ESP32-WROOM-32E-N4,,,confirmed,PCB antenna - matches MCU.SchDoc. MANDATORY antenna keepout: no copper any layer under antenna; module overhangs board edge. Standard part is -40..+85C - if the board sits inside a climate-chamber run (80C ceiling) order the 105C variant instead
+U2,1,DS18B20,,TO-92 / probe,Maxim,DS18B20+,,,confirmed,Primary temperature; 4.7k pull-up to 3.3V required
+U3,1,DHT22 / AM2302,,module,Aosong,AM2302,,,confirmed,Humidity + cross-check temperature
+U4,1,SSD1306 OLED 128x64,,module I2C,,,,,confirmed,I2C addr 0x3C
+U5,1,DS1307 RTC,,SOIC-8 / module,Maxim,DS1307Z,,,confirmed,Shares I2C bus; needs 32.768 kHz xtal + coin cell
+U6,1,LM1117I-3.3,3.3V,SOT-223 (DCY),Texas Instruments,LM1117IMPX3.3/NOPB,,,confirmed,800 mA LDO; -40..+125C grade. MUST be fed from 5V not 12V. Tab is VOUT - pour >=0.3 in2 of 3.3V copper NOT ground. See common/3v3-rail-lm1117.md
+C3,1,Capacitor tantalum,10uF,,,,,,REQUIRED,LM1117 VOUT stability cap - datasheet minimum. Tantalum not bare ceramic (bipolar LDO needs some ESR)
+C4,1,Capacitor,10uF,0805,,,,,REQUIRED,LM1117 VIN bulk
+C5,1,Capacitor,100nF,0603,,,,,REQUIRED,LM1117 VIN decoupling close to pin
+Q1,1,IRL540N,,TO-220,Infineon,IRL540N,,,confirmed,Logic-level N-MOSFET; fan PWM (inverted duty); datasheet on file
+K1,1,SSR-40DA,,panel module,,,,,confirmed,PANEL-MOUNTED not on PCB; heater only; datasheet on file
+K2-K5,4,Relay or SSR,,TBD,,,,,BLOCKING,Cooler/humidifier/pump/turner - element undecided; blocks 5V budget
+PSU1,1,AC-DC module 5V,,encapsulated,,,,,BLOCKING,Rating depends on K2-K5 decision
+TC1,1,Thermal cutout,,inline,,,,,REQUIRED,In series with heater element; independent of ESP32. See incubator/README.md
+F1,1,Fuse + holder,,,,,,,TBD,Line side; rating set by heater
+RV1,1,MOV,,disc,,,,,TBD,Mains transient
+BT1,1,Coin cell + holder,CR2032,,,,,,confirmed,RTC backup
+R1,1,Resistor,4.7k,0805,,,,,confirmed,DS18B20 1-Wire pull-up to 3.3V
+R2-R3,2,Resistor,4.7k,0805,,,,,confirmed,I2C pull-ups
+R4-R9,6,Resistor,10k,0805,,,,,REQUIRED,Fail-safe pull-ups to 3.3V on each actuator channel - hold loads OFF during reset
+C1,1,Capacitor,10uF,0805,,,,,confirmed,ESP32 bulk; rate 105C - cabinet ambient
+C2,1,Capacitor,100nF,0603,,,,,confirmed,ESP32 decoupling at pin
+SW1-SW3,3,Tactile switch,,,,,,,confirmed,UP / DOWN / OK; active-LOW
+J1,1,UART0 header,,2.54mm 4-pin,,,,,REQUIRED,TX0/RX0/GND/3V3 for flashing and provisioning
+ANT1,0,NOT FITTED,,,,,,,n/a,-32E has an on-module PCB antenna - no external antenna part. Reinstate only if the board is respun to -32UE

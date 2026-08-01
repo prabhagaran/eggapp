@@ -33,6 +33,22 @@ infra/docker/mosquitto/passwd
 # Raw firmware capture logs (large; summaries belong in the contract docs)
 docs/iot/captures/
 
+# Third-party Altium library — 2.4 GB / 31k files (STEP models, SchLibs).
+# Far too large to vendor into git. Keep it local, or pull it in as a git
+# submodule / Git LFS store if it needs to be shared. See hardware/common/README.md
+hardware/common/altium-library-master/
+hardware/common/altium-library-master.zip
+
+# Hardware / EDA scratch — see hardware/CONVENTIONS.md
+# Released fabrication outputs are committed under <board>/pcb/releases/;
+# ad-hoc exports and tool caches are not.
+**/History/
+**/__Previews/
+*.PrjPcbStructure
+*-backups/
+*.kicad_prl
+fp-info-cache
+
 # Next.js generated
 apps/web/next-env.d.ts
 
@@ -43,3 +59,4 @@ apps/web/next-env.d.ts
 .DS_Store
 Thumbs.db
 *.tsbuildinfo
+apps/android/.kotlin/
