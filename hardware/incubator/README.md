@@ -9,8 +9,8 @@ Device ID `INCUBATOR_01`. Firmware 2.0.0.
 
 ## State
 
-**Schematic substantially drawn — 71 components. PCB file still empty. Nothing
-fabricated.**
+**Schematic complete — 80 components, fully annotated, imported into the board.
+Layout not started. Nothing fabricated.**
 
 The live Altium project is [../eggubator/](../eggubator/) —
 `eggubator.PrjPcb`, with `MCU.SchDoc`, `eggubator.SchLib`, `eggubator.PcbLib`
@@ -40,16 +40,23 @@ covers all six firmware actuators and resolves the "switching element per
 channel" question for everything except the heater, which stays on the
 panel-mounted SSR-40DA.
 
-### Still blocking
+### Blocking the board
 
-1. **`eggubator.PcbDoc` is empty.** `Components6`, `Nets6`, `Pads6`, `Vias6`,
-   `Tracks6`, `Arcs6`, `Texts6`, `Fills6`, `Regions6`, `Polygons6` and
-   `Connections6` are all zero-length; only the layer stack, default design
-   rules and board region hold data, and `BOARDOUTLINE=FALSE`. No *Update PCB
-   Document* has run. **All 80 components are annotated, so this is unblocked**
-   — it is the next action, and the only remaining step before layout can start.
+Nothing. The schematic is complete and has been imported into the board —
+`eggubator.PcbDoc` now holds all 80 components, the netlist, pads, ratsnest and
+3D bodies, with every footprint resolved.
 
-That is now the single blocker on this sheet.
+**Work has moved to layout.** Routing has not started: `Vias6` and `Polygons6`
+are both empty, so there is no ground pour and no layer transitions yet.
+
+Two rules apply from here, and neither can be fixed after fabrication:
+
+- The **LM1117 tab is VOUT**. Pour ≥ 0.3 in² of **3.3 V** copper on it, not
+  ground — ground under that tab shorts the rail.
+  [common/3v3-rail-lm1117.md](../common/3v3-rail-lm1117.md#rule-2-the-sot-223-tab-is-vout-not-ground)
+- The **WROOM-32E antenna keepout** — no copper on any layer beneath it, module
+  overhanging the board edge.
+  [CONVENTIONS.md](../CONVENTIONS.md#antenna-keepout)
 
 Two things to verify rather than change: only **two** tactile switches are
 placed while the firmware expects three buttons, so confirm whether
