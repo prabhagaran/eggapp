@@ -21,6 +21,7 @@ and `eggubator.PcbDoc`.
 | Block | Parts |
 |---|---|
 | MCU | `ESP32-WROOM-32E-N4`, 2× 19-pin header, EN RC (10 kΩ + 100 nF), 2× 100 nF decoupling |
+| Programming | 6-pin header, auto-reset pair (2× `MMBT2222A-G` + 2× 10 kΩ) on `DTR`/`RTS` → `EN`/`IO0` |
 | 3.3 V rail | `LM1117IMPX3.3`, 2× 22 µF 0805 |
 | **5 V rail** | `LM2596S-ADJ` buck, 330 µH `CDRH104RNP-331NC`, 2× 865060453007 polarised cap, `SS54` Schottky |
 | Actuators, ×6 identical channels | `AWHSH112D00G` relay, `APC-817C1-SL` optocoupler, `MMBT2222A-G` NPN, `1N4007` flyback, 1 k + 680 R, red LED |
@@ -45,18 +46,18 @@ panel-mounted SSR-40DA.
    `Tracks6`, `Arcs6`, `Texts6`, `Fills6`, `Regions6`, `Polygons6` and
    `Connections6` are all zero-length; only the layer stack, default design
    rules and board region hold data, and `BOARDOUTLINE=FALSE`. No *Update PCB
-   Document* has run. **Annotation is now done (71/71), so this is unblocked** —
-   it is the next action.
-2. **Two parts are unannotated** (`C?`, `R?` — the EN RC pair). Re-run
-   *Tools → Annotate Schematics* before the PCB import, or they arrive on the
-   board without designators.
+   Document* has run. **All 80 components are annotated, so this is unblocked**
+   — it is the next action, and the only remaining step before layout can start.
+
+That is now the single blocker on this sheet.
 
 Two things to verify rather than change: only **two** tactile switches are
-placed while the firmware expects three buttons plus a reset/boot pair, so
-confirm whether `BTN_UP`/`BTN_DOWN`/`BTN_OK` are intended to arrive on a header
-rather than on-board. And `SD0`–`SD3`, `CMD`, `CLK` (GPIO6–11) are still routed
-to the 19-pin headers; they are the internal flash lines and unusable, so mark
-them on the silkscreen.
+placed while the firmware expects three buttons, so confirm whether
+`BTN_UP`/`BTN_DOWN`/`BTN_OK` are intended to arrive on a header rather than
+on-board — the auto-reset pair covers reset/boot, so the switches are not
+those. And `SD0`–`SD3`, `CMD`, `CLK` (GPIO6–11) are still routed to the 19-pin
+headers; they are the internal flash lines and unusable, so mark them on the
+silkscreen.
 
 The working system today is still a devkit with wired modules.
 

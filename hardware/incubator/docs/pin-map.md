@@ -102,23 +102,22 @@ GPIO5 is usable with the caveat above. GPIO12 and GPIO15 are free since the
 relocation but should stay unused for anything driven at reset. GPIO16 and
 GPIO17 are now taken by the pump and turner.
 
-## Programming and debug
+## Programming and debug — done
 
-Not in the firmware pin map, but the board needs them:
+Not in the firmware pin map, but the board needs them, and both are now on the
+sheet:
 
-- **UART0 header** — TX0/RX0/GND/3V3 for flashing and the serial monitor
-  (115200 baud). Not optional: this is how the device is provisioned and
-  diagnosed.
-- **EN and IO0 access** — auto-reset circuit (the standard DTR/RTS transistor
-  pair) or, at minimum, reset and boot pushbuttons. Without one of the two,
-  flashing means shorting pins by hand.
+- **6-pin programming header**, carrying `TXD0`, `RXD0`, `DTR`, `RTS` plus power
+  and ground — the standard USB-serial adapter pinout. This is how the device is
+  flashed, provisioned and diagnosed (115200 baud), so it is not optional.
+- **Auto-reset circuit** — 2× `MMBT2222A-G` with 2× 10 kΩ, driving `EN` and
+  `IO0` from `DTR`/`RTS`. This is the arrangement `esptool` and the Arduino IDE
+  expect; without it, flashing means holding BOOT and tapping EN by hand every
+  time. It matches the DevKitC v4's `Q1`/`Q2` + `R21`/`R22` pair
+  ([esp32_devkitc_v4-sch.pdf](../../common/esp32_devkitc_v4-sch.pdf)).
 
 **EN RC — done.** 10 kΩ to 3.3 V plus 100 nF to GND, matching Espressif's own
 ESP32-DevKitC v4 reference schematic (`R11` 10K, `C1` 0.1 µF —
 [esp32_devkitc_v4-sch.pdf](../../common/esp32_devkitc_v4-sch.pdf)). It holds EN
 low until the rail is up; without it the module boots unreliably on a
 slow-rising supply, which looks exactly like an intermittent firmware fault.
-
-The DevKitC schematic is also the reference for the auto-reset circuit if you
-add one — its `Q1`/`Q2` pair with `R21`/`R22` (10 K each) is the DTR/RTS
-arrangement every ESP32 flashing tool expects.
