@@ -1,0 +1,1 @@
+{"nodes": [{"id": "infra_db_getprisma", "label": "getPrisma() lazy singleton", "file_type": "code", "source_file": "apps/api/src/infra/db.ts", "source_location": "7-10", "source_url": null, "captured_at": null, "author": null, "contributor": null}], "edges": [], "hyperedges": []}
