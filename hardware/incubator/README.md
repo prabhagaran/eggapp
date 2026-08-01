@@ -9,49 +9,61 @@ Device ID `INCUBATOR_01`. Firmware 2.0.0.
 
 ## State
 
-**A module breakout sheet exists. The controller schematic does not. The PCB
-file is empty. Nothing fabricated.**
+**Schematic substantially drawn — 71 components. PCB file still empty. Nothing
+fabricated.**
 
 The live Altium project is [../eggubator/](../eggubator/) —
 `eggubator.PrjPcb`, with `MCU.SchDoc`, `eggubator.SchLib`, `eggubator.PcbLib`
 and `eggubator.PcbDoc`.
 
-### What MCU.SchDoc actually contains
+### What MCU.SchDoc contains
 
-Three components: one **ESP32-WROOM-32E-N4** and two 19-pin headers. Every one
-of the module's 38 pins is net-labelled with its raw name (`IO34`, `IO35`,
-`SD0`, `CMD`, `TXD0`…) and wired straight out to a header pin. Three power
-ports: `VCC_3.3V`, `VCC_5V`, `GND`.
+| Block | Parts |
+|---|---|
+| MCU | `ESP32-WROOM-32E-N4`, 2× 19-pin header |
+| 3.3 V rail | `LM1117IMPX3.3`, 2× 22 µF 0805 |
+| **5 V rail** | `LM2596S-ADJ` buck, 330 µH `CDRH104RNP-331NC`, 2× 865060453007 polarised cap, `SS54` Schottky |
+| Actuators, ×6 identical channels | `AWHSH112D00G` relay, `APC-817C1-SL` optocoupler, `MMBT2222A-G` NPN, `1N4007` flyback, 1 k + 680 R, red LED |
+| Sensors / IO | 4.7 kΩ DS18B20 pull-up, 8× `691137710003` connectors, headers 4/5/7/10 |
+| Buttons | 2× `TL1105AF160Q` tactile |
+| Terminals | `282837-2`, `282837-5` screw terminals |
 
-It is a **1:1 module breakout** — a carrier you wire the incubator up to. That
-is a reasonable first board, but it is not the controller: no sensors, no
-relays or drivers, no regulator, no passives. The
-[block diagram](docs/block-diagram.md) describes the controller; this sheet
-implements the ESP32 block of it and nothing else.
+Nets use the firmware macro names — `DHT_PIN`, `DS18B20_PIN`, `I2C_SDA`,
+`I2C_SCL`, `BTN_UP`/`BTN_DOWN`/`BTN_OK` — which is what
+[CONVENTIONS.md](../CONVENTIONS.md#naming) asks for and keeps the sheet
+checkable against `config.h`. Power ports: `VIN`, `VCC_5V`, `VCC_3.3V`, `GND`.
 
-### Four things blocking progress on it
+The six actuator channels are **opto-isolated** — optocoupler into an NPN into
+the relay coil, with a flyback diode and an indicator LED per channel. That
+covers all six firmware actuators and resolves the "switching element per
+channel" question for everything except the heater, which stays on the
+panel-mounted SSR-40DA.
 
-1. **Designators are unannotated** — `IC?`, `P?`, `P?`, with both headers
-   sharing `P?`. Altium will not push an unannotated schematic to a board.
-   *Tools → Annotate Schematics* is the first step, and it is why item 2 is
-   true.
-2. **`eggubator.PcbDoc` is empty.** `Components6`, `Nets6`, `Pads6`, `Vias6`,
+### Still blocking
+
+1. **`eggubator.PcbDoc` is empty.** `Components6`, `Nets6`, `Pads6`, `Vias6`,
    `Tracks6`, `Arcs6`, `Texts6`, `Fills6`, `Regions6`, `Polygons6` and
    `Connections6` are all zero-length; only the layer stack, default design
    rules and board region hold data, and `BOARDOUTLINE=FALSE`. No *Update PCB
-   Document* has run.
-3. **No EN RC circuit and no 3V3 decoupling on the sheet.** Both are required
-   by the datasheet's *Peripheral Schematics* section — v2.0's revision history
-   specifically records an update to the RC note. Without the EN RC the module
-   boots unreliably on a slow-rising supply, which presents as an intermittent
-   firmware fault. These belong on the breakout, not on whatever plugs into it.
-4. **`VCC_5V` is placed but unsourced.** Nothing on the sheet generates or
-   consumes it.
+   Document* has run. **Annotation is now done (71/71), so this is unblocked** —
+   it is the next action.
+2. **No EN RC circuit and no 3V3 decoupling visible on the sheet.** Both are
+   required by the ESP32 datasheet's *Peripheral Schematics* section — v2.0's
+   revision history specifically records an update to the RC note. Without the
+   EN RC the module boots unreliably on a slow-rising supply, which presents as
+   an intermittent firmware fault. The 22 µF caps are bulk, not the 100 nF at
+   the module pin.
+3. **`RELAY_PUMP` is still on GPIO12 and `RELAY_TURNER` on GPIO15.** The
+   strapping conflict is unresolved — see
+   [docs/pin-map.md](docs/pin-map.md#strapping-pin-conflicts). Fix it before
+   layout, not after.
 
-One thing to check rather than fix: `SD0`–`SD3`, `CMD` and `CLK` (GPIO6–11) are
-brought out to the headers. That is normal for a breakout, but they are the
-internal flash lines and are unusable. Mark them on the silkscreen or the
-header invites someone to wire to them.
+Two things to verify rather than change: only **two** tactile switches are
+placed while the firmware expects three buttons plus a reset/boot pair, so
+confirm whether `BTN_UP`/`BTN_DOWN`/`BTN_OK` are intended to arrive on a header
+rather than on-board. And `SD0`–`SD3`, `CMD`, `CLK` (GPIO6–11) are still routed
+to the 19-pin headers; they are the internal flash lines and unusable, so mark
+them on the silkscreen.
 
 The working system today is still a devkit with wired modules.
 
@@ -76,22 +88,27 @@ each changes the schematic.
    Designing the board around free pins costs nothing now and cannot be fixed
    later without a spin. See
    [docs/pin-map.md](docs/pin-map.md#strapping-pin-conflicts).
-2. **Switching element per channel.** SSR-40DA is on file for the heater. What
-   switches the cooler, humidifier, pump and turner — mechanical relays, more
-   SSRs, or a mix — is undecided, and it sets the mains section's size and
-   creepage.
-3. **Mains vs. low-voltage split.** Which loads are mains and which are 12/24 V
-   DC. The fan is PWM-driven through a logic-level MOSFET, so it is DC. The
-   turner is a slow AC gear motor in most builds. Unconfirmed for the rest.
-   This overlaps with the next item — the DC rail voltage is now load-bearing.
-4. **What voltage enters the board.** The old block-diagram sheet shows a 12 V
-   supply. The 3.3 V regulator is an **LM1117I LDO**, which cannot be fed from
-   12 V in any workable layout — at 12 V in it dissipates 2.4 W in a SOT-223 and
-   goes into thermal shutdown. If the input is 12 V, a **buck stage to 5 V is
-   required** ahead of it. Settle this before schematic work continues:
-   [common/3v3-rail-lm1117.md](../common/3v3-rail-lm1117.md#rule-1-feed-it-from-5-v-never-12-v).
-5. **Enclosure and panel layout.** Drives connector placement, OLED and button
+2. **Mains vs. low-voltage split.** Which loads are mains and which are DC. The
+   fan is PWM-driven through a logic-level MOSFET, so it is DC. The turner is a
+   slow AC gear motor in most builds. The relay contacts on the sheet can carry
+   either, so this is about creepage and the mains section's size, not part
+   choice.
+3. **Enclosure and panel layout.** Drives connector placement, OLED and button
    positions, and where the SSR heatsink lives.
+
+### Settled by the current schematic
+
+- **Switching element per channel** — six identical opto-isolated relay
+  channels (`AWHSH112D00G` + `APC-817C1-SL` + `MMBT2222A-G`), with the heater
+  still on the panel-mounted SSR-40DA.
+- **Board input voltage** — an `LM2596S-ADJ` buck now generates 5 V from `VIN`,
+  which is what makes the LM1117 workable. It must **not** be bypassed: feeding
+  the LM1117 from 12 V directly dissipates 2.4 W in a SOT-223 and lands it in
+  thermal shutdown
+  ([common/3v3-rail-lm1117.md](../common/3v3-rail-lm1117.md#rule-1-feed-it-from-5-v-never-12-v)).
+  The buck's own feedback divider sets the 5 V output — it is the **ADJ**
+  variant, so that divider is not optional and its values decide whether the
+  LM1117 has enough headroom.
 
 ## Safety
 

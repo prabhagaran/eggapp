@@ -44,6 +44,7 @@ hardware/common/altium-library-master.zip
 # ad-hoc exports and tool caches are not.
 **/History/
 **/__Previews/
+**/Project Logs for */
 *.PrjPcbStructure
 *-backups/
 *.kicad_prl
