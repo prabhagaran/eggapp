@@ -93,10 +93,14 @@ land on ADC1 (GPIO32–39).
 | 2 | Boot strapping — must be LOW/floating to flash; onboard LED on many devkits |
 | 6–11 | Internal SPI flash — never |
 
-## Free after the fix
+## Free
 
-GPIO19, GPIO23 (and 16/17 if the relocation lands elsewhere). GPIO5 with the
-caveat above.
+**GPIO19 and GPIO23** — safe, non-strapping, and the first choice for any
+further output.
+
+GPIO5 is usable with the caveat above. GPIO12 and GPIO15 are free since the
+relocation but should stay unused for anything driven at reset. GPIO16 and
+GPIO17 are now taken by the pump and turner.
 
 ## Programming and debug
 

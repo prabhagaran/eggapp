@@ -92,10 +92,11 @@ The pin-map documents in this folder are transcribed from firmware and cite the
 defining file and line. If you change a pin here, change it in `config.h` in
 the same commit, or you have created a board nobody can flash correctly.
 
-There are two known ESP32 strapping-pin conflicts on the incubator
-(`RELAY_PUMP` on GPIO12, `RELAY_TURNER` on GPIO15). These must be resolved
-**in hardware** before layout — see
-[incubator/docs/pin-map.md](incubator/docs/pin-map.md#strapping-pin-conflicts).
+The incubator's two ESP32 strapping-pin conflicts are **resolved**:
+`RELAY_PUMP` moved GPIO12 → 16 and `RELAY_TURNER` GPIO15 → 17, in the schematic
+and `config.h` together. GPIO12 and GPIO15 are now free but should stay unused
+for anything driven at reset — see
+[incubator/docs/pin-map.md](incubator/docs/pin-map.md#strapping-pin-conflicts--resolved).
 
 ## Before fabricating anything
 
