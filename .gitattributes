@@ -4,3 +4,14 @@
 *.webp binary
 *.keystore binary
 *.jks binary
+
+# Altium sources — binary, never diffed or line-ending normalized
+*.PcbDoc binary
+*.SchDoc binary
+*.PcbLib binary
+*.SchLib binary
+*.zip binary
+
+# Fabrication outputs are a released artifact: keep them byte-identical to
+# what was generated and sent to the fab house, so a checkout can be re-sent.
+hardware/**/Project?Outputs?for?*/** -text

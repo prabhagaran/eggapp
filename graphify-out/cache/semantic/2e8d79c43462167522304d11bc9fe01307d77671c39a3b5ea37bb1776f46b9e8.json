@@ -1,0 +1,1 @@
+{"nodes": [{"id": "adr_0003_tenancy_model", "label": "Farm-Scoped Tenancy Model", "file_type": "rationale", "source_file": "docs/architecture/adr/0003-tenancy-model.md", "source_location": null, "source_url": null, "captured_at": null, "author": "chief-product-architect", "contributor": null}], "edges": [], "hyperedges": []}

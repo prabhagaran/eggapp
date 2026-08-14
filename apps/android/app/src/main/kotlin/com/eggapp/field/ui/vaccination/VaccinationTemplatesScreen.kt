@@ -13,7 +13,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -23,7 +22,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -37,7 +35,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.eggapp.field.data.VaccinationTemplateItem
 import com.eggapp.field.data.VaccinationTemplateItemRequest
+import com.eggapp.field.ui.components.AppCard
 import com.eggapp.field.ui.components.DropdownField
+import com.eggapp.field.ui.components.EggAppSubBar
 import com.eggapp.field.ui.components.MutedText
 
 private val PURPOSE_OPTIONS = listOf("layer" to "Layer", "broiler" to "Broiler", "breeder" to "Breeder")
@@ -52,9 +52,9 @@ fun VaccinationTemplatesScreen(viewModel: VaccinationTemplatesViewModel = viewMo
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Vaccination templates") },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
+            EggAppSubBar(
+                title = "Vaccination templates",
+                onBack = onBack,
                 actions = {
                     TextButton(onClick = { editing = null; showForm = !showForm }) { Text(if (showForm) "Cancel" else "Add") }
                 },
@@ -131,8 +131,8 @@ private fun TemplateForm(
     var disease by remember(key) { mutableStateOf(editing?.disease ?: "") }
     var route by remember(key) { mutableStateOf(editing?.route ?: "") }
 
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    AppCard(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(if (editing != null) "Edit template item" else "Add template item", style = MaterialTheme.typography.titleMedium)
             DropdownField("Species", speciesId, species.map { it.id to it.name }, { speciesId = it }, Modifier.fillMaxWidth())
             DropdownField("Purpose", purpose, PURPOSE_OPTIONS, { purpose = it }, Modifier.fillMaxWidth())
@@ -167,8 +167,8 @@ private fun TemplateForm(
 
 @Composable
 private fun TemplateRow(item: VaccinationTemplateItem, speciesName: String, onEdit: () -> Unit, onDelete: () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-        Column(modifier = Modifier.padding(16.dp)) {
+    AppCard(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+        Column {
             Text("$speciesName · ${item.purpose}", style = MaterialTheme.typography.titleSmall)
             MutedText("day ${item.ageDaysFrom}–${item.ageDaysTo} · ${item.vaccine} for ${item.disease} (${item.route})")
             Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {

@@ -1,0 +1,1017 @@
+{
+  "D:\\My_Workspace\\eggAPP\\.claude\\settings.local.json": {
+    "mtime": 1784392175.883229,
+    "ast_hash": "29455eab1a2af722631d787b2f274261",
+    "semantic_hash": "29455eab1a2af722631d787b2f274261"
+  },
+  "D:\\My_Workspace\\eggAPP\\.mcp.json": {
+    "mtime": 1784392152.8749535,
+    "ast_hash": "c65393ca03d9a278da0d1aa457beb638",
+    "semantic_hash": "c65393ca03d9a278da0d1aa457beb638"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\app\\build.gradle.kts": {
+    "mtime": 1784398424.7021668,
+    "ast_hash": "a515c615218e898ea3419ec38cf2a447",
+    "semantic_hash": "a515c615218e898ea3419ec38cf2a447"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\app\\src\\main\\kotlin\\com\\eggapp\\field\\MainActivity.kt": {
+    "mtime": 1784440213.7965186,
+    "ast_hash": "a9135c419bac7c4f7d05fd92ad21cdc2",
+    "semantic_hash": "a9135c419bac7c4f7d05fd92ad21cdc2"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\app\\src\\main\\kotlin\\com\\eggapp\\field\\data\\ApiClient.kt": {
+    "mtime": 1784316243.7848601,
+    "ast_hash": "02bbf183ad6343014531e69099da8c9c",
+    "semantic_hash": "02bbf183ad6343014531e69099da8c9c"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\app\\src\\main\\kotlin\\com\\eggapp\\field\\data\\ApiModels.kt": {
+    "mtime": 1784470255.0864437,
+    "ast_hash": "18d0702799ad05e713abafe3fa1f7291",
+    "semantic_hash": "18d0702799ad05e713abafe3fa1f7291"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\app\\src\\main\\kotlin\\com\\eggapp\\field\\data\\ApiService.kt": {
+    "mtime": 1784445053.032307,
+    "ast_hash": "78c0feab2a72a55662a92910dbf41051",
+    "semantic_hash": "78c0feab2a72a55662a92910dbf41051"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\app\\src\\main\\kotlin\\com\\eggapp\\field\\data\\BatchCache.kt": {
+    "mtime": 1784318149.393731,
+    "ast_hash": "77e4b02c062a546618970517ce14fcd5",
+    "semantic_hash": "77e4b02c062a546618970517ce14fcd5"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\app\\src\\main\\kotlin\\com\\eggapp\\field\\data\\FieldRecordRepository.kt": {
+    "mtime": 1784393341.4978333,
+    "ast_hash": "fc897c21e34ae68fb70426cddb55988a",
+    "semantic_hash": "fc897c21e34ae68fb70426cddb55988a"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\app\\src\\main\\kotlin\\com\\eggapp\\field\\data\\JsonBody.kt": {
+    "mtime": 1784439771.866136,
+    "ast_hash": "05d862f17f7fc658876f74be314a4812",
+    "semantic_hash": "05d862f17f7fc658876f74be314a4812"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\app\\src\\main\\kotlin\\com\\eggapp\\field\\data\\TokenStore.kt": {
+    "mtime": 1784316219.9659684,
+    "ast_hash": "c54ad5a5c3e199fd08a0c0cd2b02f6c0",
+    "semantic_hash": "c54ad5a5c3e199fd08a0c0cd2b02f6c0"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\app\\src\\main\\kotlin\\com\\eggapp\\field\\data\\local\\AppDatabase.kt": {
+    "mtime": 1784393221.7442403,
+    "ast_hash": "d23aa9b24ae77e8beae91f057cc58234",
+    "semantic_hash": "d23aa9b24ae77e8beae91f057cc58234"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\app\\src\\main\\kotlin\\com\\eggapp\\field\\data\\local\\FieldRecordDao.kt": {
+    "mtime": 1784393205.869298,
+    "ast_hash": "7bbb10b724a2977c6ab7afbbf42e6fee",
+    "semantic_hash": "7bbb10b724a2977c6ab7afbbf42e6fee"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\app\\src\\main\\kotlin\\com\\eggapp\\field\\data\\local\\FieldRecordEntities.kt": {
+    "mtime": 1784393172.1310146,
+    "ast_hash": "3259861ad7bdc58618f84b1346612361",
+    "semantic_hash": "3259861ad7bdc58618f84b1346612361"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\app\\src\\main\\kotlin\\com\\eggapp\\field\\push\\EggAppMessagingService.kt": {
+    "mtime": 1784320355.504846,
+    "ast_hash": "e7f1bab06af9e9261e726887d48cbc02",
+    "semantic_hash": "e7f1bab06af9e9261e726887d48cbc02"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\app\\src\\main\\kotlin\\com\\eggapp\\field\\sync\\SyncWorker.kt": {
+    "mtime": 1784393383.6763177,
+    "ast_hash": "2827c9e36f05b731b42dabac24c08ab7",
+    "semantic_hash": "2827c9e36f05b731b42dabac24c08ab7"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\app\\src\\main\\kotlin\\com\\eggapp\\field\\ui\\batch\\BatchDetailScreen.kt": {
+    "mtime": 1784470585.042561,
+    "ast_hash": "d6ab47de7af86e10c8d3081a3938fcb2",
+    "semantic_hash": "d6ab47de7af86e10c8d3081a3938fcb2"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\app\\src\\main\\kotlin\\com\\eggapp\\field\\ui\\batch\\BatchDetailViewModel.kt": {
+    "mtime": 1784470196.9797657,
+    "ast_hash": "6d2f14f175fd493119eb11b4fc6bb7da",
+    "semantic_hash": "6d2f14f175fd493119eb11b4fc6bb7da"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\app\\src\\main\\kotlin\\com\\eggapp\\field\\ui\\batch\\BatchesScreen.kt": {
+    "mtime": 1784452201.0280943,
+    "ast_hash": "a11d065bd5f1c7f2acfa1e75f4ab3fb9",
+    "semantic_hash": "a11d065bd5f1c7f2acfa1e75f4ab3fb9"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\app\\src\\main\\kotlin\\com\\eggapp\\field\\ui\\batch\\BatchesViewModel.kt": {
+    "mtime": 1784445407.5054398,
+    "ast_hash": "68fe898d30e672fd5e1db75023043637",
+    "semantic_hash": "68fe898d30e672fd5e1db75023043637"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\app\\src\\main\\kotlin\\com\\eggapp\\field\\ui\\collections\\CollectionsScreen.kt": {
+    "mtime": 1784398664.5932934,
+    "ast_hash": "46b85fa914345dfe8092b803ec67082a",
+    "semantic_hash": "46b85fa914345dfe8092b803ec67082a"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\app\\src\\main\\kotlin\\com\\eggapp\\field\\ui\\collections\\CollectionsViewModel.kt": {
+    "mtime": 1784426274.1396437,
+    "ast_hash": "12caff9cf1bc61a6e0761940b2ba9f2f",
+    "semantic_hash": "12caff9cf1bc61a6e0761940b2ba9f2f"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\app\\src\\main\\kotlin\\com\\eggapp\\field\\ui\\components\\AppComponents.kt": {
+    "mtime": 1784440394.0581615,
+    "ast_hash": "b09290f19d135414f71cfb230b172254",
+    "semantic_hash": "b09290f19d135414f71cfb230b172254"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\app\\src\\main\\kotlin\\com\\eggapp\\field\\ui\\flocks\\FlockDetailScreen.kt": {
+    "mtime": 1784440008.5365503,
+    "ast_hash": "89a9cb6ea26fb1e2e56dde97bb32e140",
+    "semantic_hash": "89a9cb6ea26fb1e2e56dde97bb32e140"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\app\\src\\main\\kotlin\\com\\eggapp\\field\\ui\\flocks\\FlockDetailViewModel.kt": {
+    "mtime": 1784439959.1317983,
+    "ast_hash": "a7500d08a2f61a4b810ee337c2c15bbd",
+    "semantic_hash": "a7500d08a2f61a4b810ee337c2c15bbd"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\app\\src\\main\\kotlin\\com\\eggapp\\field\\ui\\flocks\\FlocksScreen.kt": {
+    "mtime": 1784452162.7861917,
+    "ast_hash": "733b38f81532c5fdb54a176e8bd0e292",
+    "semantic_hash": "733b38f81532c5fdb54a176e8bd0e292"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\app\\src\\main\\kotlin\\com\\eggapp\\field\\ui\\flocks\\FlocksViewModel.kt": {
+    "mtime": 1784445264.4724882,
+    "ast_hash": "1e2a6bf3472b4a065304b67b03708523",
+    "semantic_hash": "1e2a6bf3472b4a065304b67b03708523"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\app\\src\\main\\kotlin\\com\\eggapp\\field\\ui\\incubators\\IncubatorsScreen.kt": {
+    "mtime": 1784445601.9065895,
+    "ast_hash": "efe07494c12f6b86f86fc09e27bf6a7f",
+    "semantic_hash": "efe07494c12f6b86f86fc09e27bf6a7f"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\app\\src\\main\\kotlin\\com\\eggapp\\field\\ui\\incubators\\IncubatorsViewModel.kt": {
+    "mtime": 1784445120.4750302,
+    "ast_hash": "573a07621669c008230314f127b8c732",
+    "semantic_hash": "573a07621669c008230314f127b8c732"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\app\\src\\main\\kotlin\\com\\eggapp\\field\\ui\\incubators\\SetpointsScreen.kt": {
+    "mtime": 1784439904.2877686,
+    "ast_hash": "108250a471185461eb4136dc173ecadb",
+    "semantic_hash": "108250a471185461eb4136dc173ecadb"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\app\\src\\main\\kotlin\\com\\eggapp\\field\\ui\\incubators\\SetpointsViewModel.kt": {
+    "mtime": 1784439865.0229652,
+    "ast_hash": "65fc7b4fe69ba4d2d247b72d1e61fa22",
+    "semantic_hash": "65fc7b4fe69ba4d2d247b72d1e61fa22"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\app\\src\\main\\kotlin\\com\\eggapp\\field\\ui\\inventory\\InventoryScreen.kt": {
+    "mtime": 1784440178.9977043,
+    "ast_hash": "8e0b85e2b45da5d53cb792fc00a83e4f",
+    "semantic_hash": "8e0b85e2b45da5d53cb792fc00a83e4f"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\app\\src\\main\\kotlin\\com\\eggapp\\field\\ui\\inventory\\InventoryViewModel.kt": {
+    "mtime": 1784440136.047243,
+    "ast_hash": "dfcb20b2478a9e968ecafdb14cc7504a",
+    "semantic_hash": "dfcb20b2478a9e968ecafdb14cc7504a"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\app\\src\\main\\kotlin\\com\\eggapp\\field\\ui\\login\\LoginScreen.kt": {
+    "mtime": 1784398582.37398,
+    "ast_hash": "78c158eab8d96d5f0b26c4cd8a84835f",
+    "semantic_hash": "78c158eab8d96d5f0b26c4cd8a84835f"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\app\\src\\main\\kotlin\\com\\eggapp\\field\\ui\\login\\LoginViewModel.kt": {
+    "mtime": 1784319995.3905704,
+    "ast_hash": "8b16638432d58d8bb95bacd9c785e15f",
+    "semantic_hash": "8b16638432d58d8bb95bacd9c785e15f"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\app\\src\\main\\kotlin\\com\\eggapp\\field\\ui\\profile\\ProfileScreen.kt": {
+    "mtime": 1784440232.5185175,
+    "ast_hash": "263ef79687bff96c3acdb8a27d3dbebc",
+    "semantic_hash": "263ef79687bff96c3acdb8a27d3dbebc"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\app\\src\\main\\kotlin\\com\\eggapp\\field\\ui\\profile\\ProfileViewModel.kt": {
+    "mtime": 1784398339.9299383,
+    "ast_hash": "e724dd53ecd8201c9218328ec156aa90",
+    "semantic_hash": "e724dd53ecd8201c9218328ec156aa90"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\app\\src\\main\\kotlin\\com\\eggapp\\field\\ui\\theme\\Theme.kt": {
+    "mtime": 1784443892.3444364,
+    "ast_hash": "f3f8ef4dbb3e921974538898702504bd",
+    "semantic_hash": "f3f8ef4dbb3e921974538898702504bd"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\app\\src\\main\\kotlin\\com\\eggapp\\field\\ui\\vaccination\\VaccinationTemplatesScreen.kt": {
+    "mtime": 1784440111.6866536,
+    "ast_hash": "233e9ef9e0c87525e3658fdd395c3077",
+    "semantic_hash": "233e9ef9e0c87525e3658fdd395c3077"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\app\\src\\main\\kotlin\\com\\eggapp\\field\\ui\\vaccination\\VaccinationTemplatesViewModel.kt": {
+    "mtime": 1784440081.9011505,
+    "ast_hash": "7e2a629bd5f6a3a8e10d02898b54509c",
+    "semantic_hash": "7e2a629bd5f6a3a8e10d02898b54509c"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\build.gradle.kts": {
+    "mtime": 1784319826.8346558,
+    "ast_hash": "61d32eec207800c4ee918d64f8a38473",
+    "semantic_hash": "61d32eec207800c4ee918d64f8a38473"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\gradlew": {
+    "mtime": 1784316526.1984181,
+    "ast_hash": "f092910dfa8e47c5a37a452c3f6baf8a",
+    "semantic_hash": "f092910dfa8e47c5a37a452c3f6baf8a"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\settings.gradle.kts": {
+    "mtime": 1784316149.6685674,
+    "ast_hash": "421990de6d1d61d0793a2099f85af994",
+    "semantic_hash": "421990de6d1d61d0793a2099f85af994"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\package.json": {
+    "mtime": 1784319578.777367,
+    "ast_hash": "7c53fcabe08a8584b9e61e01d9729482",
+    "semantic_hash": "7c53fcabe08a8584b9e61e01d9729482"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\app.ts": {
+    "mtime": 1784430475.7450101,
+    "ast_hash": "9cd33761d4e6f46e2c005b3f77095fdb",
+    "semantic_hash": "9cd33761d4e6f46e2c005b3f77095fdb"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\config.ts": {
+    "mtime": 1784319593.3707552,
+    "ast_hash": "bf3ed6cf7825e8a8da9dc666d8bc6ad4",
+    "semantic_hash": "bf3ed6cf7825e8a8da9dc666d8bc6ad4"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\domain\\alerting.ts": {
+    "mtime": 1784312563.187948,
+    "ast_hash": "103aa40138c906c99a9f7bef9f4fe73e",
+    "semantic_hash": "103aa40138c906c99a9f7bef9f4fe73e"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\domain\\flock.ts": {
+    "mtime": 1784429612.1339307,
+    "ast_hash": "9caee5d6172208d5748af35f9289365d",
+    "semantic_hash": "9caee5d6172208d5748af35f9289365d"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\domain\\incubation.ts": {
+    "mtime": 1784293175.4491568,
+    "ast_hash": "2d8c89ea6389878a3fd8dfb668c62bc6",
+    "semantic_hash": "2d8c89ea6389878a3fd8dfb668c62bc6"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\domain\\reports.ts": {
+    "mtime": 1784402225.8932376,
+    "ast_hash": "c9f97b96a5454b0121813090307fe508",
+    "semantic_hash": "c9f97b96a5454b0121813090307fe508"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\domain\\vaccination.ts": {
+    "mtime": 1784392294.400341,
+    "ast_hash": "4934f7052c5079b97b77877ae4919fb1",
+    "semantic_hash": "4934f7052c5079b97b77877ae4919fb1"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\index.ts": {
+    "mtime": 1784400976.4905896,
+    "ast_hash": "478c5cb733ba4323275ef9f651307ecd",
+    "semantic_hash": "478c5cb733ba4323275ef9f651307ecd"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\infra\\db.ts": {
+    "mtime": 1784289137.276683,
+    "ast_hash": "267619cdc8ec83490e2b53f7e51655e4",
+    "semantic_hash": "267619cdc8ec83490e2b53f7e51655e4"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\infra\\fcm\\client.ts": {
+    "mtime": 1784319612.0419557,
+    "ast_hash": "e9f9e8d21ab824db3f69f713481a9710",
+    "semantic_hash": "e9f9e8d21ab824db3f69f713481a9710"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\infra\\mqtt\\ingest.ts": {
+    "mtime": 1784438218.9825177,
+    "ast_hash": "717d2d24e9f889a3e5ce6a324313601f",
+    "semantic_hash": "717d2d24e9f889a3e5ce6a324313601f"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\lib\\errors.ts": {
+    "mtime": 1784289138.5524554,
+    "ast_hash": "2ef1d3bbfeaee2ab13aaa816244d8e97",
+    "semantic_hash": "2ef1d3bbfeaee2ab13aaa816244d8e97"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\plugins\\auth.ts": {
+    "mtime": 1784289142.3731775,
+    "ast_hash": "6835a192fc9a66e86cc3205fe196f655",
+    "semantic_hash": "6835a192fc9a66e86cc3205fe196f655"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\routes\\health.ts": {
+    "mtime": 1784288006.7510052,
+    "ast_hash": "71e095fde7ba9a1ebf29a0d5ac989e1d",
+    "semantic_hash": "71e095fde7ba9a1ebf29a0d5ac989e1d"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\routes\\v1\\alerts.ts": {
+    "mtime": 1784312411.3920186,
+    "ast_hash": "976b0cdbf0feffc542f0f9529c46f980",
+    "semantic_hash": "976b0cdbf0feffc542f0f9529c46f980"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\routes\\v1\\auth.ts": {
+    "mtime": 1784319639.9669237,
+    "ast_hash": "b5a210eda0e037f2b9b7c9e7701f341f",
+    "semantic_hash": "b5a210eda0e037f2b9b7c9e7701f341f"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\routes\\v1\\batches.ts": {
+    "mtime": 1784293326.3168516,
+    "ast_hash": "73f4583baf12354f4f98ed3518f8222a",
+    "semantic_hash": "73f4583baf12354f4f98ed3518f8222a"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\routes\\v1\\collections.ts": {
+    "mtime": 1784392546.5011182,
+    "ast_hash": "d16ec0ac9b8d22954d540aa9ae6b22df",
+    "semantic_hash": "d16ec0ac9b8d22954d540aa9ae6b22df"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\routes\\v1\\devices.ts": {
+    "mtime": 1784289221.4065003,
+    "ast_hash": "85c2023983dba26b78a32198b6683491",
+    "semantic_hash": "85c2023983dba26b78a32198b6683491"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\routes\\v1\\farms.ts": {
+    "mtime": 1784401199.096277,
+    "ast_hash": "06fe7ff5e1e1877c158f96d1c6fa3cb9",
+    "semantic_hash": "06fe7ff5e1e1877c158f96d1c6fa3cb9"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\routes\\v1\\feedwater.ts": {
+    "mtime": 1784400910.1195765,
+    "ast_hash": "a361aa2453142db79c9f3a655781c323",
+    "semantic_hash": "a361aa2453142db79c9f3a655781c323"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\routes\\v1\\flocks.ts": {
+    "mtime": 1784429667.0855489,
+    "ast_hash": "593a97451c39b159fa8c5c2935246a02",
+    "semantic_hash": "593a97451c39b159fa8c5c2935246a02"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\routes\\v1\\incubators.ts": {
+    "mtime": 1784426387.7293458,
+    "ast_hash": "20d48f7e4c1495754561557564524707",
+    "semantic_hash": "20d48f7e4c1495754561557564524707"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\routes\\v1\\index.ts": {
+    "mtime": 1784401219.4238021,
+    "ast_hash": "70dd1a46540f4a2c46f7b2efd5d0ea34",
+    "semantic_hash": "70dd1a46540f4a2c46f7b2efd5d0ea34"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\routes\\v1\\inventory.ts": {
+    "mtime": 1784426540.430163,
+    "ast_hash": "dbfc226d9032771ac22dfd2cd931cafc",
+    "semantic_hash": "dbfc226d9032771ac22dfd2cd931cafc"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\routes\\v1\\members.ts": {
+    "mtime": 1784401179.8791497,
+    "ast_hash": "5795c5c5b4ab16aaef3e9c281d304f80",
+    "semantic_hash": "5795c5c5b4ab16aaef3e9c281d304f80"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\routes\\v1\\reports.ts": {
+    "mtime": 1784401094.8469214,
+    "ast_hash": "0e1d851f8c64ae7194cdac2e7861776b",
+    "semantic_hash": "0e1d851f8c64ae7194cdac2e7861776b"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\routes\\v1\\setup.ts": {
+    "mtime": 1784303125.8762138,
+    "ast_hash": "d1f4684d7e76caa18001d7bbbd69b30d",
+    "semantic_hash": "d1f4684d7e76caa18001d7bbbd69b30d"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\routes\\v1\\species.ts": {
+    "mtime": 1784289202.849403,
+    "ast_hash": "6ee6156df63bc788be330f9759f299dd",
+    "semantic_hash": "6ee6156df63bc788be330f9759f299dd"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\routes\\v1\\vaccination.ts": {
+    "mtime": 1784426509.7383525,
+    "ast_hash": "3ee535fc0726ceb72c9c0054dffd1e20",
+    "semantic_hash": "3ee535fc0726ceb72c9c0054dffd1e20"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\services\\access.ts": {
+    "mtime": 1784289156.5479648,
+    "ast_hash": "ce967064de60a771709066cb57053e91",
+    "semantic_hash": "ce967064de60a771709066cb57053e91"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\services\\alert.service.ts": {
+    "mtime": 1784379823.7365615,
+    "ast_hash": "1f61c1e4d9ad5d3293b9908673637b2f",
+    "semantic_hash": "1f61c1e4d9ad5d3293b9908673637b2f"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\services\\auth.service.ts": {
+    "mtime": 1784392665.626297,
+    "ast_hash": "e324f571fb930bd9054980c2e73e7215",
+    "semantic_hash": "e324f571fb930bd9054980c2e73e7215"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\services\\batch.service.ts": {
+    "mtime": 1784392874.7160368,
+    "ast_hash": "b8ed5b4bcff0c22ca258dbfeb68b8d54",
+    "semantic_hash": "b8ed5b4bcff0c22ca258dbfeb68b8d54"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\services\\collection.service.ts": {
+    "mtime": 1784392558.8174589,
+    "ast_hash": "ffb17ce9dfa0c80b691c096ff1714a49",
+    "semantic_hash": "ffb17ce9dfa0c80b691c096ff1714a49"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\services\\device.service.ts": {
+    "mtime": 1784289193.952901,
+    "ast_hash": "34467d8f15ba90b04323b3be650fe9b4",
+    "semantic_hash": "34467d8f15ba90b04323b3be650fe9b4"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\services\\deviceConfig.service.ts": {
+    "mtime": 1784380981.4910297,
+    "ast_hash": "b7b94751d5e869b6f17798135051f906",
+    "semantic_hash": "b7b94751d5e869b6f17798135051f906"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\services\\feedwater.service.ts": {
+    "mtime": 1784400845.1577911,
+    "ast_hash": "4c9d5b2a50cecacbbc79f2da630346f2",
+    "semantic_hash": "4c9d5b2a50cecacbbc79f2da630346f2"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\services\\flock.service.ts": {
+    "mtime": 1784429642.641085,
+    "ast_hash": "62655a0092c81c23a51e186aaa800f55",
+    "semantic_hash": "62655a0092c81c23a51e186aaa800f55"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\services\\incubator.service.ts": {
+    "mtime": 1784426360.786157,
+    "ast_hash": "85ee9d58c616f93a3fd4e915add7b074",
+    "semantic_hash": "85ee9d58c616f93a3fd4e915add7b074"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\services\\inventory.service.ts": {
+    "mtime": 1784426521.5925593,
+    "ast_hash": "be671d8226ba50c57d7a9743cb99e68b",
+    "semantic_hash": "be671d8226ba50c57d7a9743cb99e68b"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\services\\members.service.ts": {
+    "mtime": 1784401168.4813733,
+    "ast_hash": "5a7aa186d4983ac6a071bceeea758adb",
+    "semantic_hash": "5a7aa186d4983ac6a071bceeea758adb"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\services\\reports.service.ts": {
+    "mtime": 1784401075.868038,
+    "ast_hash": "0327e3b4ea04c14e8aea5ba8821edc89",
+    "semantic_hash": "0327e3b4ea04c14e8aea5ba8821edc89"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\services\\telemetry.service.ts": {
+    "mtime": 1784379918.0911148,
+    "ast_hash": "0b90570e45131f2539e87e3052c06cbb",
+    "semantic_hash": "0b90570e45131f2539e87e3052c06cbb"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\services\\vaccination.service.ts": {
+    "mtime": 1784426479.891705,
+    "ast_hash": "ce9d3176a96c3a8cef22558d1e7b5ae3",
+    "semantic_hash": "ce9d3176a96c3a8cef22558d1e7b5ae3"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\test\\alerting-domain.test.ts": {
+    "mtime": 1784312480.9472892,
+    "ast_hash": "d01d65ad145bba8994ccd9274c5c3893",
+    "semantic_hash": "d01d65ad145bba8994ccd9274c5c3893"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\test\\auth-unit.test.ts": {
+    "mtime": 1784289251.7304716,
+    "ast_hash": "52a7f86d45ff4051397df8df973054e6",
+    "semantic_hash": "52a7f86d45ff4051397df8df973054e6"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\test\\batch-flow.test.ts": {
+    "mtime": 1784306367.6843243,
+    "ast_hash": "2d5c0c1c3096b82909d3f12efd942f49",
+    "semantic_hash": "2d5c0c1c3096b82909d3f12efd942f49"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\test\\health.test.ts": {
+    "mtime": 1784288013.9625757,
+    "ast_hash": "e009073fdbbb8ad87cdaa716c0014b27",
+    "semantic_hash": "e009073fdbbb8ad87cdaa716c0014b27"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\test\\incubation-domain.test.ts": {
+    "mtime": 1784293357.6634183,
+    "ast_hash": "f3cf217c4b1d30299aad46d4a067b9c3",
+    "semantic_hash": "f3cf217c4b1d30299aad46d4a067b9c3"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\test\\integration.test.ts": {
+    "mtime": 1784306346.1000357,
+    "ast_hash": "a7a468032fc4a06c296513c77075fcd9",
+    "semantic_hash": "a7a468032fc4a06c296513c77075fcd9"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\tsconfig.json": {
+    "mtime": 1784288002.028827,
+    "ast_hash": "2ef7ad7d5c49a3aea49a0afd445819df",
+    "semantic_hash": "2ef7ad7d5c49a3aea49a0afd445819df"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\web\\app\\alerts\\page.tsx": {
+    "mtime": 1784312454.7032404,
+    "ast_hash": "5ffd4e58811790701408790f4fd4aec0",
+    "semantic_hash": "5ffd4e58811790701408790f4fd4aec0"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\web\\app\\batches\\[id]\\page.tsx": {
+    "mtime": 1784470191.0543919,
+    "ast_hash": "2120f09b98c1eb430cfad80324c37f21",
+    "semantic_hash": "2120f09b98c1eb430cfad80324c37f21"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\web\\app\\batches\\page.tsx": {
+    "mtime": 1784426057.3453324,
+    "ast_hash": "fee158207719a23da1937af99a9e10cd",
+    "semantic_hash": "fee158207719a23da1937af99a9e10cd"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\web\\app\\collections\\page.tsx": {
+    "mtime": 1784393112.715783,
+    "ast_hash": "10edbc8df61ef4ed040984a80c291f58",
+    "semantic_hash": "10edbc8df61ef4ed040984a80c291f58"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\web\\app\\devices\\page.tsx": {
+    "mtime": 1784303261.8214414,
+    "ast_hash": "6c138097adeb13b4debd81b65205cbf5",
+    "semantic_hash": "6c138097adeb13b4debd81b65205cbf5"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\web\\app\\flocks\\[id]\\page.tsx": {
+    "mtime": 1784429777.1794565,
+    "ast_hash": "08fe83b7f1018482ea709c7708e328f8",
+    "semantic_hash": "08fe83b7f1018482ea709c7708e328f8"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\web\\app\\flocks\\page.tsx": {
+    "mtime": 1784392899.5036254,
+    "ast_hash": "196742e4e69b656fcc76e70c9e0331a1",
+    "semantic_hash": "196742e4e69b656fcc76e70c9e0331a1"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\web\\app\\incubators\\[id]\\page.tsx": {
+    "mtime": 1784381217.9647663,
+    "ast_hash": "c53ae07c3469303c728b4574ca3d8c1b",
+    "semantic_hash": "c53ae07c3469303c728b4574ca3d8c1b"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\web\\app\\incubators\\page.tsx": {
+    "mtime": 1784426721.8131883,
+    "ast_hash": "0d107eb017d16b249657a62aba81fbb8",
+    "semantic_hash": "0d107eb017d16b249657a62aba81fbb8"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\web\\app\\inventory\\page.tsx": {
+    "mtime": 1784426820.1240742,
+    "ast_hash": "384541f682677c12fbeff3eee28b9859",
+    "semantic_hash": "384541f682677c12fbeff3eee28b9859"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\web\\app\\layout.tsx": {
+    "mtime": 1784397030.0103898,
+    "ast_hash": "f4276d6e1f619d9bda9b31a03ddf94ff",
+    "semantic_hash": "f4276d6e1f619d9bda9b31a03ddf94ff"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\web\\app\\login\\page.tsx": {
+    "mtime": 1784303199.03414,
+    "ast_hash": "771214190f2e54cad935fbff2f3e1347",
+    "semantic_hash": "771214190f2e54cad935fbff2f3e1347"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\web\\app\\page.tsx": {
+    "mtime": 1784397072.0647619,
+    "ast_hash": "38e60cd8197b9be057bf4507a770dc86",
+    "semantic_hash": "38e60cd8197b9be057bf4507a770dc86"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\web\\app\\reports\\page.tsx": {
+    "mtime": 1784403058.472611,
+    "ast_hash": "f10296e1dab180e4259e0e09e12285ab",
+    "semantic_hash": "f10296e1dab180e4259e0e09e12285ab"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\web\\app\\setup\\page.tsx": {
+    "mtime": 1784303193.1172154,
+    "ast_hash": "c4646743175e7634ea1dceabd85d43d8",
+    "semantic_hash": "c4646743175e7634ea1dceabd85d43d8"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\web\\app\\team\\page.tsx": {
+    "mtime": 1784401477.3983073,
+    "ast_hash": "814c09704a6192c3f5b9bb651adb3d0c",
+    "semantic_hash": "814c09704a6192c3f5b9bb651adb3d0c"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\web\\app\\vaccination-templates\\page.tsx": {
+    "mtime": 1784426767.5345988,
+    "ast_hash": "5a14809831b8e3c69df4c99448b4527f",
+    "semantic_hash": "5a14809831b8e3c69df4c99448b4527f"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\web\\components\\AppShell.tsx": {
+    "mtime": 1784397017.28996,
+    "ast_hash": "0831ae93fdcace164c4cd965d094b19b",
+    "semantic_hash": "0831ae93fdcace164c4cd965d094b19b"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\web\\components\\Sidebar.tsx": {
+    "mtime": 1784401514.3727264,
+    "ast_hash": "6700b94dbdafccc27b8156a2b9733540",
+    "semantic_hash": "6700b94dbdafccc27b8156a2b9733540"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\web\\components\\Topbar.tsx": {
+    "mtime": 1784401644.4543033,
+    "ast_hash": "a35b924b29fd9ca757e921b3b1a1c6dd",
+    "semantic_hash": "a35b924b29fd9ca757e921b3b1a1c6dd"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\web\\lib\\api.ts": {
+    "mtime": 1784401394.6714556,
+    "ast_hash": "b3c38306432b0ffb70da21e22d138cc5",
+    "semantic_hash": "b3c38306432b0ffb70da21e22d138cc5"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\web\\lib\\types.ts": {
+    "mtime": 1784438238.6452854,
+    "ast_hash": "283bdd958f78e90847d037c65bdc3f00",
+    "semantic_hash": "283bdd958f78e90847d037c65bdc3f00"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\web\\lib\\useAuthedFarm.ts": {
+    "mtime": 1784426036.0601897,
+    "ast_hash": "14159c0c7eb17cf7799947b11d20aa52",
+    "semantic_hash": "14159c0c7eb17cf7799947b11d20aa52"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\web\\next.config.mjs": {
+    "mtime": 1784288026.0271144,
+    "ast_hash": "21958f5752add43cc47ab0ff5172cd46",
+    "semantic_hash": "21958f5752add43cc47ab0ff5172cd46"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\web\\package.json": {
+    "mtime": 1784396871.9657447,
+    "ast_hash": "27c156a4354c2f41d730c2e9d95030a7",
+    "semantic_hash": "27c156a4354c2f41d730c2e9d95030a7"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\web\\tsconfig.json": {
+    "mtime": 1784288028.2479131,
+    "ast_hash": "9cf2554795f5b416986e8185917ff298",
+    "semantic_hash": "9cf2554795f5b416986e8185917ff298"
+  },
+  "D:\\My_Workspace\\eggAPP\\infra\\deploy\\deploy-api.sh": {
+    "mtime": 1784313771.1352828,
+    "ast_hash": "8bd222805d5ca871c88aba69b2a90e03",
+    "semantic_hash": "8bd222805d5ca871c88aba69b2a90e03"
+  },
+  "D:\\My_Workspace\\eggAPP\\infra\\deploy\\deploy-web.sh": {
+    "mtime": 1784386470.0524194,
+    "ast_hash": "b059af31bd64a63ecd20c96f2139fc19",
+    "semantic_hash": "b059af31bd64a63ecd20c96f2139fc19"
+  },
+  "D:\\My_Workspace\\eggAPP\\package.json": {
+    "mtime": 1784288108.020556,
+    "ast_hash": "a858fc015e7a5bc026783ceee71c3a59",
+    "semantic_hash": "a858fc015e7a5bc026783ceee71c3a59"
+  },
+  "D:\\My_Workspace\\eggAPP\\packages\\db\\package.json": {
+    "mtime": 1784306280.7170482,
+    "ast_hash": "f1e776db295dd44ae53c3d4d955142a9",
+    "semantic_hash": "f1e776db295dd44ae53c3d4d955142a9"
+  },
+  "D:\\My_Workspace\\eggAPP\\packages\\db\\prisma\\migrations\\0_init\\migration.sql": {
+    "mtime": 1784293268.8646443,
+    "ast_hash": "e50cf9873e5bab808e63d538b7033980",
+    "semantic_hash": "e50cf9873e5bab808e63d538b7033980"
+  },
+  "D:\\My_Workspace\\eggAPP\\packages\\db\\prisma\\migrations\\20260717221500_batch_egg_source_collection_cascade\\migration.sql": {
+    "mtime": 1784306611.2029657,
+    "ast_hash": "3d229b6856ff4e7ab976aafcf7031380",
+    "semantic_hash": "3d229b6856ff4e7ab976aafcf7031380"
+  },
+  "D:\\My_Workspace\\eggAPP\\packages\\db\\prisma\\migrations\\20260718020000_user_fcm_token\\migration.sql": {
+    "mtime": 1784319549.2322166,
+    "ast_hash": "4954496d735e657fd90ea61b9bebdf99",
+    "semantic_hash": "4954496d735e657fd90ea61b9bebdf99"
+  },
+  "D:\\My_Workspace\\eggAPP\\packages\\db\\prisma\\migrations\\20260718040000_device_current_setpoints\\migration.sql": {
+    "mtime": 1784381058.2563117,
+    "ast_hash": "c65af005f4283bb85fb8ea9929a14fea",
+    "semantic_hash": "c65af005f4283bb85fb8ea9929a14fea"
+  },
+  "D:\\My_Workspace\\eggAPP\\packages\\db\\prisma\\migrations\\20260719000000_flock_operations\\migration.sql": {
+    "mtime": 1784391945.0917008,
+    "ast_hash": "9e754ee89f67910735a7187069712c61",
+    "semantic_hash": "9e754ee89f67910735a7187069712c61"
+  },
+  "D:\\My_Workspace\\eggAPP\\packages\\db\\prisma\\migrations\\20260719000100_alert_flock_id\\migration.sql": {
+    "mtime": 1784392087.369409,
+    "ast_hash": "6ea0ac59e927e3ecb49b7f53b84b76f1",
+    "semantic_hash": "6ea0ac59e927e3ecb49b7f53b84b76f1"
+  },
+  "D:\\My_Workspace\\eggAPP\\packages\\db\\prisma\\migrations\\20260719025155_flock_stage_override\\migration.sql": {
+    "mtime": 1784429515.6437652,
+    "ast_hash": "806b9e36d48f944c5a19e2aa612c7cab",
+    "semantic_hash": "806b9e36d48f944c5a19e2aa612c7cab"
+  },
+  "D:\\My_Workspace\\eggAPP\\packages\\db\\prisma\\migrations\\20260719051610_batch_device_reported_day\\migration.sql": {
+    "mtime": 1784438170.368865,
+    "ast_hash": "09dcb988b90771ec1df5608429a1856f",
+    "semantic_hash": "09dcb988b90771ec1df5608429a1856f"
+  },
+  "D:\\My_Workspace\\eggAPP\\packages\\db\\prisma\\migrations\\20260720000000_inventory_phase3\\migration.sql": {
+    "mtime": 1784400728.4403012,
+    "ast_hash": "4cb2a6da39dae27ab797967f061550b4",
+    "semantic_hash": "4cb2a6da39dae27ab797967f061550b4"
+  },
+  "D:\\My_Workspace\\eggAPP\\packages\\db\\prisma\\seed.ts": {
+    "mtime": 1784306275.6102798,
+    "ast_hash": "0d0f9d76c152e37a69841738cffe6b78",
+    "semantic_hash": "0d0f9d76c152e37a69841738cffe6b78"
+  },
+  "D:\\My_Workspace\\eggAPP\\packages\\shared-types\\package.json": {
+    "mtime": 1784287984.4171908,
+    "ast_hash": "afd2c34cd97f79f262640e67992cc2c3",
+    "semantic_hash": "afd2c34cd97f79f262640e67992cc2c3"
+  },
+  "D:\\My_Workspace\\eggAPP\\packages\\shared-types\\src\\index.ts": {
+    "mtime": 1784429685.994613,
+    "ast_hash": "22b9bc25c88a1f65e9bd5c5176833acb",
+    "semantic_hash": "22b9bc25c88a1f65e9bd5c5176833acb"
+  },
+  "D:\\My_Workspace\\eggAPP\\packages\\shared-types\\tsconfig.json": {
+    "mtime": 1784287985.8488965,
+    "ast_hash": "8cb4b24dff07b282402e4b1e63448497",
+    "semantic_hash": "8cb4b24dff07b282402e4b1e63448497"
+  },
+  "D:\\My_Workspace\\eggAPP\\tsconfig.base.json": {
+    "mtime": 1784287943.324114,
+    "ast_hash": "8666d8d625579f65ac5dd322dff63c07",
+    "semantic_hash": "8666d8d625579f65ac5dd322dff63c07"
+  },
+  "D:\\My_Workspace\\eggAPP\\.github\\workflows\\ci.yml": {
+    "mtime": 1784288057.6035986,
+    "ast_hash": "76b054e3efc4d02ca6761951e0ffdc9d",
+    "semantic_hash": "76b054e3efc4d02ca6761951e0ffdc9d"
+  },
+  "D:\\My_Workspace\\eggAPP\\CLAUDE.md": {
+    "mtime": 1784287540.5008278,
+    "ast_hash": "33cf4b07423fc4236bd5ff416acaf9ce",
+    "semantic_hash": "33cf4b07423fc4236bd5ff416acaf9ce"
+  },
+  "D:\\My_Workspace\\eggAPP\\README.md": {
+    "mtime": 1784403719.5557108,
+    "ast_hash": "6bae04f7f98edc90ae7b024942845ab6",
+    "semantic_hash": "6bae04f7f98edc90ae7b024942845ab6"
+  },
+  "D:\\My_Workspace\\eggAPP\\agents\\android-architect.md": {
+    "mtime": 1784286389.1806803,
+    "ast_hash": "31e8019b248f86d43f24b498312a06b7",
+    "semantic_hash": "31e8019b248f86d43f24b498312a06b7"
+  },
+  "D:\\My_Workspace\\eggAPP\\agents\\backend-architect.md": {
+    "mtime": 1784132919.0,
+    "ast_hash": "b649fc0a28839628b9e34405add5c0da",
+    "semantic_hash": "b649fc0a28839628b9e34405add5c0da"
+  },
+  "D:\\My_Workspace\\eggAPP\\agents\\chief-product-architect.md": {
+    "mtime": 1784287543.662807,
+    "ast_hash": "bd9cffa9b3bee0b5c2b9267208393b8f",
+    "semantic_hash": "bd9cffa9b3bee0b5c2b9267208393b8f"
+  },
+  "D:\\My_Workspace\\eggAPP\\agents\\database-architect.md": {
+    "mtime": 1784285416.1317837,
+    "ast_hash": "d03aedf39ae0061dce22e0f8bcee189f",
+    "semantic_hash": "d03aedf39ae0061dce22e0f8bcee189f"
+  },
+  "D:\\My_Workspace\\eggAPP\\agents\\documentation-engineer.md": {
+    "mtime": 1784132628.0,
+    "ast_hash": "d6177b26d226604c950c15f2a07de4ed",
+    "semantic_hash": "d6177b26d226604c950c15f2a07de4ed"
+  },
+  "D:\\My_Workspace\\eggAPP\\agents\\frontend-architect.md": {
+    "mtime": 1784287542.5939481,
+    "ast_hash": "a3ed1534495be92033b286db98c254b0",
+    "semantic_hash": "a3ed1534495be92033b286db98c254b0"
+  },
+  "D:\\My_Workspace\\eggAPP\\agents\\iot-integration-architect.md": {
+    "mtime": 1784286365.7717733,
+    "ast_hash": "9c07636289fed7ddab90fb316e5bf472",
+    "semantic_hash": "9c07636289fed7ddab90fb316e5bf472"
+  },
+  "D:\\My_Workspace\\eggAPP\\agents\\poultry-domain-expert.md": {
+    "mtime": 1784132527.0,
+    "ast_hash": "605cc3686507953a3b5c36f508d11a83",
+    "semantic_hash": "605cc3686507953a3b5c36f508d11a83"
+  },
+  "D:\\My_Workspace\\eggAPP\\agents\\qa-engineer.md": {
+    "mtime": 1784286398.3683708,
+    "ast_hash": "8da406a1a5952b75b6f4d334d72dc7b4",
+    "semantic_hash": "8da406a1a5952b75b6f4d334d72dc7b4"
+  },
+  "D:\\My_Workspace\\eggAPP\\agents\\requirements-engineer.md": {
+    "mtime": 1784132518.0,
+    "ast_hash": "c9b7b60fbe26aec840b24a4b1b5247d4",
+    "semantic_hash": "c9b7b60fbe26aec840b24a4b1b5247d4"
+  },
+  "D:\\My_Workspace\\eggAPP\\agents\\security-devops-engineer.md": {
+    "mtime": 1784286409.442485,
+    "ast_hash": "291468a5dea8a661ea26ce2f1d328d71",
+    "semantic_hash": "291468a5dea8a661ea26ce2f1d328d71"
+  },
+  "D:\\My_Workspace\\eggAPP\\agents\\system-architect.md": {
+    "mtime": 1784132538.0,
+    "ast_hash": "b19113736a8cc15c6826c9aac2957d74",
+    "semantic_hash": "b19113736a8cc15c6826c9aac2957d74"
+  },
+  "D:\\My_Workspace\\eggAPP\\agents\\ui-ux-architect.md": {
+    "mtime": 1784132899.0,
+    "ast_hash": "85d1535563ab12e60434747eaa753ee8",
+    "semantic_hash": "85d1535563ab12e60434747eaa753ee8"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\android\\README.md": {
+    "mtime": 1784396226.4711869,
+    "ast_hash": "9be046c3de3a3fe24669b1c3b764e6ac",
+    "semantic_hash": "9be046c3de3a3fe24669b1c3b764e6ac"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\domain\\README.md": {
+    "mtime": 1784288010.499547,
+    "ast_hash": "b147f39e98f4bc70deb1e25accdc6612",
+    "semantic_hash": "b147f39e98f4bc70deb1e25accdc6612"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\infra\\mqtt\\README.md": {
+    "mtime": 1784311428.5582662,
+    "ast_hash": "81a1bfc1c95f4dde5220a6e5f7f098bc",
+    "semantic_hash": "81a1bfc1c95f4dde5220a6e5f7f098bc"
+  },
+  "D:\\My_Workspace\\eggAPP\\apps\\api\\src\\services\\README.md": {
+    "mtime": 1784288008.616968,
+    "ast_hash": "69150219867e616db595ec225d701bc2",
+    "semantic_hash": "69150219867e616db595ec225d701bc2"
+  },
+  "D:\\My_Workspace\\eggAPP\\docs\\README.md": {
+    "mtime": 1784403692.8967106,
+    "ast_hash": "b16c7f06cf8adfc1d5d1abc1062a21d6",
+    "semantic_hash": "b16c7f06cf8adfc1d5d1abc1062a21d6"
+  },
+  "D:\\My_Workspace\\eggAPP\\docs\\api\\openapi.yaml": {
+    "mtime": 1784438290.7638958,
+    "ast_hash": "5183b2c2a97fe71fd95fe42b9feb3622",
+    "semantic_hash": "5183b2c2a97fe71fd95fe42b9feb3622"
+  },
+  "D:\\My_Workspace\\eggAPP\\docs\\api\\sync-conflict-strategy.md": {
+    "mtime": 1784293405.360296,
+    "ast_hash": "2d3de0479c08ffb4fc48e63e2d86173b",
+    "semantic_hash": "2d3de0479c08ffb4fc48e63e2d86173b"
+  },
+  "D:\\My_Workspace\\eggAPP\\docs\\architecture\\adr\\0001-database-hosting-supabase.md": {
+    "mtime": 1784285410.8950293,
+    "ast_hash": "59118cc0b283a884dbd435c5f0fd3a73",
+    "semantic_hash": "59118cc0b283a884dbd435c5f0fd3a73"
+  },
+  "D:\\My_Workspace\\eggAPP\\docs\\architecture\\adr\\0002-ble-supplementary-device-channel.md": {
+    "mtime": 1784286343.7622488,
+    "ast_hash": "52cf7789d6aae9f1236cc0cb0b8a10d8",
+    "semantic_hash": "52cf7789d6aae9f1236cc0cb0b8a10d8"
+  },
+  "D:\\My_Workspace\\eggAPP\\docs\\architecture\\adr\\0003-tenancy-model.md": {
+    "mtime": 1784287243.0235436,
+    "ast_hash": "3041353052d27418d484edf816ef55c5",
+    "semantic_hash": "3041353052d27418d484edf816ef55c5"
+  },
+  "D:\\My_Workspace\\eggAPP\\docs\\architecture\\adr\\0004-mqtt-broker-mosquitto.md": {
+    "mtime": 1784288065.5112925,
+    "ast_hash": "71156683b6f42fe18e92d8d34f7bdbdc",
+    "semantic_hash": "71156683b6f42fe18e92d8d34f7bdbdc"
+  },
+  "D:\\My_Workspace\\eggAPP\\docs\\architecture\\adr\\0005-interim-web-field-entry.md": {
+    "mtime": 1784303114.4884112,
+    "ast_hash": "b213c37fa518055d4e0848fd89e4f89e",
+    "semantic_hash": "b213c37fa518055d4e0848fd89e4f89e"
+  },
+  "D:\\My_Workspace\\eggAPP\\docs\\architecture\\adr\\0006-radxa-always-on-host.md": {
+    "mtime": 1784313832.3606195,
+    "ast_hash": "68f69ae5c18ee670010b3d889fbf78d1",
+    "semantic_hash": "68f69ae5c18ee670010b3d889fbf78d1"
+  },
+  "D:\\My_Workspace\\eggAPP\\docs\\architecture\\adr\\0007-api-deployment-systemd.md": {
+    "mtime": 1784313811.9114363,
+    "ast_hash": "547375a3fba303745748e1bbc49ec652",
+    "semantic_hash": "547375a3fba303745748e1bbc49ec652"
+  },
+  "D:\\My_Workspace\\eggAPP\\docs\\architecture\\domain-model.md": {
+    "mtime": 1784403604.4176443,
+    "ast_hash": "f549ed177530f4d4a496c8ab828711d2",
+    "semantic_hash": "f549ed177530f4d4a496c8ab828711d2"
+  },
+  "D:\\My_Workspace\\eggAPP\\docs\\architecture\\nfr.md": {
+    "mtime": 1784287526.3776445,
+    "ast_hash": "d1419ecb0895604c1ba6786948a46b01",
+    "semantic_hash": "d1419ecb0895604c1ba6786948a46b01"
+  },
+  "D:\\My_Workspace\\eggAPP\\docs\\architecture\\system-architecture.md": {
+    "mtime": 1784313887.2328172,
+    "ast_hash": "0ec8399797cb00c78b39e21d3a294e81",
+    "semantic_hash": "0ec8399797cb00c78b39e21d3a294e81"
+  },
+  "D:\\My_Workspace\\eggAPP\\docs\\iot\\device-lifecycle.md": {
+    "mtime": 1784311352.107311,
+    "ast_hash": "a89bdda7d117b5ad4053c0cd32cbfbce",
+    "semantic_hash": "a89bdda7d117b5ad4053c0cd32cbfbce"
+  },
+  "D:\\My_Workspace\\eggAPP\\docs\\iot\\firmware-discovery-guide.md": {
+    "mtime": 1784288090.2614546,
+    "ast_hash": "152e5c05ff592ba1161fa180f74cf028",
+    "semantic_hash": "152e5c05ff592ba1161fa180f74cf028"
+  },
+  "D:\\My_Workspace\\eggAPP\\docs\\iot\\mqtt-topics.md": {
+    "mtime": 1784380277.6025064,
+    "ast_hash": "89106b43bfee98cf027ea7ce53ce46a0",
+    "semantic_hash": "89106b43bfee98cf027ea7ce53ce46a0"
+  },
+  "D:\\My_Workspace\\eggAPP\\docs\\iot\\telemetry-contract.md": {
+    "mtime": 1784438312.053122,
+    "ast_hash": "76a6254b5f944e2639749bb713b459e3",
+    "semantic_hash": "76a6254b5f944e2639749bb713b459e3"
+  },
+  "D:\\My_Workspace\\eggAPP\\docs\\product\\PRD.md": {
+    "mtime": 1784287323.4696045,
+    "ast_hash": "765addcfecc96826f89669e698064771",
+    "semantic_hash": "765addcfecc96826f89669e698064771"
+  },
+  "D:\\My_Workspace\\eggAPP\\docs\\product\\business-rules.md": {
+    "mtime": 1784293391.2633586,
+    "ast_hash": "1e18036e9b30004be6e3aa2aa9708009",
+    "semantic_hash": "1e18036e9b30004be6e3aa2aa9708009"
+  },
+  "D:\\My_Workspace\\eggAPP\\docs\\product\\domain-knowledge.md": {
+    "mtime": 1784287282.7973397,
+    "ast_hash": "ad618221ea7ca52ebc4960f56893f0d4",
+    "semantic_hash": "ad618221ea7ca52ebc4960f56893f0d4"
+  },
+  "D:\\My_Workspace\\eggAPP\\docs\\product\\roadmap.md": {
+    "mtime": 1784403629.1192968,
+    "ast_hash": "f70ba38115223e0708601565a366bfae",
+    "semantic_hash": "f70ba38115223e0708601565a366bfae"
+  },
+  "D:\\My_Workspace\\eggAPP\\docs\\product\\user-stories\\batches.md": {
+    "mtime": 1784287362.794475,
+    "ast_hash": "d6c86086bf61484bc3f0a40e0117a284",
+    "semantic_hash": "d6c86086bf61484bc3f0a40e0117a284"
+  },
+  "D:\\My_Workspace\\eggAPP\\docs\\product\\user-stories\\candling.md": {
+    "mtime": 1784287379.1385598,
+    "ast_hash": "1506b0b4015a652303196152c93a677a",
+    "semantic_hash": "1506b0b4015a652303196152c93a677a"
+  },
+  "D:\\My_Workspace\\eggAPP\\docs\\product\\user-stories\\devices.md": {
+    "mtime": 1784287348.4931743,
+    "ast_hash": "a2c6caed3339b9a2d20153430df2d762",
+    "semantic_hash": "a2c6caed3339b9a2d20153430df2d762"
+  },
+  "D:\\My_Workspace\\eggAPP\\docs\\product\\user-stories\\egg-management.md": {
+    "mtime": 1784287368.26094,
+    "ast_hash": "6158a769db13a9b96822e5ee5fe22fd5",
+    "semantic_hash": "6158a769db13a9b96822e5ee5fe22fd5"
+  },
+  "D:\\My_Workspace\\eggAPP\\docs\\product\\user-stories\\environmental-monitoring.md": {
+    "mtime": 1784287393.8174195,
+    "ast_hash": "9532561f80f11886540455ad4a979270",
+    "semantic_hash": "9532561f80f11886540455ad4a979270"
+  },
+  "D:\\My_Workspace\\eggAPP\\docs\\product\\user-stories\\farms.md": {
+    "mtime": 1784287452.3622386,
+    "ast_hash": "e9aadacdf677b05341df8e7aebdf6bce",
+    "semantic_hash": "e9aadacdf677b05341df8e7aebdf6bce"
+  },
+  "D:\\My_Workspace\\eggAPP\\docs\\product\\user-stories\\feed.md": {
+    "mtime": 1784287422.5135837,
+    "ast_hash": "94d356575649b5e4ebc9e60ac563a4ea",
+    "semantic_hash": "94d356575649b5e4ebc9e60ac563a4ea"
+  },
+  "D:\\My_Workspace\\eggAPP\\docs\\product\\user-stories\\flocks.md": {
+    "mtime": 1784287410.717906,
+    "ast_hash": "59fe00ec5eafd6b00a92178615c78450",
+    "semantic_hash": "59fe00ec5eafd6b00a92178615c78450"
+  },
+  "D:\\My_Workspace\\eggAPP\\docs\\product\\user-stories\\hatching.md": {
+    "mtime": 1784287386.5062478,
+    "ast_hash": "bf9795631c2a6687288491f000167ec5",
+    "semantic_hash": "bf9795631c2a6687288491f000167ec5"
+  },
+  "D:\\My_Workspace\\eggAPP\\docs\\product\\user-stories\\incubators.md": {
+    "mtime": 1784287354.7601247,
+    "ast_hash": "a2f6ce8845c8f1c3abdccbdc3c95cb29",
+    "semantic_hash": "a2f6ce8845c8f1c3abdccbdc3c95cb29"
+  },
+  "D:\\My_Workspace\\eggAPP\\docs\\product\\user-stories\\inventory.md": {
+    "mtime": 1784287436.7540474,
+    "ast_hash": "ad435e90e19145e1a678f1913928854e",
+    "semantic_hash": "ad435e90e19145e1a678f1913928854e"
+  },
+  "D:\\My_Workspace\\eggAPP\\docs\\product\\user-stories\\notifications.md": {
+    "mtime": 1784287400.2407742,
+    "ast_hash": "ff8f9a4e5d4ca6431945075ae1e24d54",
+    "semantic_hash": "ff8f9a4e5d4ca6431945075ae1e24d54"
+  },
+  "D:\\My_Workspace\\eggAPP\\docs\\product\\user-stories\\reports.md": {
+    "mtime": 1784287442.3785763,
+    "ast_hash": "826bfc9869ee05d4b009fb775b91d418",
+    "semantic_hash": "826bfc9869ee05d4b009fb775b91d418"
+  },
+  "D:\\My_Workspace\\eggAPP\\docs\\product\\user-stories\\users.md": {
+    "mtime": 1784287448.5150468,
+    "ast_hash": "320df566cf7fa90ade7e1c09e4a29318",
+    "semantic_hash": "320df566cf7fa90ade7e1c09e4a29318"
+  },
+  "D:\\My_Workspace\\eggAPP\\docs\\product\\user-stories\\vaccination.md": {
+    "mtime": 1784287417.7419071,
+    "ast_hash": "bd58eea8ee93377aa04682ce1adac133",
+    "semantic_hash": "bd58eea8ee93377aa04682ce1adac133"
+  },
+  "D:\\My_Workspace\\eggAPP\\docs\\product\\user-stories\\water.md": {
+    "mtime": 1784287425.5006928,
+    "ast_hash": "bcf6cc00227444b940cd449fedba2385",
+    "semantic_hash": "bcf6cc00227444b940cd449fedba2385"
+  },
+  "D:\\My_Workspace\\eggAPP\\infra\\ci\\README.md": {
+    "mtime": 1784288055.7044942,
+    "ast_hash": "c8e2bd09abcc310164dcb2767d9ae57d",
+    "semantic_hash": "c8e2bd09abcc310164dcb2767d9ae57d"
+  },
+  "D:\\My_Workspace\\eggAPP\\infra\\deploy\\README.md": {
+    "mtime": 1784387980.1057491,
+    "ast_hash": "18ba5b6fa7ff0041f0423a81f46c7661",
+    "semantic_hash": "18ba5b6fa7ff0041f0423a81f46c7661"
+  },
+  "D:\\My_Workspace\\eggAPP\\infra\\docker\\docker-compose.yml": {
+    "mtime": 1784313845.009279,
+    "ast_hash": "aa5e16bb3c4b3c1532cec7bce75354ad",
+    "semantic_hash": "aa5e16bb3c4b3c1532cec7bce75354ad"
+  },
+  "D:\\My_Workspace\\eggAPP\\infra\\docker\\mosquitto\\README.md": {
+    "mtime": 1784288052.8394969,
+    "ast_hash": "9d37bc92bbb7eac306cb7124e0d4680e",
+    "semantic_hash": "9d37bc92bbb7eac306cb7124e0d4680e"
+  },
+  "D:\\My_Workspace\\eggAPP\\packages\\db\\README.md": {
+    "mtime": 1784306740.1138005,
+    "ast_hash": "2c15d8a81e1aa388c05f53ec9f5850f2",
+    "semantic_hash": "2c15d8a81e1aa388c05f53ec9f5850f2"
+  },
+  "D:\\My_Workspace\\eggAPP\\pnpm-workspace.yaml": {
+    "mtime": 1784287941.5345452,
+    "ast_hash": "3a197c4738205e53d2dca3f581eed5cb",
+    "semantic_hash": "3a197c4738205e53d2dca3f581eed5cb"
+  }
+}

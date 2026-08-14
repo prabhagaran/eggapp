@@ -41,6 +41,18 @@ interface ApiService {
         @Path("id") id: String,
     ): Response<Incubator>
 
+    // Dashboard reads only — the coop/alert management screens stay web-only
+    // per CLAUDE.md's surface split; the phone shows their state, not their
+    // admin.
+    @GET("v1/farms/{farmId}/coops")
+    suspend fun coops(@Path("farmId") farmId: String): Response<List<Coop>>
+
+    @GET("v1/farms/{farmId}/alerts")
+    suspend fun alerts(
+        @Path("farmId") farmId: String,
+        @Query("state") state: String? = null,
+    ): Response<List<Alert>>
+
     @GET("v1/farms/{farmId}/batches")
     suspend fun batches(
         @Path("farmId") farmId: String,

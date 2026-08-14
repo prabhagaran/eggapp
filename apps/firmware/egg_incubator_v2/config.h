@@ -35,8 +35,13 @@
 #define RELAY_COOLER       27
 #define RELAY_HUMIDIFIER   14
 #define RELAY_FAN          13
-#define RELAY_PUMP         12
-#define RELAY_TURNER       15
+// Moved off GPIO12/GPIO15 (BUG-004). Both are strapping pins: MTDI selects
+// the internal flash regulator voltage at reset and must read 0, MTDO
+// controls boot-log printing. A driver holding either high at reset stops
+// the module booting. GPIO16/17 are safe on WROOM — they are reserved for
+// PSRAM only on WROVER. Matches hardware/eggubator/MCU.SchDoc.
+#define RELAY_PUMP         16
+#define RELAY_TURNER       17
 
 // Active-LOW relay board
 #define RELAY_ON           LOW

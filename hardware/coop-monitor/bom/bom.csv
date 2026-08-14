@@ -1,0 +1,26 @@
+refdes,qty,part,value,package,manufacturer,mpn,supplier,supplier_pn,status,fitted_default,notes
+U1,1,ESP32-WROOM-32E,,module SMD,Espressif,ESP32-WROOM-32E-N4,,,confirmed,yes,PCB antenna - matches the incubator board. MANDATORY antenna keepout. RANGE RISK: coop is far from the house AP - range-test at the real mounting point before layout; -32UE is the fallback
+U2,1,DHT22 / AM2302,,module,Aosong,AM2302,,,confirmed,yes,GPIO4; the one sensor assumed present
+U3,1,MH-Z19B,,module,Winsen,MH-Z19B,,,optional,no,NDIR CO2; UART2; 5V supply 3.3V logic
+U4,1,MQ-137,,module,Winsen,MQ-137,,,optional,no,Ammonia; 150 mA continuous heater - dominates power budget; needs Rs/R0 calibration
+U5,1,BH1750,,module,Rohm,BH1750FVI,,,optional,no,Lux; I2C; 3.3V native
+U6-U7,2,HC-SR04,,module,,,,,optional,no,Feed + water level; 5V; echo needs level shift
+U8,1,LM1117I-3.3,3.3V,SOT-223 (DCY),Texas Instruments,LM1117IMPX3.3/NOPB,,,confirmed,yes,800 mA LDO; -40..+125C grade REQUIRED (coop goes below 0C in winter - plain LM1117 is 0..125C). MUST be fed from 5V not 12V. Tab is VOUT - pour >=0.3 in2 of 3.3V copper NOT ground. See common/3v3-rail-lm1117.md
+C3,1,Capacitor tantalum,10uF,,,,,,REQUIRED,yes,LM1117 VOUT stability cap - datasheet minimum. Tantalum not bare ceramic
+C4,1,Capacitor,10uF,0805,,,,,REQUIRED,yes,LM1117 VIN bulk
+C5,1,Capacitor,100nF,0603,,,,,REQUIRED,yes,LM1117 VIN decoupling close to pin
+PSU1,1,Power input,,TBD,,,,,BLOCKING,yes,Mains adapter / PoE / battery - UNDECIDED and blocks layout. See README.md
+D1,1,Reverse-polarity protection,,,,,,,REQUIRED,yes,Field-wired in a shed; assume a reversed input
+D2,1,TVS diode,,,,,,,REQUIRED,yes,Input transient
+R1,1,Resistor,10k,0805,,,,,confirmed,yes,DHT22 pull-up to 3.3V
+R2-R3,2,Resistor,4.7k,0805,,,,,confirmed,no,I2C pull-ups (BH1750)
+R4-R7,4,Resistor,1k/2k divider,0805,,,,,REQUIRED,no,HC-SR04 echo level shift x2. GPIO34 is input-only with NO clamp
+R8-R9,2,Resistor,TBD,0805,,,,,BLOCKING,no,MQ-137 ADC divider - value is part of the sensor calibration. Target ~2.4 V full-scale not 3.3 V: datasheet Table 10 note says accuracy degrades above ~2450 mV at atten=3
+C1,1,Capacitor,10uF,0805,,,,,confirmed,yes,ESP32 bulk
+C2,1,Capacitor,100nF,0603,,,,,confirmed,yes,ESP32 decoupling at pin
+SW1,1,Tactile switch,,,,,,,REQUIRED,yes,GPIO0 WiFi portal trigger - must stay reachable through the enclosure
+LED1,1,Status LED + resistor,,0805,,,,,recommended,yes,No display on this node; only field diagnostic. Reserve a GPIO
+J1,1,UART0 header,,2.54mm 4-pin,,,,,REQUIRED,yes,TX0/RX0/GND/3V3; provisioning tells the user to watch serial at 115200
+J2-J7,6,Sensor connectors,,TBD,,,,,TBD,partial,One per sensor; each independently fittable
+ANT1,0,NOT FITTED,,,,,,,n/a,no,-32E has an on-module PCB antenna. Reinstate only if range testing forces a respin to -32UE
+-,1,Conformal coating,,,,,,,REQUIRED,yes,Ammonia attacks copper and silver; not an upgrade

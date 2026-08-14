@@ -13,7 +13,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -23,7 +22,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -38,7 +36,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.eggapp.field.data.CreateInventoryItemRequest
 import com.eggapp.field.data.InventoryItem
 import com.eggapp.field.data.UpdateInventoryItemRequest
+import com.eggapp.field.ui.components.AppCard
 import com.eggapp.field.ui.components.DropdownField
+import com.eggapp.field.ui.components.EggAppSubBar
 import com.eggapp.field.ui.components.MutedText
 import com.eggapp.field.ui.components.PillTone
 import com.eggapp.field.ui.components.StatusPill
@@ -56,9 +56,9 @@ fun InventoryScreen(viewModel: InventoryViewModel = viewModel(), onBack: () -> U
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Inventory") },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
+            EggAppSubBar(
+                title = "Inventory",
+                onBack = onBack,
                 actions = {
                     TextButton(onClick = { showCreate = !showCreate }) { Text(if (showCreate) "Cancel" else "Add") }
                 },
@@ -121,8 +121,8 @@ private fun CreateForm(saving: Boolean, onSave: (CreateInventoryItemRequest) -> 
     var expiry by remember { mutableStateOf("") }
     var lowStockThreshold by remember { mutableStateOf("") }
 
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    AppCard(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Add inventory item", style = MaterialTheme.typography.titleMedium)
             DropdownField("Kind", kind, KIND_OPTIONS, { kind = it }, Modifier.fillMaxWidth())
             OutlinedTextField(name, { name = it }, label = { Text("Name") }, modifier = Modifier.fillMaxWidth())
@@ -172,8 +172,8 @@ private fun EditForm(item: InventoryItem, saving: Boolean, onSave: (UpdateInvent
     var expiry by remember(item.id) { mutableStateOf(item.expiry?.take(10) ?: "") }
     var lowStockThreshold by remember(item.id) { mutableStateOf(item.lowStockThreshold?.toString() ?: "") }
 
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    AppCard(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Edit ${item.name}", style = MaterialTheme.typography.titleMedium)
             OutlinedTextField(name, { name = it }, label = { Text("Name") }, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(unit, { unit = it }, label = { Text("Unit") }, modifier = Modifier.fillMaxWidth())
@@ -210,8 +210,8 @@ private fun EditForm(item: InventoryItem, saving: Boolean, onSave: (UpdateInvent
 @Composable
 private fun ItemRow(item: InventoryItem, onEdit: () -> Unit, onDelete: () -> Unit) {
     val low = item.lowStockThreshold != null && item.quantity <= item.lowStockThreshold
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-        Column(modifier = Modifier.padding(16.dp)) {
+    AppCard(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+        Column {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column {
                     Text(item.name, style = MaterialTheme.typography.titleSmall)

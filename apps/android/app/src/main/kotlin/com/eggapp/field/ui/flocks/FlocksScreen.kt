@@ -9,16 +9,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -27,15 +23,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.eggapp.field.data.CreateFlockRequest
 import com.eggapp.field.data.Flock
 import com.eggapp.field.data.Species
+import com.eggapp.field.ui.components.AppCard
 import com.eggapp.field.ui.components.DropdownField
+import com.eggapp.field.ui.components.EmptyNote
 import com.eggapp.field.ui.components.MutedText
 import com.eggapp.field.ui.components.PillTone
+import com.eggapp.field.ui.components.SectionRule
 import com.eggapp.field.ui.components.StatusPill
 import java.time.LocalDate
 
@@ -49,54 +49,62 @@ private val STAGE_LABEL = mapOf(
     "broiler_finisher" to "Broiler finisher",
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FlocksScreen(viewModel: FlocksViewModel = viewModel(), onOpenFlock: (Flock) -> Unit) {
     val state by viewModel.state.collectAsState()
     var showCreate by remember { mutableStateOf(false) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Flocks") },
-                actions = { TextButton(onClick = { showCreate = !showCreate }) { Text(if (showCreate) "Cancel" else "Add") } },
-            )
-        },
-    ) { padding ->
-        LazyColumn(modifier = Modifier.padding(padding)) {
+    // No Scaffold — the branded top bar in MainActivity already sits above
+    // every bottom-tab route.
+    LazyColumn(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 18.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Flocks", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                TextButton(onClick = { showCreate = !showCreate }) { Text(if (showCreate) "Cancel" else "Add") }
+            }
+            if (state.loading) CircularProgressIndicator(modifier = Modifier.padding(16.dp))
+            state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(vertical = 8.dp)) }
+        }
+        if (showCreate) {
             item {
-                if (state.loading) CircularProgressIndicator(modifier = Modifier.padding(16.dp))
-                state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp)) }
+                CreateFlockForm(
+                    species = state.species,
+                    completedHatches = state.completedHatches,
+                    saving = state.saving,
+                    onSave = { body -> viewModel.createFlock(body) { showCreate = false } },
+                )
             }
-            if (showCreate) {
-                item {
-                    CreateFlockForm(
-                        species = state.species,
-                        completedHatches = state.completedHatches,
-                        saving = state.saving,
-                        onSave = { body -> viewModel.createFlock(body) { showCreate = false } },
+        }
+        item { SectionRule("All flocks") }
+        if (!state.loading && state.flocks.isEmpty() && state.error == null) {
+            item { EmptyNote("No flocks yet — add one with the Add button.") }
+        }
+        items(state.flocks) { flock ->
+            AppCard(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), onClick = { onOpenFlock(flock) }) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        flock.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f),
                     )
+                    StatusPill(STAGE_LABEL[flock.stage] ?: flock.stage ?: "—", PillTone.Accent)
                 }
-            }
-            if (!state.loading && state.flocks.isEmpty() && state.error == null) {
-                item { Text("No flocks yet — add one above.", modifier = Modifier.padding(16.dp)) }
-            }
-            items(state.flocks) { flock ->
-                Card(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), onClick = { onOpenFlock(flock) }) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                            Text(flock.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                            StatusPill(STAGE_LABEL[flock.stage] ?: flock.stage ?: "—", PillTone.Accent)
-                        }
-                        MutedText(
-                            "${flock.species?.name ?: flock.speciesId} · ${flock.purpose}",
-                            modifier = Modifier.padding(top = 4.dp),
-                        )
-                        MutedText("${flock.currentCount} birds · ${flock.ageDays ?: "—"} days old")
-                    }
+                MutedText(
+                    "${flock.species?.name ?: flock.speciesId} · ${flock.purpose}",
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+                Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(top = 8.dp)) {
+                    Text("${flock.currentCount}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    MutedText("birds · ${flock.ageDays ?: "—"} days old", modifier = Modifier.padding(start = 6.dp, bottom = 2.dp))
                 }
             }
         }
+        item { Column(modifier = Modifier.padding(bottom = 24.dp)) {} }
     }
 }
 
@@ -119,9 +127,9 @@ private fun CreateFlockForm(
     var acquisitionNote by remember { mutableStateOf("") }
     var hatchEventId by remember { mutableStateOf(completedHatches.firstOrNull()?.hatchEventId ?: "") }
 
-    Card(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Add flock", style = MaterialTheme.typography.titleMedium)
+    AppCard(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Add flock", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             OutlinedTextField(name, { name = it }, label = { Text("Name") }, modifier = Modifier.fillMaxWidth())
             DropdownField("Species", speciesId, species.map { it.id to it.name }, { speciesId = it }, Modifier.fillMaxWidth())
             DropdownField("Purpose", purpose, PURPOSE_OPTIONS, { purpose = it }, Modifier.fillMaxWidth())

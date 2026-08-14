@@ -10,13 +10,13 @@ RELAY_HEATER,26,Relay - heater,config.h,34,used,Active-LOW relay board (RELAY_ON
 RELAY_COOLER,27,Relay - cooler,config.h,35,used,Active-LOW; climate-chamber profile only
 RELAY_HUMIDIFIER,14,Relay - humidifier,config.h,36,used,Active-LOW
 RELAY_FAN,13,Fan PWM,config.h,37,used,LEDC PWM with INVERTED duty (100% speed = pin LOW); not a plain relay drive
-RELAY_PUMP,12,Relay - pump,config.h,38,used,WARNING strapping pin MTDI (BUG-004): external pull-up at reset can brick boot; relocate to 16/17/19/23 or burn flash-voltage eFuse
-RELAY_TURNER,15,Relay - turner,config.h,39,used,WARNING strapping pin MTDO (BUG-004): verify boot with relay board attached; candidate for relocation
+RELAY_PUMP,16,Relay - pump,config.h,43,used,Relocated from GPIO12 (BUG-004 resolved); safe on WROOM - PSRAM-reserved only on WROVER
+RELAY_TURNER,17,Relay - turner,config.h,44,used,Relocated from GPIO15 (BUG-004 resolved); safe on WROOM
 
-GPIO16,16,General purpose,, ,free,Safe on WROOM (reserved for PSRAM on WROVER); preferred relocation target for pump/turner
-GPIO17,17,General purpose,, ,free,Safe on WROOM (reserved for PSRAM on WROVER); preferred relocation target for pump/turner
-GPIO19,19,General purpose,, ,free,Safe; relocation target
-GPIO23,23,General purpose,, ,free,Safe; relocation target
+GPIO12,12,Boot strapping,, ,free,MTDI - freed by the pump relocation. Do NOT reuse for anything driven high at reset: selects 1.8V flash and stops the module booting
+GPIO15,15,Boot strapping,, ,free,MTDO - freed by the turner relocation. Usable but suppresses the boot log if held; prefer 19/23
+GPIO19,19,General purpose,, ,free,Safe; next relocation target
+GPIO23,23,General purpose,, ,free,Safe; next relocation target
 GPIO5,5,General purpose,, ,free,Usable but a strapping pin (SDIO timing); boots HIGH - avoid for fail-ON loads
 
 GPIO34,34,Input-only,, ,input-only,No pull-ups; ADC capable (candidate: water-level sensor)
