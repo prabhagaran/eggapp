@@ -3,7 +3,9 @@
 > ESP32 figures are from the **ESP32-WROOM-32E/32UE datasheet v2.0**
 > ([common/datasheets/](../../common/datasheets/)), Tables 14 and 16. Everything
 > else is an estimate from datasheets and typical parts, and **nothing has been
-> measured on this hardware**. See [Unverified](#unverified) before ordering.
+> measured on this hardware**. Boards were ordered 2026-08-14 on these
+> estimates, so [Unverified](#unverified) is now a bring-up checklist rather
+> than a pre-order one — take those measurements on the first article.
 
 ## 3.3 V rail
 
@@ -115,7 +117,8 @@ chamber.
 
 ## Unverified
 
-Before a fabrication release, these need measurement rather than estimation:
+These were never measured before the boards were ordered, so measure them on
+the first article — a bad answer here means a respin, not a tweak:
 
 - Actual ESP32 average draw with this firmware's duty cycle — it publishes
   every 60 s and holds an MQTT keepalive of 30 s, so it is never in deep sleep

@@ -1,0 +1,23 @@
+----------------------------------------------------------------------------------------------------------------------------------
+NCDrill File Report For: eggubator.PcbDoc   08-08-2026  21:09:01
+----------------------------------------------------------------------------------------------------------------------------------
+
+Layer Pair : Top Layer to Bottom Layer
+ASCII RoundHoles File : eggubator.TXT
+EIA File   : eggubator.DRL
+
+Tool       Hole Size               Hole Tolerance               Hole Type       Hole Count   Plated         Tool Travel
+----------------------------------------------------------------------------------------------------------------------------------
+T1      16mil (0.406mm)                                           Round             64        PTH        31.31inch (795.21mm)
+T2      28mil (0.711mm)                                           Round             4         PTH        0.84inch (21.34mm)
+T3      35mil (0.9mm)                                             Round             75        PTH        25.89inch (657.71mm)
+T4      39mil (1mm)                                               Round             12        PTH        4.02inch (102.00mm)
+T5      41mil (1.05mm)                                            Round             8         PTH        2.72inch (69.20mm)
+T6      43mil (1.1mm)                                             Round             2         PTH        0.20inch (5.08mm)
+T7      47mil (1.2mm)                                             Round             5         PTH        0.80inch (20.32mm)
+T8      51mil (1.3mm)                                             Round             42        PTH        20.04inch (508.90mm)
+T9      165mil (4.2mm)                                            Round             3         PTH        7.03inch (178.60mm)
+----------------------------------------------------------------------------------------------------------------------------------
+Totals                                                                              215
+
+Total Processing Time (hh:mm:ss) : 00:00:00

@@ -76,17 +76,26 @@ Migration policy: [CONVENTIONS.md](CONVENTIONS.md#eda-tool).
 
 ### Current design state
 
-`MCU.SchDoc` is a **1:1 module breakout**, not the controller schematic, and
-`eggubator.PcbDoc` contains **no components, nets or copper** — the schematic
-has never been imported into it. Details and the blocking items are in
-[incubator/README.md](incubator/README.md#state).
+The incubator board is **routed, DRC-clean and ordered** — 5 boards from Lion
+Circuits, ordered 2026-08-14; 2 layers, ≈ 152 × 101 mm. Gerbers and NC drill
+are under
+[eggubator/Project Outputs for eggubator/](eggubator/Project%20Outputs%20for%20eggubator/).
+Nothing has arrived, been assembled or been powered. Details, and the checks to
+run on the first article, are in [incubator/README.md](incubator/README.md#state).
+
+The coop-monitor board has not been started.
 
 ## Who owns the pin map
 
 The pin map lives in firmware (`config.h`) and in the per-board
-`docs/pin-map.md` here. Those two must agree, and today the firmware is what
-physically runs — so **firmware is authoritative until a board is fabricated**,
-at which point the fabricated board becomes authoritative and firmware adapts.
+`docs/pin-map.md` here. Those two must agree, and firmware was authoritative
+only until a board was fabricated — at which point the fabricated board becomes
+authoritative and firmware adapts.
+
+**For the incubator, that switch has happened**: the board is ordered and its
+pin map is fixed in copper. Changing an incubator GPIO in `config.h` now means
+changing it to match the board, never the reverse. The coop-monitor board does
+not exist yet, so its firmware remains authoritative.
 
 The pin-map documents in this folder are transcribed from firmware and cite the
 defining file and line. If you change a pin here, change it in `config.h` in
@@ -98,9 +107,16 @@ and `config.h` together. GPIO12 and GPIO15 are now free but should stay unused
 for anything driven at reset — see
 [incubator/docs/pin-map.md](incubator/docs/pin-map.md#strapping-pin-conflicts--resolved).
 
-## Before fabricating anything
+## Before powering anything
 
 Nothing in this folder has been built or electrically verified. Every current
 figure in the power budgets is an estimate from datasheets and typical parts,
-not a measurement. Read the "Unverified" section of each board's power budget
-before ordering.
+not a measurement — including for the incubator boards now on order. Read the
+"Unverified" section of the relevant power budget
+([incubator](incubator/docs/power-budget.md#unverified) ·
+[coop-monitor](coop-monitor/docs/power-budget.md#unverified)) before ordering a
+new board, and before bringing up a fabricated one.
+
+Bring the incubator board up unpopulated on the mains side and rail-by-rail:
+[incubator/README.md](incubator/README.md#check-on-the-first-article) lists what
+to check, and actuator drive polarity is a hazard rather than a nuisance.

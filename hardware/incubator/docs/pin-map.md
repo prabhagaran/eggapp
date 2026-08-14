@@ -3,8 +3,10 @@
 Transcribed from
 [egg_incubator_v2/config.h](../../../apps/firmware/egg_incubator_v2/config.h)
 and [egg_incubator_v2/pins.csv](../../../apps/firmware/egg_incubator_v2/pins.csv).
-Firmware is authoritative until a board is fabricated
-([../../README.md](../../README.md#who-owns-the-pin-map)).
+**This map is now frozen in copper.** Boards were ordered 2026-08-14, so the
+fabricated board — not `config.h` — is authoritative from here
+([../../README.md](../../README.md#who-owns-the-pin-map)). A GPIO change in
+firmware must match this table, never replace it.
 
 Module: **ESP32-WROOM-32E-N4** (PCB antenna, 4 MB flash), per
 [MCU.SchDoc](../../eggubator/MCU.SchDoc). Antenna keepout is mandatory —
