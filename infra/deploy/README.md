@@ -1,37 +1,47 @@
-# Deploying apps/api and apps/web to the Radxa
+# Deploying apps/api and apps/web to nila
 
-Per ADR 0007 (refining ADR 0006): both run as native Node processes under
-systemd on the Radxa (192.168.1.44), not Docker — avoids cross-compiling a
-pnpm monorepo for ARM64, and a systemd unit gives the same always-on/auto-
-restart guarantee with far less moving parts. Docker remains right for
-Mosquitto (a self-contained official image, no build step).
+Per ADR 0007 (refining ADR 0006, revised 2026-08-15 when nila replaced the
+Radxa as the always-on host): both run as native Node processes under
+systemd on nila (Tailscale `100.100.38.32`), not Docker — avoids
+cross-compiling a pnpm monorepo for ARM64, and a systemd unit gives the
+same always-on/auto-restart guarantee with far less moving parts. Docker
+remains right for Mosquitto (a self-contained official image, no build
+step).
 
-## One-time setup (already done on the current Radxa)
+## One-time setup (already done on the current nila host)
 
-1. SSH key auth to `radxa@192.168.1.44` (see `docs/architecture/adr/0006-radxa-always-on-host.md`).
-2. `pnpm` installed globally on the Radxa, symlinked into `/usr/local/bin`
-   (Node itself lives at `/opt/node22`, not on PATH by default for
-   globally-installed packages — see that ADR for the exact symlink fix
-   if setting up a new device).
+1. SSH key auth to `nila@100.100.38.32` (see
+   `docs/architecture/adr/0006-radxa-always-on-host.md` for the general
+   pattern this follows).
+2. Node 22 and pnpm already installed on nila at `/usr/local/bin/`.
 3. Source deployed to `~/eggapp-app/` — see `deploy-api.sh` / `deploy-web.sh`
    for exactly what each ships. Env files created directly on the device,
-   never copied from a dev machine's `.env`:
-   - `apps/api/.env` — production secrets. `MQTT_URL` in particular must be
-     `mqtt://localhost:1883`, not the LAN IP, since the broker and API are
+   never copied from a dev machine's `.env`, with two exceptions treated
+   as shared external credentials rather than per-host secrets:
+   - `apps/api/.env` — `DATABASE_URL`/`DIRECT_URL` reused from the same
+     Supabase project (not per-host); `JWT_SECRET` and
+     `MQTT_API_PASSWORD` generated fresh directly on nila.
+     `MQTT_URL` is `mqtt://localhost:1883` since the broker and API are
      co-located.
-   - `apps/web/.env.production` — just `NEXT_PUBLIC_API_URL=http://192.168.1.44:3001`.
-     Not a secret (it ends up in the client-side JS bundle regardless), but
-     kept device-local anyway for consistency and because `next build`
-     bakes it in at build time — a dev machine's value could silently drift
-     from what's actually deployed.
+   - `apps/api/firebase-service-account.json` — copied as-is (same
+     Firebase project).
+   - `apps/web/.env.production` — `NEXT_PUBLIC_API_URL=http://100.100.38.32:3001`
+     (Tailscale address, not LAN — this is what makes the dashboard
+     reachable off the home network, the gap the Radxa setup never
+     closed). Not a secret (it ends up in the client-side JS bundle
+     regardless), but kept device-local anyway for consistency and
+     because `next build` bakes it in at build time.
 4. Systemd units (`infra/systemd/eggapp-api.service`, `eggapp-web.service`)
    copied to `/etc/systemd/system/`, then for each:
    `sudo systemctl daemon-reload && sudo systemctl enable --now <unit>`.
-5. Narrow passwordless-sudo rules in `/etc/sudoers.d/` (`eggapp-deploy`,
-   `eggapp-web-deploy`) scoped to exactly `systemctl restart/status
-   <service>` — lets redeploys restart the service without a password
-   prompt, without granting broader sudo access. Add analogously for any
-   future service.
+5. Mosquitto (`infra/docker/docker-compose.yml`) — the `passwd` file must
+   be world-readable (`chmod 644`) even though it's root-owned; the
+   container runs mosquitto as a non-root user and silently exits
+   (code 13, no error logged unless `log_type error` is set) if it can't
+   read a `600` file. Learned the hard way setting this up on nila.
+6. Sudo: nila's `nila` user has passwordless `ALL:ALL` sudo (broader than
+   the Radxa's narrow scoped rule) — a deliberate choice to keep setup
+   simple; revisit if nila is ever exposed beyond Tailscale.
 
 **`apps/web`'s ExecStart quirk** (documented in the unit file too, but
 worth restating): it calls `node_modules/.bin/next` directly as an
@@ -46,7 +56,7 @@ fail:
 
 The working form runs the shim directly as an executable (it has a
 shebang and the exec bit set):
-`/home/radxa/eggapp-app/apps/web/node_modules/.bin/next start -p 3000 -H 0.0.0.0`.
+`/home/nila/eggapp-app/apps/web/node_modules/.bin/next start -p 3000 -H 0.0.0.0`.
 
 ## Redeploying after a code change
 
@@ -56,37 +66,45 @@ bash infra/deploy/deploy-web.sh
 ```
 
 Each packs its app + the workspace packages it depends on, ships them,
-rebuilds in place, restarts the service. Run from a real terminal — the
-restart step needs a live TTY the first time in a session for `ssh -t`,
-though with the NOPASSWD sudoers rules in place it won't actually prompt
-for a password.
+rebuilds in place, restarts the service.
 
-**This must be run by a human from an actual terminal, not by an agent's
-non-interactive shell.** sudo's tty_tickets requirement isn't satisfied by
-an agent-driven `ssh -t`/`ssh -tt`/`sudo -n` call even though `sudo -l`
-shows the exact command as NOPASSWD — it fails with "sudo: a password is
-required" every time. A silent/no-output result from the restart command is
-not proof it worked; always confirm with `systemctl status` before treating
-a deploy as live.
+Unlike the old Radxa setup, nila's passwordless `ALL:ALL` sudo means the
+restart step does **not** need an interactive TTY or a human at the
+keyboard — confirmed working via a plain non-interactive `ssh` restart.
+Still worth confirming with `systemctl status` after a deploy rather than
+trusting silent success.
 
 **If an apps/api change includes a schema migration**, run it yourself first:
 ```
 pnpm --filter @eggapp/db db:deploy
 ```
 (from the dev machine, against the same Supabase database — migrations
-don't need to run on the Radxa itself, just once against the shared DB.)
+don't need to run on nila itself, just once against the shared DB.)
 
 ## Operating it
 
-- Logs: `ssh radxa@192.168.1.44 "journalctl -u eggapp-api -f"` /
-  `"journalctl -u eggapp-web -f"` — no sudo needed, the `radxa` user is in
-  the `adm`/`systemd-journal` groups.
-- Status: `ssh radxa@192.168.1.44 "sudo systemctl status eggapp-api"` (or
+- Logs: `ssh nila@100.100.38.32 "sudo journalctl -u eggapp-api -f"` /
+  `"sudo journalctl -u eggapp-web -f"`.
+- Status: `ssh nila@100.100.38.32 "sudo systemctl status eggapp-api"` (or
   `eggapp-web`).
 - Both survive reboots (`enabled`) and crashes (`Restart=always`, 5s
-  backoff) — verified for `eggapp-api` by force-killing the process and
-  confirming systemd respawned it within seconds.
-- Reachable on the LAN at `http://192.168.1.44:3001` (API) and
-  `http://192.168.1.44:3000` (web dashboard). Not reachable outside the
-  home network yet — that's a separate, not-yet-done step (Tailscale or
-  similar).
+  backoff).
+- Reachable over Tailscale at `http://100.100.38.32:3001` (API) and
+  `http://100.100.38.32:3000` (web dashboard) — from any device with
+  Tailscale connected, not just the home LAN. Also reachable on the LAN
+  at `http://192.168.1.45:<port>`.
+
+## Migrating from the Radxa (2026-08-15)
+
+The previous host (`radxa@192.168.1.44` / Tailscale `100.92.177.99`) was
+decommissioned and is no longer reachable. Its secrets (`apps/api/.env`,
+mosquitto's `passwd` file) could not be recovered, so nila runs with
+fresh `JWT_SECRET` and MQTT credentials — any existing device MQTT
+credentials tied to the old broker will need to be reprogrammed against
+nila's new `passwd` file (currently only `api-ingest` is provisioned; see
+`infra/docker/mosquitto/README.md` for adding per-device accounts). Still
+open, tracked as follow-up work for iot-integration-architect:
+- Android app's `API_BASE_URL` needs updating from `100.92.177.99` to
+  `100.100.38.32` (`apps/android/README.md` / `build.gradle.kts`).
+- ADR 0006 needs a superseding entry naming nila as the host.
+- Firmware devices need new MQTT credentials issued and flashed.

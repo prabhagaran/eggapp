@@ -219,10 +219,10 @@ in the repo and used afterward).
 ## Configuration
 
 `API_BASE_URL` is set in `app/build.gradle.kts` (`buildConfigField`) —
-points at the Radxa's **Tailscale** address (`http://100.92.177.99:3001/`),
+points at nila's **Tailscale** address (`http://100.100.38.32:3001/`),
 not its LAN IP. A Tailscale address is reachable whether the phone is on
 home WiFi or anywhere else with internet, as long as Tailscale is
-connected on both ends (Radxa + phone) — no separate home/away config.
+connected on both ends (nila + phone) — no separate home/away config.
 Revisit if this ever needs to be configurable per-build (e.g. a release
 variant hitting a different host).
 
