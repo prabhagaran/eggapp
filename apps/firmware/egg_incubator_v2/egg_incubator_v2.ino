@@ -442,6 +442,15 @@ void setup() {
     //   via Settings → WiFi → Connect.  If no stored credentials exist,
     //   WiFi.begin() returns quickly and the device boots offline.
     WiFi.mode(WIFI_STA);
+    // Disable WiFi modem sleep. The ESP32 Arduino core enables power save in
+    // STA mode by default, which parks the radio between DTIM beacons. On this
+    // device that showed up as: ping RTT swinging 10–500 ms, the board dropping
+    // out of the router's ARP table, MQTT connect() timing out (PubSubClient
+    // rc=-2) even with the broker reachable from every other host, and sessions
+    // that did connect dying on the 30 s keepalive. This is a mains-powered
+    // incubator, so the ~25 mA power save would have bought is worth nothing
+    // against a telemetry link that stays up.
+    WiFi.setSleep(false);
     WiFi.begin();   // attempt stored SSID/password; returns immediately
     Serial.println("[SETUP] WiFi.begin() called (non-blocking)");
 

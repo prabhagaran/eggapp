@@ -87,6 +87,12 @@ void task_wifi_manager(void* pvParameters) {
 
         if (req == WIFI_REQ_CONNECT && !wifiPortalActive.load(std::memory_order_acquire)) {
             WiFi.mode(WIFI_STA);
+            // Re-assert modem sleep off: WiFi.mode() resets the power-save
+            // setting, so setting it once in setup() is not enough — a
+            // user-triggered reconnect from the WiFi menu would otherwise come
+            // back up with power save on. See the note in setup() for what that
+            // breaks.
+            WiFi.setSleep(false);
             wm.setConfigPortalBlocking(false);
             wm.setConfigPortalTimeout(WIFI_PORTAL_TIMEOUT_SEC);
             WiFi.setAutoReconnect(true);
@@ -163,6 +169,26 @@ void task_wifi_manager(void* pvParameters) {
             WiFi.reconnect();
             vTaskDelay(pdMS_TO_TICKS(5000));
             continue;
+        }
+
+        // ── Adopt a late association ──────────────────────────────────────
+        // wifiUserEnabled latches true only inside the 8 s boot window above,
+        // or on an explicit user connect. If the AP took longer than that to
+        // associate, the flag stayed false permanently — and since both the
+        // auto-reconnect branch above and task_mqtt's gate test it, the device
+        // sat pingable but silent above the IP layer: WiFi.begin()'s own retry
+        // kept the radio associated while nothing ever published again.
+        // Observed on INCUBATOR_02: connected, dropped on a keepalive timeout,
+        // then never reconnected or retried until a reboot that happened to
+        // associate fast enough. An actual association is intent enough.
+        // A user-requested disconnect leaves the radio in WIFI_OFF, so
+        // WL_CONNECTED cannot be true here and this will not override it.
+        if (!wifiUserEnabled.load(std::memory_order_acquire) &&
+            !wifiPortalActive.load(std::memory_order_acquire) &&
+            WiFi.status() == WL_CONNECTED) {
+            wifiUserEnabled.store(true, std::memory_order_release);
+            Serial.print("[WIFI] Associated after boot window: ");
+            Serial.println(WiFi.localIP());
         }
 
         // ── Idle ──────────────────────────────────────────────────────────
