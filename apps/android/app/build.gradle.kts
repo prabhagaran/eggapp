@@ -16,14 +16,14 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
-        // Points at the always-on API deployed to nila (ADR 0007/0010),
+        // Points at the always-on API deployed to nila (ADR 0007/0010/0011),
         // not localhost (the phone is a separate device on the network,
         // same reasoning as the firmware's MQTT_BROKER_HOST). Uses
-        // nila's Tailscale address, not its LAN IP (192.168.1.45) — a
+        // nila's Tailscale address, not its LAN IP (192.168.1.41) — a
         // Tailscale address is reachable whether the phone is on home
         // WiFi or anywhere else, as long as Tailscale is connected on
         // both ends, so there's no separate home/away configuration.
-        buildConfigField("String", "API_BASE_URL", "\"http://100.100.38.32:3001/\"")
+        buildConfigField("String", "API_BASE_URL", "\"http://100.76.190.23:3001/\"")
     }
 
     buildTypes {

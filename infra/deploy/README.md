@@ -2,7 +2,7 @@
 
 Per ADR 0007 (refining ADR 0006, revised 2026-08-15 when nila replaced the
 Radxa as the always-on host): both run as native Node processes under
-systemd on nila (Tailscale `100.100.38.32`), not Docker — avoids
+systemd on nila (Tailscale `100.76.190.23`), not Docker — avoids
 cross-compiling a pnpm monorepo for ARM64, and a systemd unit gives the
 same always-on/auto-restart guarantee with far less moving parts. Docker
 remains right for Mosquitto (a self-contained official image, no build
@@ -10,7 +10,7 @@ step).
 
 ## One-time setup (already done on the current nila host)
 
-1. SSH key auth to `nila@100.100.38.32` (see
+1. SSH key auth to `nila@100.76.190.23` (see
    `docs/architecture/adr/0006-radxa-always-on-host.md` for the general
    pattern this follows).
 2. Node 22 and pnpm already installed on nila at `/usr/local/bin/`.
@@ -25,7 +25,7 @@ step).
      co-located.
    - `apps/api/firebase-service-account.json` — copied as-is (same
      Firebase project).
-   - `apps/web/.env.production` — `NEXT_PUBLIC_API_URL=http://100.100.38.32:3001`
+   - `apps/web/.env.production` — `NEXT_PUBLIC_API_URL=http://100.76.190.23:3001`
      (Tailscale address, not LAN — this is what makes the dashboard
      reachable off the home network, the gap the Radxa setup never
      closed). Not a secret (it ends up in the client-side JS bundle
@@ -83,16 +83,16 @@ don't need to run on nila itself, just once against the shared DB.)
 
 ## Operating it
 
-- Logs: `ssh nila@100.100.38.32 "sudo journalctl -u eggapp-api -f"` /
+- Logs: `ssh nila@100.76.190.23 "sudo journalctl -u eggapp-api -f"` /
   `"sudo journalctl -u eggapp-web -f"`.
-- Status: `ssh nila@100.100.38.32 "sudo systemctl status eggapp-api"` (or
+- Status: `ssh nila@100.76.190.23 "sudo systemctl status eggapp-api"` (or
   `eggapp-web`).
 - Both survive reboots (`enabled`) and crashes (`Restart=always`, 5s
   backoff).
-- Reachable over Tailscale at `http://100.100.38.32:3001` (API) and
-  `http://100.100.38.32:3000` (web dashboard) — from any device with
+- Reachable over Tailscale at `http://100.76.190.23:3001` (API) and
+  `http://100.76.190.23:3000` (web dashboard) — from any device with
   Tailscale connected, not just the home LAN. Also reachable on the LAN
-  at `http://192.168.1.45:<port>`.
+  at `http://192.168.1.41:<port>`.
 
 ## Migrating from the Radxa (2026-08-15)
 
@@ -108,3 +108,26 @@ open, tracked as follow-up work for iot-integration-architect:
   `100.100.38.32` (`apps/android/README.md` / `build.gradle.kts`).
 - ADR 0006 needs a superseding entry naming nila as the host.
 - Firmware devices need new MQTT credentials issued and flashed.
+
+## Second migration: nila corrupted, replaced (2026-08-22)
+
+The nila host above (`192.168.1.45` / `100.100.38.32`) was itself
+corrupted. It was replaced with a new Raspberry Pi, still called "nila",
+at `192.168.1.41` / Tailscale `100.76.190.23` (the addresses used
+throughout this doc now). See
+`docs/architecture/adr/0011-nila-host-replaced-after-corruption.md` for
+full details. Unlike the Radxa migration, this one was **not** a
+from-scratch-secrets reset — the owner had the previous host's
+`MQTT_API_PASSWORD`/device MQTT credentials and `JWT_SECRET` recorded on
+the dev machine (`apps/api/.env`,
+`apps/firmware/egg_incubator_v2/secrets.h`) and asked to carry them
+over rather than regenerate, so the "generated fresh directly on nila"
+line in step 3 above describes the *general* pattern, not what actually
+happened this time.
+
+Still open from this migration:
+- `coop_monitor_v1` firmware and any ESP32 WiFi provisioning — owner
+  handling directly, not tracked here.
+- Android app's `API_BASE_URL` still points at `100.100.38.32` (the
+  *previous* nila, itself never updated from the Radxa-era address —
+  see the unresolved item above). Needs updating to `100.76.190.23`.

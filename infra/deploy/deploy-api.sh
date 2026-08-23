@@ -11,7 +11,7 @@
 # deploy includes a schema change.
 set -euo pipefail
 
-HOST="nila@100.100.38.32"
+HOST="nila@100.76.190.23"
 REMOTE_DIR="~/eggapp-app"
 TARBALL="/tmp/eggapp-api-deploy.tar.gz"
 
