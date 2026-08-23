@@ -41,3 +41,19 @@ for this scale (no email infra — an existing user is added immediately,
 a new user gets a one-time temporary password to share out-of-band)
 rather than building token-based invite emails for a 1-2-user personal
 deployment.
+
+## Phase 4 — Field operability (open)
+Firmware **OTA updates** (US-DEV-005, BR-015). Raised 2026-08-22 while
+deploying the two incubator boards to their field positions: with no OTA
+path in firmware, every firmware change requires physical USB access to
+each board. That cost is already concrete rather than hypothetical — a
+single day's debugging session (WiFi modem-sleep, a stuck-reconnect bug,
+per-board identity) took roughly ten reflashes across two boards while
+they were still on the bench. Once boards are mounted in their final
+positions, the same work needs a laptop carried to each one.
+**Blocked on:** an ADR choosing the delivery channel (MQTT-triggered pull
+vs. HTTP endpoint) — iot-integration-architect owns the device contract,
+embedded-engineer the firmware implementation.
+**Exit:** a firmware fix reaches every online device from the dashboard,
+with a failed update provably rolling back to the previous image and never
+interrupting an active batch's control loop beyond the reboot itself.

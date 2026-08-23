@@ -28,6 +28,7 @@ to prevent overlapping ownership between agents that cover related ground.
 11. [QA Engineer](../agents/qa-engineer.md) — test strategy across web, Android, backend, and IoT
 12. [Security & DevOps Engineer](../agents/security-devops-engineer.md) — threat modeling, OWASP, CI/CD, Android release/signing, infra
 13. [Documentation Engineer](../agents/documentation-engineer.md) — continuous doc maintenance and consistency
+14. [Obsidian Sync Engineer](../agents/obsidian-sync-engineer.md) — mirrors project state into the user's personal Obsidian vault
 
 ## Documentation Index
 
@@ -110,10 +111,10 @@ BLE not yet — the only remaining P1 Android gap, blocked on firmware),
 [setup steps](../packages/db/README.md)), `packages/shared-types`
 (canonical enums), `infra/docker` (Mosquitto) + `infra/systemd`/`infra/deploy`
 (apps/api **and now apps/web**, both via systemd) — all deployed and
-running on the always-on host **nila** (Raspberry Pi) per ADR 0007/0010,
-not the dev machine — reachable over Tailscale at `100.100.38.32:3001`
-(API) and `100.100.38.32:3000` (dashboard) from anywhere, and on the LAN
-at `192.168.1.45:3001`/`:3000` — `.github/workflows/ci.yml`.
+running on the always-on host **nila** (Raspberry Pi) per ADR 0007/0010/0011,
+not the dev machine — reachable over Tailscale at `100.76.190.23:3001`
+(API) and `100.76.190.23:3000` (dashboard) from anywhere, and on the LAN
+at `192.168.1.41:3001`/`:3000` — `.github/workflows/ci.yml`.
 
 **Firmware** (separate repo, `egg-incubator-esp32-rtos`): MQTT publish
 added alongside the pre-existing Google Sheets telemetry path (both run
