@@ -37,9 +37,22 @@ export function fmtDate(iso: string | null | undefined) {
   return iso ? new Date(iso).toLocaleDateString() : "—";
 }
 
+// Incubation day, counted the way the hatchery (and the ESP32 firmware in
+// apps/firmware, calcIncubationDay()) counts it: the day the eggs are set is
+// day 1, and the number rolls over at local midnight — not at the set
+// timestamp's time of day. Comparing calendar days rather than elapsed
+// milliseconds keeps a batch set at 15:30 on "day 1" for the rest of that
+// day instead of for the next 24 hours. Date.UTC on local Y/M/D pins each
+// date to a fixed instant so a DST shift can't make a day 23 or 25 hours.
 export function dayOf(setAt: string | null): number | null {
   if (!setAt) return null;
-  return Math.floor((Date.now() - Date.parse(setAt)) / 86_400_000);
+  const set = new Date(setAt);
+  if (Number.isNaN(set.getTime())) return null;
+  const midnightUTC = (d: Date) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+  const day = Math.floor((midnightUTC(new Date()) - midnightUTC(set)) / 86_400_000) + 1;
+  // A batch scheduled ahead of time reads as day 1, matching the firmware's
+  // own nowEpoch < startEpoch guard rather than showing 0 or a negative day.
+  return day < 1 ? 1 : day;
 }
 
 // US-INC-002/ENV-001 target ≤60s freshness; 90s gives one missed-interval

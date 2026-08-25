@@ -54,6 +54,14 @@ schedules) come from `domain-knowledge.md` via seeded species reference data
 - **BR-007** A device is bound to at most one incubator. Telemetry from an
   unbound/decommissioned device is rejected and logged, not stored against
   any incubator. Rebinding requires an explicit unbind first.
+- **BR-015** A firmware update must be **fail-safe**: an image that does not
+  download or verify cleanly is never applied, and the device returns to its
+  previous working firmware. An incubator holding a live batch must never be
+  left unable to run its temperature/humidity control loop by a failed or
+  interrupted update — the control loop is a life-support function for the
+  eggs, and the device controls climate autonomously precisely so platform
+  problems cannot reach it. A device also rejects an image not intended for
+  its device type. See US-DEV-005.
 
 ## Sync & access
 

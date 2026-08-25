@@ -66,5 +66,6 @@ every power-budget figure is still a datasheet estimate rather than a
 measurement. Coop-monitor board not started.
 
 **Not yet.** BLE provisioning (blocked on firmware) is the remaining P1 Android
-gap; the deployment is LAN-only (`192.168.1.44`) with no tunnel yet. See
+gap. The deployment (nila, a Raspberry Pi — ADR 0010) is reachable over
+Tailscale (`100.100.38.32`), not just the LAN. See
 [docs/product/roadmap.md](docs/product/roadmap.md) for what's next.

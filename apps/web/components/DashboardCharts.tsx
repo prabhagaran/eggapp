@@ -5,9 +5,6 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  Legend,
-  Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -132,47 +129,164 @@ export function AlertsSeverityBars({ warning, critical }: { warning: number; cri
   );
 }
 
-// ── Incubator temp/humidity mini chart ───────────────────────────────
-// Two series → legend required (never rely on color-matching alone).
-export function IncubatorEnvChart({ history }: { history: IncubatorHistory }) {
-  const data = history.points.map((p) => ({
-    ts: p.ts,
-    time: new Date(p.ts).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }),
-    tempC: p.tempC,
-    humidityPct: p.humidityPct,
-  }));
-  if (data.length < 2) {
-    return <p className="muted" style={{ margin: "0.5rem 0" }}>Not enough recent telemetry to chart yet.</p>;
-  }
+// ── Incubator temp/humidity mini chart ─────────────────────
+// Two stacked single-series sparkplots, not one two-series line chart:
+// °C and %RH have no common scale, so plotting them against one y-axis
+// makes their crossings look like events. Same colours and the same
+// syncId'd crosshair as the full chart on the incubator page, at
+// dashboard-card size.
+const ENV_TEMP = "#eb6834";
+const ENV_HUMIDITY = "#2a78d6";
+
+function MiniEnvPanel({
+  data,
+  label,
+  unit,
+  color,
+  decimals,
+  gradientId,
+  syncId,
+  showAxis,
+}: {
+  data: { ts: number; value: number | null }[];
+  label: string;
+  unit: string;
+  color: string;
+  decimals: number;
+  gradientId: string;
+  syncId: string;
+  showAxis: boolean;
+}) {
+  const values = data.map((d) => d.value).filter((v): v is number => v != null);
+  if (values.length < 2) return null;
+  const latest = [...data].reverse().find((d) => d.value != null)!.value!;
+  const lo = Math.min(...values);
+  const hi = Math.max(...values);
+  const pad = (hi - lo) * 0.25 || 0.5;
+
   return (
-    <div style={{ width: "100%", height: 130 }}>
-      <ResponsiveContainer>
-        <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
-          <CartesianGrid strokeDasharray="0" stroke={BORDER} vertical={false} />
-          <XAxis dataKey="time" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} minTickGap={40} />
-          <YAxis tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} width={34} />
-          <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: MUTED, fontSize: "0.75rem" }} />
-          <Legend
-            verticalAlign="top"
-            height={22}
-            iconType="plainline"
-            formatter={(value) => <span style={{ color: MUTED, fontSize: "0.75rem" }}>{value}</span>}
-          />
-          <Line type="monotone" dataKey="tempC" name="Temp °C" stroke={ACCENT} strokeWidth={2} dot={false} isAnimationActive={false} connectNulls />
-          <Line
-            type="monotone"
-            dataKey="humidityPct"
-            name="Humidity %"
-            stroke={HUMIDITY}
-            strokeWidth={2}
-            dot={false}
-            isAnimationActive={false}
-            connectNulls
-          />
-        </LineChart>
-      </ResponsiveContainer>
+    <div>
+      <div className="env-mini-head">
+        <i className="env-key" style={{ background: color }} aria-hidden="true" />
+        <span>{label}</span>
+        <b style={{ color }}>
+          {latest.toFixed(decimals)}
+          {unit}
+        </b>
+      </div>
+      <div style={{ width: "100%", height: showAxis ? 74 : 62 }}>
+        <ResponsiveContainer>
+          <AreaChart data={data} syncId={syncId} margin={{ top: 4, right: 6, bottom: 0, left: 0 }}>
+            <defs>
+              <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={color} stopOpacity={0.22} />
+                <stop offset="100%" stopColor={color} stopOpacity={0.02} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid stroke={BORDER} vertical={false} />
+            <XAxis
+              dataKey="ts"
+              type="number"
+              scale="time"
+              domain={["dataMin", "dataMax"]}
+              tickFormatter={(ts: number) =>
+                new Date(ts).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+              }
+              tick={{ fill: MUTED, fontSize: 10 }}
+              tickMargin={6}
+              minTickGap={48}
+              axisLine={{ stroke: BORDER }}
+              tickLine={false}
+              height={showAxis ? 22 : 4}
+              hide={!showAxis}
+            />
+            <YAxis
+              domain={[lo - pad, hi + pad]}
+              ticks={[lo, hi]}
+              tickFormatter={(v: number) => v.toFixed(decimals)}
+              tick={{ fill: MUTED, fontSize: 10 }}
+              width={30}
+              axisLine={false}
+              tickLine={false}
+            />
+            <Tooltip
+              cursor={{ stroke: MUTED, strokeOpacity: 0.45, strokeWidth: 1 }}
+              isAnimationActive={false}
+              content={({ active, payload, label: ts }) => {
+                if (!active || !payload?.length) return null;
+                const v = payload[0]!.value as number | null;
+                return (
+                  <div className="env-tip">
+                    <b style={{ color }}>{v == null ? "—" : `${v.toFixed(decimals)}${unit}`}</b>
+                    <span>{label}</span>
+                    <span className="env-tip-ts">
+                      {new Date(Number(ts)).toLocaleString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </div>
+                );
+              }}
+            />
+            <Area
+              type="monotone"
+              dataKey="value"
+              stroke={color}
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              fill={`url(#${gradientId})`}
+              dot={false}
+              activeDot={{ r: 3.5, fill: color, stroke: "#fff", strokeWidth: 2 }}
+              isAnimationActive={false}
+              connectNulls
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }
 
-export const chartColors = { ACCENT, ACCENT_SOFT, HUMIDITY, HUMIDITY_SOFT, WARN, DANGER, MUTED };
+export function IncubatorEnvChart({ history, id }: { history: IncubatorHistory; id: string }) {
+  const sorted = [...history.points].sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts));
+  const temp = sorted.map((p) => ({ ts: Date.parse(p.ts), value: p.tempC }));
+  const humidity = sorted.map((p) => ({ ts: Date.parse(p.ts), value: p.humidityPct }));
+
+  if (sorted.length < 2) {
+    return (
+      <p className="muted" style={{ margin: "0.5rem 0" }}>
+        Not enough recent telemetry to chart yet.
+      </p>
+    );
+  }
+  return (
+    <div className="env-mini">
+      <MiniEnvPanel
+        data={temp}
+        label="Temp"
+        unit="°C"
+        color={ENV_TEMP}
+        decimals={1}
+        gradientId={`miniTemp-${id}`}
+        syncId={`mini-${id}`}
+        showAxis={false}
+      />
+      <MiniEnvPanel
+        data={humidity}
+        label="Humidity"
+        unit="%"
+        color={ENV_HUMIDITY}
+        decimals={0}
+        gradientId={`miniHum-${id}`}
+        syncId={`mini-${id}`}
+        showAxis
+      />
+    </div>
+  );
+}
+
+export const chartColors = { ACCENT, ACCENT_SOFT, HUMIDITY, HUMIDITY_SOFT, WARN, DANGER, MUTED, ENV_TEMP, ENV_HUMIDITY };

@@ -3,8 +3,17 @@
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DEVICE IDENTITY
+//
+// DEVICE_ID is NOT set here — it lives in `secrets.h`, next to the MQTT
+// credentials it has to match. This file is tracked in git; secrets.h is not.
+// When DEVICE_ID lived here, flashing a second board meant editing a tracked
+// file and an untracked one together and remembering to revert both, and the
+// two halves of a board's identity could silently drift apart. Two boards
+// ended up flashed as INCUBATOR_01 that way: same MQTT client id, so each
+// connection kicked the other off the broker in a loop.
+//
+// One board = one secrets.h. See secrets.h.example and flash.ps1.
 // ─────────────────────────────────────────────────────────────────────────────
-#define DEVICE_ID          "INCUBATOR_01"
 #define FW_VERSION         "2.0.0"
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -46,6 +55,14 @@
 // Active-LOW relay board
 #define RELAY_ON           LOW
 #define RELAY_OFF          HIGH
+
+// The humidifier channel is the one exception: its module is active-HIGH, so
+// GPIO14 must be driven HIGH to run it and LOW to stop it — the inverse of
+// every other relay. Never write RELAY_ON/RELAY_OFF to RELAY_HUMIDIFIER
+// directly; go through relayLevel() in globals.h, which picks the right
+// polarity per pin.
+#define HUMIDIFIER_ON      HIGH
+#define HUMIDIFIER_OFF     LOW
 
 // ─────────────────────────────────────────────────────────────────────────────
 // OLED DISPLAY
@@ -244,6 +261,11 @@
 #    include "secrets.h"
 #  else
 // Default fallbacks (empty -> disabled). Provide a secrets.h to enable cloud.
+// DEVICE_ID gets an obviously-wrong placeholder rather than a plausible one:
+// a board publishing as INCUBATOR_UNCONFIGURED is self-evidently unconfigured,
+// where a default of "INCUBATOR_01" would look correct while colliding with a
+// real board.
+#    define DEVICE_ID         "INCUBATOR_UNCONFIGURED"
 #    define GOOGLE_SCRIPT_URL ""
 #    define CLOUD_TOKEN        ""
 #    define CLOUD_ROOT_CA      ""
@@ -257,6 +279,13 @@
 #else
 // Fallback for toolchains without __has_include
 #  include "secrets.h"
+#endif
+
+// A secrets.h written before DEVICE_ID moved here would otherwise build fine
+// and flash whatever identity happened to be left in config.h — precisely the
+// silent wrong-identity failure this layout exists to prevent. Fail loudly.
+#ifndef DEVICE_ID
+#  error "DEVICE_ID is not defined. Add it to secrets.h (see secrets.h.example): it names THIS board and must match its MQTT_USERNAME."
 #endif
 
 #endif // CONFIG_H

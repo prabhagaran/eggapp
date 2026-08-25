@@ -28,6 +28,7 @@ to prevent overlapping ownership between agents that cover related ground.
 11. [QA Engineer](../agents/qa-engineer.md) — test strategy across web, Android, backend, and IoT
 12. [Security & DevOps Engineer](../agents/security-devops-engineer.md) — threat modeling, OWASP, CI/CD, Android release/signing, infra
 13. [Documentation Engineer](../agents/documentation-engineer.md) — continuous doc maintenance and consistency
+14. [Obsidian Sync Engineer](../agents/obsidian-sync-engineer.md) — mirrors project state into the user's personal Obsidian vault
 
 ## Documentation Index
 
@@ -98,22 +99,20 @@ charts + setpoint control, an Alerts page with ack, Phase 2 `/flocks`,
 `/flocks/[id]`, `/vaccination-templates` pages, and Phase 3 `/inventory`,
 `/reports` (tabbed, 4 report views + CSV export), `/team` (invite/remove
 members) pages plus a farm switcher/creator in the top bar), `apps/android`
-(Kotlin + Compose — login, live incubator status, offline-first
-candling/hatch/egg-collection recording via Room + WorkManager, FCM
-push notifications (`push/EggAppMessagingService.kt`), and Phase 2
-flock list/detail screens with offline-first mortality/vaccination/
-feed/water recording (same Room + WorkManager sync pattern), all built
-and verified for real on-emulator against the deployed API, including
-genuine offline/reconnect testing and a full MQTT→Alert→push chain;
-BLE not yet — the only remaining P1 Android gap, blocked on firmware),
+(**Flutter**, Android + iOS — rebuilt from the Kotlin app on 2026-08-23,
+ADR 0012. Phase 1 shipped: login with Keystore/Keychain token storage,
+refresh-on-401 API client, and live read screens for incubators, batches,
+collections, flocks and alerts. The offline queue, push, and write parity
+that the Kotlin app had are staged as Phases 2–4 and are **not yet
+rebuilt**; BLE remains blocked on firmware),
 `packages/db` (Prisma + Species seed,
 [setup steps](../packages/db/README.md)), `packages/shared-types`
 (canonical enums), `infra/docker` (Mosquitto) + `infra/systemd`/`infra/deploy`
 (apps/api **and now apps/web**, both via systemd) — all deployed and
-running on the always-on Radxa host per ADR 0006/0007, not the dev
-machine — reachable on the LAN at `192.168.1.44:3001` (API) and
-`192.168.1.44:3000` (dashboard); not reachable outside the home network
-yet (Tailscale/tunnel — not started) — `.github/workflows/ci.yml`.
+running on the always-on host **nila** (Raspberry Pi) per ADR 0007/0010/0011,
+not the dev machine — reachable over Tailscale at `100.76.190.23:3001`
+(API) and `100.76.190.23:3000` (dashboard) from anywhere, and on the LAN
+at `192.168.1.41:3001`/`:3000` — `.github/workflows/ci.yml`.
 
 **Firmware** (separate repo, `egg-incubator-esp32-rtos`): MQTT publish
 added alongside the pre-existing Google Sheets telemetry path (both run

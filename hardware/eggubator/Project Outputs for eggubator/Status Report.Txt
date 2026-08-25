@@ -1,25 +1,14 @@
 Project Outputs Generation Report
 ---------------------------------
-Start Output Generation At 21:15:05 On 08-08-2026
+Start Output Generation At 21:30:26 On 15-08-2026
 
-Output: Gerber Files
-Type  : Gerber
-From  : Variant [[No Variations]] of PCB Document [eggubator.PcbDoc]
-   Generated File[eggubator.GTO]
-   Generated File[eggubator.GTP]
-   Generated File[eggubator.GTS]
-   Generated File[eggubator.GTL]
-   Generated File[eggubator.GBL]
-   Generated File[eggubator.GBS]
-   Generated File[eggubator.GBP]
-   Generated File[eggubator.GBO]
-   Generated File[eggubator.GM1]
-   Generated File[eggubator.RUL]
-   Generated File[eggubator.EXTREP]
-   Generated File[eggubator.REP]
+Output: Copy of Bill of Materials
+Type  : BOM
+From  : Variant [[No Variations]] of Project [eggubator.PrjPcb]
+   Generated File[Copy of Bill of Materials-eggubator.xlsx]
 
 
-Files Generated   : 12
+Files Generated   : 1
 Documents Printed : 0
 
-Finished Output Generation At 21:15:05 On 08-08-2026
+Finished Output Generation At 21:30:28 On 15-08-2026

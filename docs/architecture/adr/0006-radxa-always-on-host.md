@@ -3,7 +3,10 @@
 - **Date:** 2026-07-17
 - **Author agent:** system-architect (with security-devops-engineer on
   the operational side)
-- **Status:** Accepted
+- **Status:** Superseded by
+  [ADR 0010](0010-nila-replaces-radxa.md) (2026-08-15) — the Radxa was
+  decommissioned; a Raspberry Pi ("nila") took over the same role. Kept
+  below for historical context.
 
 ## Context
 ADR 0004 chose Mosquitto but didn't pin down *where* it runs. It was

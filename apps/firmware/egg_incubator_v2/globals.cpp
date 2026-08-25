@@ -83,7 +83,7 @@ void setRelay(uint8_t pin, bool on) {
 
     // GPIO write is atomic on ESP32 — always execute it regardless of mutex state.
     // The mutex only protects the gRelayState software mirror.
-    digitalWrite(pin, on ? RELAY_ON : RELAY_OFF);
+    digitalWrite(pin, relayLevel(pin, on));
 
     if (xSemaphoreTake(controlMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
         switch (pin) {

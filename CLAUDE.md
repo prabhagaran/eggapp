@@ -1,7 +1,7 @@
 # Smart Poultry Farm Management System — Agent Coordination Charter
 
 ## Purpose
-This file defines how the 13 specialist agents in `agents/` work together. It is
+This file defines how the 15 specialist agents in `agents/` work together. It is
 read by every agent before it begins work, and it is the arbitration reference
 when two agents' outputs conflict.
 
@@ -39,6 +39,13 @@ agents — it is not re-litigated per feature.
    (parallel with step 3); security review of implemented code happens continuously,
    not as a final gate.
 7. **documentation-engineer** — maintains docs continuously; not a final-step agent.
+8. **obsidian-sync-engineer** — mirrors resulting state (status, issues,
+   decisions, lessons learned) into the user's personal Obsidian vault;
+   runs continuously after documentation-engineer's work lands, never before.
+9. **embedded-engineer** — builds, flashes, and hardware-in-the-loop tests
+   ESP32 firmware changes against a physical devkit board once
+   iot-integration-architect's contract and the firmware code itself exist;
+   runs whenever firmware in `apps/firmware/` changes, not as a one-time step.
 
 ### Shared source of truth
 - All cross-agent decisions (tenancy model, auth strategy, storage choices, MQTT
@@ -79,12 +86,16 @@ concurrent users, and whether this is single-tenant or multi-tenant SaaS.
 
 ## Client / Device Surfaces
 This product has **three** first-class surfaces, not two:
-- **ESP32 firmware** (`apps/firmware/`, owned by iot-integration-architect) —
-  merged into this repo as a git subtree of `egg-incubator-esp32-rtos`
-  (history preserved). It publishes/consumes the device-facing contract
-  documented in `docs/iot/mqtt-topics.md` / `docs/iot/telemetry-contract.md`.
-  That contract remains authoritative per the escalation rule above — other
-  agents adapt to it, not the reverse — but firmware behavior is now in-repo
-  and may be reviewed/modified here rather than treated as a black box.
+- **ESP32 firmware** (`apps/firmware/`, contract owned by
+  iot-integration-architect; build/flash/hardware-test owned by
+  **embedded-engineer**) — merged into this repo as a git subtree of
+  `egg-incubator-esp32-rtos` (history preserved). It publishes/consumes the
+  device-facing contract documented in `docs/iot/mqtt-topics.md` /
+  `docs/iot/telemetry-contract.md`. That contract remains authoritative per
+  the escalation rule above — other agents adapt to it, not the reverse —
+  but firmware behavior is now in-repo and may be reviewed/modified here
+  rather than treated as a black box. embedded-engineer is the agent that
+  actually compiles, flashes, and verifies firmware changes on a physical
+  ESP32 devkit board.
 - **Android app** (owned by android-architect) — see "Client surfaces" below.
 - **Web dashboard** (owned by frontend-architect) — see "Client surfaces" below.

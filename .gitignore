@@ -53,6 +53,9 @@ fp-info-cache
 # Next.js generated
 apps/web/next-env.d.ts
 
+# Agent harness — per-developer permissions, not shared config
+.claude/settings.local.json
+
 # IDE / OS
 .idea/
 .vscode/

@@ -473,7 +473,7 @@ export default function Dashboard() {
             )}
             {inc.device && envHistory[inc.id] && (
               <div style={{ marginTop: "0.6rem" }}>
-                <IncubatorEnvChart history={envHistory[inc.id]!} />
+                <IncubatorEnvChart history={envHistory[inc.id]!} id={inc.id} />
               </div>
             )}
           </div>
