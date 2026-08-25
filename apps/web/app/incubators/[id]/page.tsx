@@ -1,12 +1,14 @@
 "use client";
 // US-ENV-002: history charts (24h / 7d / full-batch window) with min/max/avg.
-// No charting library — payloads are small (downsampled server-side to
-// ≤500 points), so a hand-rolled SVG polyline keeps this dependency-free.
+// The plotting lives in EnvHistoryChart (recharts, shared with the
+// dashboard) so both surfaces read the same; this page owns the range
+// picker and the fetch.
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../../../lib/api";
 import type { Batch, DeviceConfig, Incubator } from "../../../lib/types";
 import { useAuthedFarm } from "../../../lib/useAuthedFarm";
+import { EnvHistoryChart } from "../../../components/EnvHistoryChart";
 
 interface HistoryPoint {
   ts: string;
@@ -29,10 +31,6 @@ interface History {
 }
 
 type RangeOption = "24h" | "7d" | "batch";
-
-function fmt(n: number | null, unit: string) {
-  return n == null ? "—" : `${n.toFixed(1)}${unit}`;
-}
 
 export default function IncubatorHistoryPage() {
   const farmId = useAuthedFarm();
@@ -98,55 +96,27 @@ export default function IncubatorHistoryPage() {
         )}
       </div>
 
-      {history && (
-        <>
-          <div className="metrics card">
-            <span className="stat">
-              <b>{fmt(history.summary.temp.min, "°C")}</b>
-              <span className="muted">temp min</span>
-            </span>
-            <span className="stat">
-              <b>{fmt(history.summary.temp.avg, "°C")}</b>
-              <span className="muted">temp avg</span>
-            </span>
-            <span className="stat">
-              <b>{fmt(history.summary.temp.max, "°C")}</b>
-              <span className="muted">temp max</span>
-            </span>
-            <span className="stat">
-              <b>{fmt(history.summary.humidity.min, "%")}</b>
-              <span className="muted">humidity min</span>
-            </span>
-            <span className="stat">
-              <b>{fmt(history.summary.humidity.avg, "%")}</b>
-              <span className="muted">humidity avg</span>
-            </span>
-            <span className="stat">
-              <b>{fmt(history.summary.humidity.max, "%")}</b>
-              <span className="muted">humidity max</span>
-            </span>
-          </div>
-
-          {history.points.length === 0 ? (
-            <p className="muted">No telemetry in this window.</p>
-          ) : (
-            <>
-              <div className="card">
-                <div className="muted" style={{ marginBottom: "0.4rem" }}>
-                  Temperature (°C)
-                </div>
-                <LineChart points={history.points} pick={(p) => p.tempC} color="var(--danger)" />
-              </div>
-              <div className="card">
-                <div className="muted" style={{ marginBottom: "0.4rem" }}>
-                  Humidity (%)
-                </div>
-                <LineChart points={history.points} pick={(p) => p.humidityPct} color="var(--accent)" />
-              </div>
-            </>
-          )}
-        </>
-      )}
+      {history &&
+        (history.points.length === 0 ? (
+          <p className="muted">No telemetry in this window.</p>
+        ) : (
+          // min/avg/max now ride each panel's header rather than a
+          // separate stat strip — the numbers belong next to the curve
+          // they describe.
+          <EnvHistoryChart
+            points={history.points}
+            range={range}
+            summary={history.summary}
+            tempBand={{
+              setpoint: incubator?.device?.currentTempSetpoint ?? null,
+              hysteresis: incubator?.device?.currentTempHysteresis ?? null,
+            }}
+            humidityBand={{
+              setpoint: incubator?.device?.currentHumSetpoint ?? null,
+              hysteresis: incubator?.device?.currentHumHysteresis ?? null,
+            }}
+          />
+        ))}
     </>
   );
 }
@@ -383,50 +353,5 @@ function ActuatorsCard({
         </p>
       )}
     </div>
-  );
-}
-
-function LineChart({
-  points,
-  pick,
-  color,
-}: {
-  points: HistoryPoint[];
-  pick: (p: HistoryPoint) => number | null;
-  color: string;
-}) {
-  const width = 880;
-  const height = 220;
-  const padding = 24;
-
-  const series = points.map((p) => ({ x: Date.parse(p.ts), y: pick(p) })).filter((p) => p.y != null) as {
-    x: number;
-    y: number;
-  }[];
-  if (series.length < 2) return <p className="muted">Not enough data points yet.</p>;
-
-  const xMin = series[0]!.x;
-  const xMax = series[series.length - 1]!.x;
-  const yMin = Math.min(...series.map((p) => p.y));
-  const yMax = Math.max(...series.map((p) => p.y));
-  const yPad = (yMax - yMin) * 0.1 || 1;
-
-  const toX = (x: number) => padding + ((x - xMin) / (xMax - xMin || 1)) * (width - 2 * padding);
-  const toY = (y: number) =>
-    height - padding - ((y - (yMin - yPad)) / (yMax + yPad - (yMin - yPad) || 1)) * (height - 2 * padding);
-
-  const path = series.map((p, i) => `${i === 0 ? "M" : "L"}${toX(p.x).toFixed(1)},${toY(p.y).toFixed(1)}`).join(" ");
-
-  return (
-    <svg viewBox={`0 0 ${width} ${height}`} style={{ width: "100%", height: "auto", display: "block" }}>
-      <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="var(--border)" />
-      <path d={path} fill="none" stroke={color} strokeWidth={2} />
-      <text x={padding} y={14} className="muted" fontSize={11} fill="var(--muted)">
-        {yMax.toFixed(1)}
-      </text>
-      <text x={padding} y={height - padding - 4} className="muted" fontSize={11} fill="var(--muted)">
-        {yMin.toFixed(1)}
-      </text>
-    </svg>
   );
 }

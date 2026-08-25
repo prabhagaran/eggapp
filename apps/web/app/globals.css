@@ -386,3 +386,75 @@ button:disabled { opacity: 0.5; cursor: default; }
 .metrics { display: flex; gap: 1.5rem; flex-wrap: wrap; }
 .metrics .stat { display: flex; flex-direction: column; }
 .metrics .stat b { font-size: 1.4rem; }
+
+/* ── Environment history chart (temperature / humidity) ───────────── */
+/* One card holding two stacked single-series panels. They are separate
+   plots on purpose (°C and %RH don't share a scale) but read as one
+   figure: same width, same time axis, one crosshair across both. */
+.env-chart { padding: 0.35rem 1.25rem 1rem; }
+.env-panel { padding: 0.9rem 0 0.35rem; }
+.env-divider { height: 1px; background: var(--border); margin: 0.25rem 0; }
+
+.env-panel-head {
+  display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap;
+  margin-bottom: 0.15rem;
+}
+.env-panel-title {
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  font-size: 0.85rem; font-weight: 600; color: var(--muted);
+}
+/* A short stroke of the series color carries identity — the text stays ink. */
+.env-key { width: 14px; height: 3px; border-radius: 2px; flex-shrink: 0; }
+.env-panel-now {
+  font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1;
+}
+.env-panel-stats {
+  display: flex; gap: 0.9rem; margin-left: auto;
+  font-size: 0.75rem; color: var(--muted);
+}
+.env-panel-stats b { color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.env-plot { width: 100%; height: 190px; }
+.env-panel:last-of-type .env-plot { height: 210px; }
+
+.env-tip {
+  display: flex; flex-direction: column; gap: 0.1rem;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); box-shadow: var(--shadow-md);
+  padding: 0.5rem 0.7rem;
+}
+/* Value leads, label follows — the reader already knows the series. */
+.env-tip b { font-size: 1.05rem; line-height: 1.2; letter-spacing: -0.01em; }
+.env-tip > span { font-size: 0.75rem; color: var(--muted); }
+.env-tip-ts { font-variant-numeric: tabular-nums; }
+
+.env-legend-note {
+  display: flex; align-items: center; gap: 0.4rem;
+  font-size: 0.75rem; color: var(--muted); margin: 0.5rem 0 0;
+}
+.env-band-key {
+  width: 18px; height: 10px; border-radius: 3px; flex-shrink: 0;
+  background: rgba(18, 53, 36, 0.08); border-top: 1px dashed rgba(18, 53, 36, 0.4);
+  border-bottom: 1px dashed rgba(18, 53, 36, 0.4);
+}
+
+.env-table { margin-top: 0.65rem; }
+.env-table > summary {
+  cursor: pointer; font-size: 0.78rem; color: var(--muted);
+  width: fit-content; padding: 0.15rem 0;
+}
+.env-table > summary:hover { color: var(--accent); }
+.env-table td { font-variant-numeric: tabular-nums; }
+
+@media (max-width: 640px) {
+  .env-panel-stats { margin-left: 0; width: 100%; }
+  .env-plot, .env-panel:last-of-type .env-plot { height: 165px; }
+}
+
+/* Dashboard-card version of the same figure. */
+.env-mini { display: flex; flex-direction: column; gap: 0.35rem; }
+.env-mini-head {
+  display: flex; align-items: baseline; gap: 0.45rem;
+  font-size: 0.75rem; color: var(--muted);
+}
+.env-mini-head b { margin-left: auto; font-size: 0.95rem; letter-spacing: -0.01em; }
