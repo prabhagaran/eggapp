@@ -272,6 +272,18 @@ void pushError(const char* type, const char* message);
 inline float round1(float v) { return roundf(v * 10.0f) / 10.0f; }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// HELPER: GPIO level for a relay channel in the given logical state.
+// Relay polarity is not uniform: the board is active-LOW, but the humidifier
+// module on GPIO14 is active-HIGH. Every write to a relay pin — setRelay() and
+// the boot-time OFF sweep in setup() alike — resolves its level here so the
+// two cannot drift apart.
+// ─────────────────────────────────────────────────────────────────────────────
+inline uint8_t relayLevel(uint8_t pin, bool on) {
+    if (pin == RELAY_HUMIDIFIER) return on ? HUMIDIFIER_ON : HUMIDIFIER_OFF;
+    return on ? RELAY_ON : RELAY_OFF;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // HELPER: safe relay write — ALL relay changes must go through this
 // ─────────────────────────────────────────────────────────────────────────────
 void setRelay(uint8_t pin, bool on);

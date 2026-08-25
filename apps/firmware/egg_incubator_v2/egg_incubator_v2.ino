@@ -366,12 +366,14 @@ void setup() {
     Serial.println("[SETUP] Boot v" FW_VERSION);
 
     // ── Relay pins — drive OFF immediately before anything else ──────────────
-    pinMode(RELAY_HEATER,     OUTPUT); digitalWrite(RELAY_HEATER,     RELAY_OFF);
-    pinMode(RELAY_COOLER,     OUTPUT); digitalWrite(RELAY_COOLER,     RELAY_OFF);
-    pinMode(RELAY_HUMIDIFIER, OUTPUT); digitalWrite(RELAY_HUMIDIFIER, RELAY_OFF);
-    pinMode(RELAY_FAN,        OUTPUT); digitalWrite(RELAY_FAN,        RELAY_OFF);
-    pinMode(RELAY_PUMP,       OUTPUT); digitalWrite(RELAY_PUMP,       RELAY_OFF);
-    pinMode(RELAY_TURNER,     OUTPUT); digitalWrite(RELAY_TURNER,     RELAY_OFF);
+    // relayLevel() resolves the OFF level per channel: HIGH for the active-LOW
+    // board, LOW for the active-HIGH humidifier module.
+    pinMode(RELAY_HEATER,     OUTPUT); digitalWrite(RELAY_HEATER,     relayLevel(RELAY_HEATER,     false));
+    pinMode(RELAY_COOLER,     OUTPUT); digitalWrite(RELAY_COOLER,     relayLevel(RELAY_COOLER,     false));
+    pinMode(RELAY_HUMIDIFIER, OUTPUT); digitalWrite(RELAY_HUMIDIFIER, relayLevel(RELAY_HUMIDIFIER, false));
+    pinMode(RELAY_FAN,        OUTPUT); digitalWrite(RELAY_FAN,        relayLevel(RELAY_FAN,        false));
+    pinMode(RELAY_PUMP,       OUTPUT); digitalWrite(RELAY_PUMP,       relayLevel(RELAY_PUMP,       false));
+    pinMode(RELAY_TURNER,     OUTPUT); digitalWrite(RELAY_TURNER,     relayLevel(RELAY_TURNER,     false));
 
     // ── Fan PWM — init LEDC once, before any task can call setFanSpeed() ─────
     initFanPwm();

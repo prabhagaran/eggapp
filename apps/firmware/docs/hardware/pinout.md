@@ -35,7 +35,7 @@ Debounced in software (50 ms, ezButton) by the button task.
 |----------|------|-------|
 | Heater | GPIO 26 | |
 | Cooler | GPIO 27 | climate-chamber profile only |
-| Humidifier | GPIO 14 | |
+| Humidifier | GPIO 14 | ⚠ **active-HIGH** — inverse of every other channel |
 | Fan | GPIO 13 | **LEDC PWM**, inverted duty (100 % speed = pin LOW) |
 | Pump | GPIO 12 | ⚠ strapping pin — see warning below |
 | Turner | GPIO 15 | ⚠ strapping pin — see warning below |
@@ -48,10 +48,33 @@ Debounced in software (50 ms, ezButton) by the button task.
     flash-voltage eFuse (`espefuse.py set_flash_voltage 3.3V`). Verify boot
     behavior with the actual relay board attached.
 
+## Relay polarity
+
+The relay board is active-LOW (`RELAY_ON = LOW`), but the **humidifier module
+on GPIO 14 is active-HIGH** (`HUMIDIFIER_ON = HIGH`) — driving it LOW stops it.
+
+| Channel | ON level | OFF level |
+|---------|----------|-----------|
+| Heater, cooler, pump, turner | LOW | HIGH |
+| **Humidifier** | **HIGH** | **LOW** |
+| Fan | LEDC PWM, inverted duty | — |
+
+Nothing writes `RELAY_ON`/`RELAY_OFF` to a pin directly. Both write sites —
+`setRelay()` in `globals.cpp` and the boot-time OFF sweep in `setup()` — resolve
+the level through `relayLevel(pin, on)` in `globals.h`, so the two cannot drift
+apart when a channel's polarity changes.
+
+!!! warning "GPIO 14 pulses at reset"
+    GPIO 14 emits a brief pulse during ESP32 boot, before `setup()` runs. On the
+    old active-LOW wiring that pulse read as *off*; active-HIGH inverts that, so
+    the humidifier can twitch on for a few milliseconds at every reset. Harmless
+    for a mister, but if the channel ever drives something that must not be
+    pulsed, add an external pull-down on GPIO 14 rather than relying on firmware.
+
 ## Safety-relevant electrical notes
 
-- All relay pins are driven to `RELAY_OFF` (HIGH) **first thing in `setup()`**,
-  before any peripheral init.
+- All relay pins are driven to their **OFF level** (per the polarity table above)
+  **first thing in `setup()`**, before any peripheral init.
 - The fan LEDC channel initializes at duty 255 (= relay OFF for the inverted
   active-LOW convention).
 - All ESP32 GPIOs are 3.3 V logic; relay coils must be driven via the opto-isolated

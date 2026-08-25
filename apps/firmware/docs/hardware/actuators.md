@@ -77,18 +77,22 @@ This provides:
 
 ## Actuator Pin Assignment
 
-| Relay | Actuator | GPIO |
-|----|---------|------|
-| Relay 1 | Heater | GPIO 25 |
-| Relay 2 | Cooling Fan | GPIO 26 |
-| Relay 3 | Humidifier | GPIO 27 |
-| Relay 4 | Water Pump | GPIO 14 |
-| Relay 5 | Rotation Motor | GPIO 12 |
-| Relay 6 | Spare | GPIO 13 |
-| Relay 7 | Spare | GPIO 32 |
-| Relay 8 | Spare | GPIO 33 |
+As-built, from `egg_incubator_v2/config.h`. The design-phase 8-relay bank was
+superseded during implementation; [pinout.md](pinout.md) is the authoritative
+page and carries the strapping-pin and polarity notes.
 
-The system supports **up to 8 relay outputs**.
+| Actuator | GPIO | ON level |
+|----------|------|----------|
+| Heater | GPIO 26 | LOW |
+| Cooler | GPIO 27 | LOW |
+| Humidifier | GPIO 14 | **HIGH** — active-HIGH module |
+| Fan | GPIO 13 | LEDC PWM, inverted duty |
+| Pump | GPIO 16 | LOW |
+| Turner | GPIO 17 | LOW |
+
+Six channels, not eight. The board is active-LOW throughout except the
+humidifier; resolve levels with `relayLevel(pin, on)` rather than writing
+`RELAY_ON`/`RELAY_OFF` to a pin directly.
 
 ---
 

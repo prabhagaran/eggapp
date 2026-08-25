@@ -56,6 +56,14 @@
 #define RELAY_ON           LOW
 #define RELAY_OFF          HIGH
 
+// The humidifier channel is the one exception: its module is active-HIGH, so
+// GPIO14 must be driven HIGH to run it and LOW to stop it — the inverse of
+// every other relay. Never write RELAY_ON/RELAY_OFF to RELAY_HUMIDIFIER
+// directly; go through relayLevel() in globals.h, which picks the right
+// polarity per pin.
+#define HUMIDIFIER_ON      HIGH
+#define HUMIDIFIER_OFF     LOW
+
 // ─────────────────────────────────────────────────────────────────────────────
 // OLED DISPLAY
 // ─────────────────────────────────────────────────────────────────────────────
