@@ -99,14 +99,12 @@ charts + setpoint control, an Alerts page with ack, Phase 2 `/flocks`,
 `/flocks/[id]`, `/vaccination-templates` pages, and Phase 3 `/inventory`,
 `/reports` (tabbed, 4 report views + CSV export), `/team` (invite/remove
 members) pages plus a farm switcher/creator in the top bar), `apps/android`
-(Kotlin + Compose — login, live incubator status, offline-first
-candling/hatch/egg-collection recording via Room + WorkManager, FCM
-push notifications (`push/EggAppMessagingService.kt`), and Phase 2
-flock list/detail screens with offline-first mortality/vaccination/
-feed/water recording (same Room + WorkManager sync pattern), all built
-and verified for real on-emulator against the deployed API, including
-genuine offline/reconnect testing and a full MQTT→Alert→push chain;
-BLE not yet — the only remaining P1 Android gap, blocked on firmware),
+(**Flutter**, Android + iOS — rebuilt from the Kotlin app on 2026-08-23,
+ADR 0012. Phase 1 shipped: login with Keystore/Keychain token storage,
+refresh-on-401 API client, and live read screens for incubators, batches,
+collections, flocks and alerts. The offline queue, push, and write parity
+that the Kotlin app had are staged as Phases 2–4 and are **not yet
+rebuilt**; BLE remains blocked on firmware),
 `packages/db` (Prisma + Species seed,
 [setup steps](../packages/db/README.md)), `packages/shared-types`
 (canonical enums), `infra/docker` (Mosquitto) + `infra/systemd`/`infra/deploy`

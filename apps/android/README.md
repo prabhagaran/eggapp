@@ -1,252 +1,220 @@
-# eggAPP Android (field app)
+# eggAPP field app (Flutter)
 
-Owner: android-architect. Kotlin + Jetpack Compose, min SDK 26.
+Owner: android-architect. Flutter 3.44 / Dart 3.12, targeting **Android and
+iOS**. Replaces the Kotlin + Jetpack Compose app that lived here until
+2026-08-23 — see [ADR 0012](../../docs/architecture/adr/0012-flutter-replaces-kotlin-android-app.md)
+for why, and what was given up.
 
-## Status (first increment, 2026-07-18)
+The old Kotlin source is not gone, just not here: it is in git history at
+commit `6f94dda` under `apps/android/app/src/main/kotlin/`.
 
-Built and verified for real — Gradle build, install on an emulator, and a
-live network call against the deployed API were all actually exercised,
-not just written:
+## Status: Phase 1 (2026-08-23) — auth and live read screens
 
-- **Login** (US-USR-001): email/password → JWT, stored via
-  `EncryptedSharedPreferences` (Keystore-backed, per the security-devops
-  review item in `agents/android-architect.md`).
-- **Incubators list**: live temp/humidity per incubator, polling every
-  15s (matches `apps/web`'s cadence — telemetry itself lands every ~60s,
-  see `docs/iot/telemetry-contract.md`).
-- Retrofit client with an `Authenticator` that refreshes the access
-  token once on a 401 and retries, mirroring `apps/web/lib/api.ts`.
+Phase 1 is deliberately **read-only**. Every write in the Kotlin app went
+through a local record before the network, and shipping a write path that
+skips that queue would teach field workers a behaviour Phase 2 then takes
+away.
 
-## Status (second increment, 2026-07-18): offline-first field entry
+- **Login** — email/password → JWT, stored via `flutter_secure_storage`
+  (Android Keystore / iOS Keychain). Same posture as the Kotlin app's
+  `EncryptedSharedPreferences`, now on both platforms.
+- **API client** (`lib/data/api_client.dart`) — Dio with a bearer-token
+  interceptor and a refresh-once-on-401 retry, mirroring `apps/web/lib/api.ts`
+  and the Kotlin `RefreshAuthenticator`. Concurrent 401s collapse onto a
+  single refresh instead of firing one each.
+- **Screens** — incubators (live telemetry, 15s poll), batches + detail,
+  collections, flocks + detail with vaccination compliance, alerts, profile
+  with farm switcher.
+- **Incubation day counter** — 1-based and calendar-day based
+  (`lib/core/incubation.dart`), matching the firmware's `calcIncubationDay()`.
+  Covered by `test/incubation_test.dart`.
 
-- **Candling & hatch recording** (US-CAN-002, US-HAT-002): Room-backed
-  offline queue (`data/local/`) — saves always succeed locally first,
-  regardless of connectivity. A WorkManager `SyncWorker`
-  (`NetworkType.CONNECTED` constraint) pushes queued records via the
-  same `clientId`-idempotent endpoints the web client uses (BR-010).
-  Rejections (e.g. missing discrepancy note) are marked `conflict`
-  rather than retried forever; network failures retry with WorkManager's
-  backoff.
-- **Batch list & detail** (`ui/batch/`): active batches for the farm,
-  with the candling form (while `incubating`) or hatch form (while
-  `lockdown`/`hatching`) shown inline. The next unrecorded candling day
-  is pre-filled from the batch's schedule.
-- **Found and fixed during verification, not before**: the batch detail
-  screen originally only showed the recording forms once the batch had
-  been fetched from the server — meaning the entire offline-recording UI
-  vanished when actually offline, exactly backwards for a field app.
-  Fixed with `BatchCache` (`data/BatchCache.kt`): the last successfully
-  fetched batch is cached locally and shown immediately, with a live
-  refresh attempted on top when reachable.
+### Verified for real (Pixel_9a emulator, Android 16 / API 36)
 
-**Verified for real — genuine offline, not simulated**: disabled the
-emulator's wifi/data radios (`svc wifi disable` / `svc data disable`;
-the `airplane_mode` *setting* alone doesn't cut connectivity in an
-emulator), confirmed via `ping` that the network was actually
-unreachable, then recorded a candling session through the real UI. It
-saved locally and displayed `queued`. Re-enabled connectivity;
-WorkManager fired the sync automatically within ~15s with **no manual
-action or app restart** — confirmed via OkHttp logs (`201 Created`) and
-the UI flipping to `synced`. Then confirmed server-side, independently,
-that the exact data landed correctly: `viableCount` 50→45,
-`fertilityPct` computed as 90% (BR-015), matching what was entered
-offline exactly.
+`flutter analyze` clean, 11/11 unit tests pass, debug APK builds, installs and
+runs as `com.eggapp.field`. Every Phase 1 screen was driven through the real
+UI against the **deployed** API over Tailscale — not fixtures, not mocks:
 
-**Not built yet**: BLE device provisioning (blocked on the firmware —
-see `docs/iot/device-lifecycle.md`, BLE isn't implemented there yet
-either).
+- **Login** with the `android-create@test.local` QA account (see below) →
+  landed on Incubators with the farm name resolved into the app bar.
+- **Incubators**: the test farm's incubator with no device bound renders
+  `no device` and em dashes for temperature/humidity/last-reading — confirming
+  null telemetry stays null rather than displaying as `0.0`.
+- **Batches**: a `planned` batch with no `setAt` shows day `—`; an
+  `incubating` one set 7/12/2026 shows **day 43/21**, which is the correct
+  1-based calendar count (42 elapsed days + 1) on a batch left open past its
+  hatch date.
+- **Batch detail**: metrics, schedule, and egg sources with the source
+  collection's BR-011 age chip. The `device day` stat correctly does not
+  render when the batch has no `deviceDay`.
+- **Collections**: a 35-day-old collection renders its age chip red (BR-011
+  `>14`), with counts (20 / 5 / 15 / 0) matching the API exactly.
+- **Flocks + detail**: the parallel flock + vaccination-compliance fetch
+  resolves into one screen; empty sections state what is missing rather than
+  rendering blank.
+- **Alerts**: empty state.
+- **Profile**: identity, farm radio with role/timezone, API base URL.
+- **Token persistence**: `am force-stop` then relaunch went straight back to
+  Incubators without a login prompt — and that relaunch was the installed APK
+  standalone, not under `flutter run`. Confirms `flutter_secure_storage` is
+  really persisting to the Keystore and `Session.restore()` works.
 
-## Status (third increment, 2026-07-18): push notifications (US-NOT-002)
+**Still unverified**: the refresh-on-401 path (needs a token to actually
+expire in situ), and everything iOS.
 
-Alerts now reach the phone as a real push notification through eggAPP
-itself — explicitly not a third-party relay (e.g. Telegram); the
-requirement was notifications inside the app only.
+## Status: Phase 2, first slice (2026-08-23) — offline candling and hatch
 
-- **`push/EggAppMessagingService.kt`**: `FirebaseMessagingService` that
-  displays incoming pushes as a high-priority notification (channel
-  `eggapp_alerts`) deep-linking back into the app, and registers the
-  device's FCM token with `POST /v1/me/push-token` — once right after
-  login (`LoginViewModel`, since `onNewToken` only fires on rotation,
-  not every app start) and again whenever the token rotates.
-- **Runtime permission** (`MainActivity`): Android 13+ requires
-  `POST_NOTIFICATIONS` consent or pushes arrive but never display;
-  requested once on first launch.
-- `google-services.json` (gitignored, real Firebase Android app config)
-  is required in `app/` for the Google Services Gradle plugin to
-  generate the FCM config baked into the APK.
+A deliberately narrow vertical slice: the local store, the sync queue, and
+**candling and hatch only**. Scoped this way so the offline architecture is
+proven against a real batch before six more forms are built on top of it —
+and because day-7 candling on the live batch falls on 2026-08-27.
 
-**Verified for real, full chain, on the emulator** (`Pixel_9a`,
-`google_apis_playstore` image — needed for real Play Services/FCM):
-isolated test user logged in through the actual login UI (screenshots
-at each step, not assumed), confirmed server-side via a Prisma query
-that the real FCM token registered on login landed in `User.fcmToken`,
-then published a genuinely out-of-range MQTT telemetry reading
-(`temp: 60`) for a fake test device to the real broker on the Radxa.
-Confirmed server-side that this created a real `critical` Alert row,
-then confirmed on-device — via the notification shade, not just
-logcat — that eggAPP delivered: **"eggAPP • now — 🔴 Critical alert —
-Temperature out of range: 60°C"**. Delivery took ~1m45s end-to-end
-(MQTT publish → Alert → FCM → device), consistent with normal FCM
-latency on an emulator, not an error.
+- **Local store** (`lib/data/local/database.dart`) — Drift. A field write is
+  committed here before any network attempt (FRS §9), so a save cannot fail
+  for lack of connectivity.
+- **Sync queue** carrying all ten §10 metadata fields, including the ones the
+  retired Kotlin app never stored: device identity, retry count, last attempt,
+  and error detail.
+- **Four-state machine** — `pending → syncing → synced → failed` (§10).
+  `syncing` is a real state, so a second pass cannot pick up an in-flight
+  operation.
+- **Terminal vs retryable failures** — a transport error retries with backoff
+  (30s doubling to 15m); a business-rule rejection (wrong batch status,
+  missing discrepancy note) is marked terminal and stops retrying, because no
+  amount of retrying will fix it. The user is shown why and can discard it.
+- **Sync visibility** (§19.6) — a banner above every tab, a queue screen with
+  per-record state and error, and locally-captured records shown on the batch
+  they belong to.
+- **Field-entry UI** (§19.4) — 48dp stepper targets rather than keyboard
+  entry, live BR-003 reconciliation, and day pre-fill that accounts for both
+  server-held and locally queued sessions.
+- **Eligibility checked offline** (§13, `lib/core/batch_eligibility.dart`) —
+  mirrors the server's rules so a user learns at the incubator that a record
+  will not be accepted, rather than days later on sync. The server remains
+  authoritative and re-validates.
 
-## Status (fourth increment, 2026-07-18): egg collection recording (US-EGG-001/004)
+### Verified for real — genuine offline, not simulated
 
-Closes the last unbuilt P1 Android gap (besides BLE, which stays
-blocked on the firmware) — same offline-first pattern as candling/hatch,
-reusing the already-shipped backend (`POST /farms/:farmId/collections`,
-clientId-idempotent per BR-010; `POST .../collections/:id/discard`).
+26/26 unit tests pass and `flutter analyze` is clean, but the meaningful proof
+was on the emulator against the **deployed** API:
 
-- **`ui/collections/`**: a farm-level screen (not tied to a batch, since
-  collection→batch assignment is a web-only workflow, US-EGG-003) with
-  a record-collection form and a live list. New `CollectionEntity`
-  (Room, `pending_collection` table) queues saves offline exactly like
-  `CandlingEntity`/`HatchEntity`; `SyncWorker` gained a third push loop.
-  Bumped `AppDatabase` to version 2 with `fallbackToDestructiveMigration()`
-  — no released version to preserve queued rows across.
-- **Discard is online-only, deliberately**: unlike create, the discard
-  endpoint has no `clientId` idempotency (no per-discard audit row to
-  key off — counts are aggregated in place). Queuing it for
-  retry-on-reconnect risks a retried request double-deducting eggs, so
-  `CollectionsViewModel.discard()` calls the API directly and surfaces
-  failure instead. Discarding normally happens while reviewing a
-  freshly-fetched list anyway, so this isn't a real gap in practice.
+1. Signed in, opened an incubating batch.
+2. Disabled the radios with `svc wifi disable` / `svc data disable` and
+   confirmed via `ping` that `100.76.190.23` was genuinely **unreachable** —
+   the `airplane_mode` setting alone does not cut connectivity in an emulator.
+3. Recorded a day-7 candling through the real UI with zero connectivity. It
+   saved, said *"Candling saved. It will sync when online"*, and appeared
+   under "Captured on this device".
+4. Re-enabled connectivity. It synced automatically, with no manual action or
+   app restart.
+5. Confirmed **server-side, independently** via a direct database query:
+   `dayNo 7, fertile 8, clear 2`, exactly as entered offline, carrying the
+   operation id as its `clientId`, with the batch's `viableCount` correctly
+   updated 10 → 8.
 
-**Verified for real, full chain, on the emulator**: isolated test user
-(`collection-qa@test.local`) logged in through the actual UI. Disabled
-the emulator's wifi/data radios, confirmed via `ping` the network was
-actually unreachable, recorded a 40-egg collection through the real
-form — it queued locally (`"queued"`, visible immediately, zero
-connectivity). Re-enabled connectivity; WorkManager synced it
-automatically within ~15s, no manual action or restart, confirmed via
-OkHttp logs (`201 Created`) and a direct Postgres check
-(`count: 40`, correct `clientId`). Re-entering the screen showed the
-server-computed `availableCount`/`assignedCount`. Then discarded 3 eggs
-with a reason through the real dialog — confirmed via OkHttp (`200 OK`)
-and the UI updating to `available 37 · discarded 3`. Test farm/user
-cleaned up by exact ID afterward; real account confirmed untouched.
+**Found and fixed during that run, not before**: after a successful save the
+form zeroed the loss counts but left `fertile` at the submitted value, so it
+immediately displayed a false "counts don't balance" warning about a record
+that had saved correctly. The form now resets to the same balanced default it
+opened with.
 
-## Status (fifth increment, 2026-07-18): remote setpoint control (US-INC-003, Android)
+### Not built yet
 
-Extends the web-only setpoint control (see the backend/web increment
-notes) to the field app — reuses the same `POST`/`GET
-.../incubators/:id/config` endpoints, no backend changes needed.
+Remaining Phase 2 workflows (egg collection recording and discard, mortality,
+vaccination, feed, water), Phase 3 (push), Phase 4 (setpoint control) — see
+[the gap analysis](../../docs/product/field-app-gap-analysis.md) for the full
+list and [ADR 0012](../../docs/architecture/adr/0012-flutter-replaces-kotlin-android-app.md)
+for the phase plan.
 
-- **`ui/incubators/SetpointsScreen.kt` + `SetpointsViewModel.kt`**:
-  reachable via a "Setpoints" button on each incubator card (only shown
-  when a device is bound). Fetches the incubator by id (same idiom as
-  `BatchDetailViewModel` — not passed the full object through nav args),
-  prefills temp/humidity setpoint + hysteresis from the device's latest
-  telemetry snapshot, and polls `GET .../config` every 3s while the ack
-  state is `sent` or `received`, stopping once it reaches `applied` or
-  `unconfirmed`.
+Two constraints worth restating: **offline discard is blocked on the backend**
+— the discard endpoint has no idempotency key, so a replayed discard would
+double-deduct eggs (gap B1). And the sync worker runs **in-process**, not as
+an OS background job: a queued record syncs the next time the app is open and
+connected, which covers the field case but is not a true background worker.
 
-**Verified for real, full chain, on the emulator**: isolated test
-incubator/device, logged in through the real UI, confirmed the form
-prefilled with the device's actual current values (37.5/0.3/60.0/3.0),
-changed the temp setpoint and submitted — confirmed via OkHttp logs the
-real `POST .../config` call and the resulting `DeviceConfig` row.
-Published fake `received` then `applied` acks via `mosquitto_pub` (same
-technique used for the backend/web verification) and watched the
-screen's live polling correctly progress through **"v1: sent — waiting
-for device"** → **"v1: received by device — applying"** → **"v1:
-applied ✓"** with no manual refresh. Test farm/device cleaned up by
-exact ID afterward; real account confirmed untouched.
-
-## Status (sixth increment, 2026-07-18): Flock Operations — Phase 2 (US-FLK/US-VAC/US-FED/US-WTR)
-
-Extends the field app to the full Flock Operations domain: flock
-tracking, mortality/cull/sale, vaccination, and feed/water checks — all
-offline-first, same Room + WorkManager pattern as candling/hatch/
-collections.
-
-- **`ui/flocks/FlocksScreen.kt` + `FlocksViewModel.kt`**: farm-level
-  flock list (mirrors `BatchesScreen`) showing species/purpose/derived
-  stage/current count/age.
-- **`ui/flocks/FlockDetailScreen.kt` + `FlockDetailViewModel.kt`**: one
-  screen combining four offline-capable forms — mortality/cull/sale
-  (BR-009 ledger), vaccination (with a compliance hint for the next
-  due/overdue schedule item), and feed/water checks — each backed by
-  its own Room entity (`MortalityEntity`/`VaccinationEntity`/
-  `FeedLogEntity`/`WaterLogEntity`, `AppDatabase` bumped 2→3,
-  `fallbackToDestructiveMigration()`) and `SyncWorker` push loop.
-  Server data (flock detail + vaccination compliance) and the four
-  local Flow sources are combined with a small hand-rolled `Quad<A,B,C,D>`
-  (Kotlin has no built-in 4-tuple) so locally-queued records show up
-  immediately regardless of sync state, same as `BatchDetailViewModel`.
-
-**Verified for real, full chain, on the emulator**: logged into the
-isolated Phase 2 test farm/flock through the actual login UI, opened
-the flock list and detail screens and confirmed the server-computed
-metrics (`47 birds · 79 days old · Grower`), the mortality history
-table, the vaccination compliance table (5 items correctly `overdue`,
-1 `administered`, 1 `upcoming`), and the feed/water table with a
-`stage mismatch` badge — all rendered from real data, not fixtures.
-Disabled the emulator's wifi/data radios, recorded a feed check through
-the real form — it queued locally (`"queued"`, visible immediately in
-the "Not yet synced" section, zero connectivity). Re-enabled
-connectivity; `SyncWorker` synced it automatically within ~10s, no
-manual action or restart, confirmed both by the UI flipping to
-`"synced"` and independently via a direct API query against the live
-backend showing the exact `feedType`/`quantityKg` submitted offline.
-Test farm/user cleaned up by exact ID afterward; real account
-confirmed untouched.
-
-## Toolchain used to build/verify this (none of it required a separate install)
-
-- **JDK**: Android Studio's bundled JBR (`Android Studio/jbr`, OpenJDK 21)
-- **Android SDK**: already present at `%LOCALAPPDATA%\Android\Sdk`
-- **Gradle**: portable 8.9 distribution (no admin rights needed — see
-  below if setting up a new machine)
-
-```
-export JAVA_HOME="/c/Program Files/Android/Android Studio/jbr"
-./gradlew assembleDebug
-```
-
-`local.properties` (gitignored) needs `sdk.dir=` pointing at the SDK —
-**use forward slashes**, not `\\`-escaped backslashes; a single backslash
-in that file is a Java properties escape character and silently mangles
-the path (`Invalid file path` from AGP's `SdkLocator`, caught the hard
-way while first setting this up).
-
-If Gradle itself isn't installed and `choco`/admin rights aren't
-available: download the binary distribution directly —
-`https://services.gradle.org/distributions/gradle-8.9-bin.zip` — extract
-anywhere, then `gradle wrapper --gradle-version 8.9` from this directory
-generates `gradlew` properly (do this once; `gradlew` is what's tracked
-in the repo and used afterward).
+BLE device provisioning remains blocked on the firmware, as it was for the
+Kotlin app.
 
 ## Configuration
 
-`API_BASE_URL` is set in `app/build.gradle.kts` (`buildConfigField`) —
-points at nila's **Tailscale** address (`http://100.76.190.23:3001/`),
-not its LAN IP. A Tailscale address is reachable whether the phone is on
-home WiFi or anywhere else with internet, as long as Tailscale is
-connected on both ends (nila + phone) — no separate home/away config.
-Revisit if this ever needs to be configurable per-build (e.g. a release
-variant hitting a different host).
+`API_BASE_URL` defaults to nila's **Tailscale** address
+(`http://100.76.190.23:3001/`), not its LAN IP — reachable from home WiFi or
+anywhere else, as long as Tailscale is connected on both ends. Override per
+run without editing the file:
+
+```
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3001/
+```
+
+`10.0.2.2` is what an Android emulator needs to reach an API running on the
+development machine itself.
+
+## Build
+
+```
+export JAVA_HOME="/c/Program Files/Android/Android Studio/jbr"
+flutter pub get
+flutter analyze
+flutter test
+flutter run -d emulator-5554
+```
+
+Two files are gitignored and must exist locally:
+
+- `android/app/google-services.json` — the real Firebase Android config.
+  Bound to package `com.eggapp.field`, which is why the Flutter app kept that
+  exact `applicationId` rather than taking Flutter's default
+  `com.eggapp.eggapp_field`. Needed from Phase 3 on.
+- `android/local.properties` — `sdk.dir=` pointing at the Android SDK. **Use
+  forward slashes**; a single backslash is a Java properties escape character
+  and silently mangles the path.
+
+### iOS
+
+The iOS target is configured but **unverified** — it needs a Mac to build and
+sign, which the Windows machine this repo is developed on cannot do.
+
+## Test account
+
+A QA account left over from the Kotlin increments still exists on the deployed
+instance and is what Phase 1 was verified against:
+
+| | |
+|---|---|
+| Email | `android-create@test.local` |
+| Password | `android-create-pw` |
+| Farm | "Android Create QA (test — safe to delete)" |
+
+It is created by [`apps/api/android-create-verify-setup.mts`](../api/android-create-verify-setup.mts),
+which is where the password comes from — nothing here is a secret worth
+protecting, but note the farm is **live data on the deployed API**, not a
+local fixture, so anything written through it is real.
+
+The API refuses `POST /v1/setup` once any user exists, so a fresh test account
+cannot be self-provisioned; re-run that script against the database to make
+another, and delete it afterward by exact id.
 
 ## Package structure
 
 ```
-com.eggapp.field/
-  MainActivity.kt        NavHost: login -> incubators -> batches/collections/flocks -> detail screens
-  push/                  EggAppMessagingService (FCM receive + display)
-  data/                  Retrofit API client, DTOs, TokenStore, BatchCache,
-                         FieldRecordRepository (offline-first saves)
-  data/local/            Room: CandlingEntity/HatchEntity/CollectionEntity/
-                         MortalityEntity/VaccinationEntity/FeedLogEntity/WaterLogEntity, DAO, Database
-  sync/                  SyncWorker (WorkManager)
-  ui/login/               Login screen + ViewModel
-  ui/incubators/          Incubator list + setpoint control screens/ViewModels
-  ui/batch/               Batches list, batch detail + candling/hatch forms
-  ui/collections/         Egg collection recording + discard
-  ui/flocks/              Flock list, flock detail + mortality/vaccination/feed/water forms
-  ui/theme/               Compose theme (brand color matches apps/web)
+lib/
+  main.dart              wiring + logged-in/logged-out root
+  core/                  config, theme, incubation-day maths, formatting
+  data/                  api_client (auth + refresh), api_service, models, token_store
+  state/                 Session (identity, active farm)
+  ui/components/         StatusPill, AppCard, Stat, AsyncView (load/error/retry/poll)
+  ui/login/              login screen
+  ui/shell/              bottom-nav shell
+  ui/incubators/         live telemetry list
+  ui/batches/            batch list + detail (incubation day, device cross-check)
+  ui/collections/        egg collections with BR-011 storage-age bands
+  ui/flocks/             flock list + detail (mortality, vaccination, feed/water)
+  ui/alerts/             alert list
+  ui/profile/            identity, farm switcher, sign out
+test/
+  incubation_test.dart   day-count and device-mismatch rules
 ```
 
-Kapt (Room's annotation processor) is used instead of KSP — avoids a
-second Kotlin-version-matched plugin to keep in sync; falls back to
-Kotlin 1.9 language mode for the annotation-processing step only (a
-harmless warning, not an error), since kapt doesn't yet support Kotlin
-2.0's language version.
+State management is `provider` with `ChangeNotifier` — the app's shared state
+is one `Session` object, and anything heavier would be scaffolding without a
+load to carry.

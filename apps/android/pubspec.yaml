@@ -1,0 +1,47 @@
+name: eggapp_field
+description: "eggAPP field app — Android + iOS client for the Smart Poultry Farm Management System."
+publish_to: 'none'
+
+# Matches the Kotlin app this replaces (versionName 0.1.0). Phase 1 of the
+# Flutter rewrite: auth + live read screens. See README.md for the phase plan.
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  # HTTP with interceptors — the auth-header + refresh-once-on-401 behaviour
+  # needs request retry, which package:http alone does not provide.
+  dio: ^5.7.0
+  # Keystore (Android) / Keychain (iOS) token storage. Replaces the Kotlin
+  # app's EncryptedSharedPreferences, same security posture on both platforms.
+  flutter_secure_storage: ^9.2.2
+  provider: ^6.1.2
+  intl: ^0.20.2
+
+  # ── Offline field capture (FRS §8–§10) ────────────────────────────────
+  # Drift rather than raw sqflite: typed queries and a real migration path,
+  # which a queue holding un-synced field records needs — losing a queued
+  # candling session to a schema change is exactly the failure §19.1 forbids.
+  drift: ^2.20.0
+  sqlite3_flutter_libs: ^0.5.24
+  path_provider: ^2.1.4
+  path: ^1.9.0
+  # Connectivity transitions trigger sync retry (FRS §10, §19.6).
+  connectivity_plus: ^6.0.5
+  # Operation ids double as the API's idempotency key (FRS §11, BR-010).
+  uuid: ^4.5.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  drift_dev: ^2.20.0
+  build_runner: ^2.4.13
+
+flutter:
+  uses-material-design: true

@@ -8,12 +8,12 @@
 ```
 ESP32 incubator ──MQTT──▶ Broker ──▶ apps/api (Fastify)
        │                  (Docker,     │  ├─ REST API  ◀── apps/web (Next.js)
-       └────BLE────▶ Android app ──────┘  │             ◀── apps/android (Kotlin)
+       └────BLE────▶ Mobile app ───────┘  │             ◀── apps/android (Flutter)
         (provisioning,   (offline queue,  ├─ MQTT ingest module
          offline reads)   sync via REST)  ├─ background jobs (alerts, heartbeat
                                           │   timeout, reminders, FCM dispatch)
                                           └─ Prisma ──▶ Supabase Postgres (ADR 0001)
-                                     FCM ──▶ Android push
+                                     FCM ──▶ mobile push
 ```
 
 One small Docker host runs broker + api + web; Supabase hosts Postgres; FCM
@@ -25,7 +25,7 @@ the Android offline-sync pipeline like any field record (ADR 0002).
 ```
 apps/api        Fastify — routes / services / domain / infra layers
 apps/web        Next.js App Router (frontend-architect)
-apps/android    Kotlin + Compose (android-architect; Gradle, not pnpm — sibling by convention)
+apps/android    Flutter (Android + iOS; android-architect; Gradle/Dart, not pnpm — sibling by convention; ADR 0012)
 packages/db     Prisma schema + client (database-architect)
 packages/shared-types  API contract types (generated from openapi.yaml)
 infra/ci        Pipelines (security-devops-engineer)
